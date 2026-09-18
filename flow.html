@@ -984,7 +984,19 @@ body{
 .fork-3 .fork-card span{ margin-top:3px }
 .fork-card em{ display:inline; margin-left:9px; font-style:normal; font-size:10px;
   letter-spacing:.07em; text-transform:uppercase; color:var(--accent-d, #B0570F) }
-/* 「我自己填」不是卡片，是卡片下面的一行小字 */
+/* 「替真人录入」那两张（GUIDED / DIRECT）。
+   和上面三张示例卡**用同一个 .fork-card**、同一个容器、同样的间距 ——
+   气泡问的是一个问题，这五张都是它的答案，拉开距离会凭空造出
+   「先选组再选项」的层级。
+
+   唯一的区别是小标签的颜色：橙色那三个（MOBILITY / EYESIGHT / MEMORY）
+   是这套系统的三条分流，是有确切含义的词；GUIDED / DIRECT 说的是
+   录入方式，用中性灰，免得看起来像第四、第五条分流。 */
+.fork-card.is-own em{ color:var(--soft) }
+
+/* ⚠ 下面这条 .self-fill 现在没人用了 —— 那两行文字链接已经改成卡片。
+   规则留着是因为窄屏那几段里还有对它的覆盖，一起删容易漏；
+   留着不影响任何东西。以后确认无用可以整组清掉。 */
 .self-fill{ display:block; width:100%; text-align:left; align-self:flex-start;
   margin:2px 0 4px 44px; font-family:inherit; font-size:12px; font-weight:500;
   color:var(--muted); background:none; border:0; padding:4px 0; cursor:pointer }
@@ -4533,6 +4545,26 @@ body{
      哪些是我编的，那个文件顶上写清楚了。 */
   var autofilled = false;
 
+  /* 一张选择卡。三张示例老人和两条「替真人录入」共用它 ——
+     它们是同一个问题的并列选项，格式必须一致，不能一半卡片一半文字链接。
+     结构固定：<b>标题</b><em>小标签</em> 同一行，<span>副标</span> 另起一行。
+
+     ⚠ 不能叫 forkCard：第 2 步那两张卡（上传平面 / 用最接近的平面）
+     已经有一个 forkCard(title, sub, onClick)，三个参数、没有小标签。
+     函数声明会提升，同名的话后声明的那个会把先声明的整个盖掉 ——
+     于是这里的第 4 个参数没人接，addEventListener 收到一个字符串，
+     报 "parameter 2 is not of type 'Object'"，五张卡一张都出不来。 */
+  function pickCard(title, tag, sub, onPick, extra){
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'fork-card' + (extra ? ' ' + extra : '');
+    var t = document.createElement('b');    t.textContent = title;
+    var e = document.createElement('em');   e.textContent = tag;
+    var s = document.createElement('span'); s.textContent = sub;
+    b.appendChild(t); b.appendChild(e); b.appendChild(s);
+    b.addEventListener('click', onPick);
+    return b;
+  }
+
   function offerAutofill(){
     /* 开场白还没播完就有人打字了 —— 那句话是答案，别拿卡片拦在前面 */
     if (pendingIntro || !window.MNEMO_PERSONAS){ s2Ask(); return; }
@@ -4540,46 +4572,47 @@ body{
     var d = typing();
     setTimeout(function(){
       d.remove();
-      bubble('Before we start — do you want to fill this in yourself, '
-             + 'or use one of three example residents?');
+      /* 两个从句的顺序要和下面五张卡的顺序一致 —— 先三位示例，再替真人录入。
+         原来写的是「自己填，还是用示例老人」，和卡片正好反着，
+         读的顺序和选的顺序对不上。
+         另外「yourself」也不准了：自己填现在有两种（答问题 / 填卡片），
+         真正的分界是「示例的人」对「真实的人」，所以改成 someone real。 */
+      bubble('Before we start — do you want to use one of three example residents, '
+             + 'or fill this in for someone real?');
       var wrap = document.createElement('div');
       wrap.className = 'fork fork-3';
-      var mine = document.createElement('button');
+
+      /* ★ 五张卡放在**同一个**容器里，间距完全一致。
+         上面那句气泡问的是一个问题（自己填，还是用三位示例老人），
+         这五张都是这**同一个问题**的答案。
+         之前分成两组、中间拉开一段距离，等于在说「先选组、再选项」——
+         凭空造了一层并不存在的层级。
+         「这是两类东西」这件事由灰色的小标签去说就够了，不需要靠间距。
+
+         ⚠ 五张互斥：点了哪一张，整组都要撤掉。 */
+      function clearForks(){ wrap.remove(); }
+
+      /* 前三张：现成的示例老人 */
       window.MNEMO_PERSONAS.list.forEach(function(p){
-        var b = document.createElement('button');
-        b.type = 'button'; b.className = 'fork-card';
-        var t = document.createElement('b');    t.textContent = p.name + ', ' + p.age;
-        var s = document.createElement('span'); s.textContent = p.head;
-        var e = document.createElement('em');   e.textContent = p.tag;
-        b.appendChild(t); b.appendChild(e); b.appendChild(s);   /* 姓名 + 分档同一行，副标另起 */
-        b.addEventListener('click', function(){
-          /* own 在下面才创建，但 var 提升过了，这里引用得到。
-             三条入口是互斥的，选了哪一条，另外两条都得撤掉 ——
-             漏删一条就会有一行按钮孤零零留在对话里。 */
-          wrap.remove(); mine.remove(); own.remove(); runAutofill(p);
-        });
-        wrap.appendChild(b);
+        wrap.appendChild(pickCard(p.name + ', ' + p.age, p.tag, p.head, function(){
+          clearForks(); runAutofill(p);
+        }));
       });
+
+      /* 后两张：替真人录入。差别是**录入节奏**，不是录入内容 ——
+           答问题  MNEMO 一句句问，每问都带上「为什么问这个」
+           填卡片  自己一格格填，快，适合已经很清楚情况的人
+         两条最后都汇进 runFill()，填出来的卡片和方案没有任何差别。 */
+      wrap.appendChild(pickCard(
+        'I will answer for someone I know', 'GUIDED',
+        'MNEMO asks, one question at a time',
+        function(){ clearForks(); s2Ask(); }, 'is-own'));
+      wrap.appendChild(pickCard(
+        'I will fill the card in myself', 'DIRECT',
+        'Type straight into the resident card',
+        function(){ clearForks(); startCardEdit(); }, 'is-own'));
+
       thread.appendChild(wrap);
-
-      /* 两条「不用示例老人」的路，差别是录入节奏，不是录入内容：
-           答问题   —— MNEMO 一句句问，每问都带上「为什么问这个」
-           填卡片   —— 自己一格格填，快，适合已经很清楚情况的人
-         两条最后都汇进 runFill()，填出来的卡片和方案没有差别。 */
-      var own = document.createElement('button');
-      mine.type = 'button'; mine.className = 'self-fill';
-      mine.textContent = 'I will answer for someone I know' + '  →';
-      mine.addEventListener('click', function(){
-        wrap.remove(); mine.remove(); own.remove(); s2Ask();
-      });
-      thread.appendChild(mine);
-
-      own.type = 'button'; own.className = 'self-fill';
-      own.textContent = 'I will fill the card in myself' + '  →';
-      own.addEventListener('click', function(){
-        wrap.remove(); mine.remove(); own.remove(); startCardEdit();
-      });
-      thread.appendChild(own);
 
       $('gate').textContent = 'Answer a few questions to continue';
       toBottom();
