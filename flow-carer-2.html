@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MNEMOSYNE — Which of these is her flat?</title>
+
+<!-- ============================================================
+     MNEMO · 医护人员版 · 第 2 步（Their home）
+     ------------------------------------------------------------
+     对应 Figma：2346:65「CARER · 2 Their home」
+     外壳坐标全部照第 1 步（2342:65）：
+       左面板 x=121  ·  右卡 x=924,y=252  ·  对话坞 y=633
+     这一屏的核心互动：
+       下面填的门洞尺寸，会实时改写三张户型卡最后一行的比对结论。
+       ——「哪个最接近」不是靠眼睛看，是靠量出来的数算的。
+     户型缩略图直接复用 flow.html 里的 thumb-mobility-A/B/C，
+     不是我另画的，所以和家属版是同一批图。
+     ============================================================ -->
+
+<style>
+@font-face{
+  font-family:'InterLocal';
+  src:url('assets/fonts/inter-var.woff2') format('woff2-variations');
+  font-weight:100 900; font-style:normal; font-display:block;
+}
+@font-face{
+  font-family:'SpaceMonoLocal';
+  src:url('assets/fonts/space-mono-700.woff2') format('woff2');
+  font-weight:700; font-style:normal; font-display:block;
+}
+</style>
+
+<style>
+:root{
+  --cream-a:#F8ECDC; --cream-b:#F1ECE5;
+  --ink:#1A1917; --mut:#736E66; --faint:#948F87; --hint:#B0A99D; --mono-c:#8A8378;
+  --hair:#DEDAD2; --line:#CFC8BB; --hair-2:#ECE7DE;
+  --white:#FFFFFF; --soft:#F1EAE0; --chipbg:#E7DED1; --sel:#FAF3EA;
+  --accent:#ED7119; --accent-d:#B0570F; --ok:#4F6A48;
+  --r-card:14px;
+}
+*,*::before,*::after{ box-sizing:border-box }
+/* 所有 <p> 都是绝对定位 + 明确 top，浏览器默认的 1em 上边距会把
+   mono 小标整体压低 9.5px，和 Figma 对不上。 */
+p{ margin:0 }
+html{ -webkit-text-size-adjust:100%; background:var(--cream-b) }
+body{
+  margin:0;
+  font-family:'InterLocal','Inter',system-ui,-apple-system,'Segoe UI','PingFang SC',sans-serif;
+  color:var(--ink);
+  background:
+    url('assets/bg/bg-family-carer.webp') center center / cover no-repeat fixed,
+    linear-gradient(160deg,var(--cream-a) 0%,var(--cream-b) 100%);
+  -webkit-font-smoothing:antialiased; min-height:100dvh; overflow-x:hidden;
+}
+.mono{
+  font-family:'SpaceMonoLocal','Space Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-weight:700; text-transform:uppercase; letter-spacing:.09em;
+}
+
+.stagewrap{ width:100%; display:flex; justify-content:center; overflow:hidden }
+.stage{
+  position:relative; width:1440px; height:960px;
+  transform-origin:top center; transform:scale(var(--k,1)); flex:none;
+}
+
+/* ── 外壳：和第 1 步逐像素一致 ─────────────────────────── */
+.logo{ position:absolute; left:34px; top:38px; width:68px; height:68px; object-fit:contain }
+.exit{
+  position:absolute; left:40px; top:847px; width:56px; height:56px;
+  border-radius:50%; background:var(--white); border:1px solid var(--hair);
+  display:grid; place-items:center; color:var(--mut); text-decoration:none; cursor:pointer;
+  transition:box-shadow .2s ease, color .18s ease, transform .14s ease;
+}
+.exit:hover{ box-shadow:0 6px 16px rgba(80,66,48,.14); color:var(--ink) }
+.exit:active{ transform:scale(.95) }
+.exit:focus-visible{ outline:2px solid var(--accent); outline-offset:3px }
+.exit-label{ position:absolute; left:43px; top:908px; margin:0; font-size:7.5px; color:var(--mut); letter-spacing:.06em }
+
+h1.title{
+  position:absolute; left:140px; top:44px; margin:0; width:900px;
+  font-size:34px; line-height:1.1; letter-spacing:-.022em; font-weight:700;
+}
+p.sub{ position:absolute; left:140px; top:94px; margin:0; width:700px; font-size:14.5px; line-height:21px; color:var(--mut) }
+
+.stepchip{
+  position:absolute; left:1218px; top:52px; width:174px; height:36px;
+  border-radius:18px; background:var(--white); border:1px solid var(--hair);
+  display:flex; align-items:center; gap:10px; padding-left:20px;
+}
+.stepchip i{ width:8px; height:8px; border-radius:50%; background:var(--accent); flex:none }
+.stepchip span{ font-size:11px; color:var(--mut) }
+
+.steps{ position:absolute; left:121px; top:152px; width:948px; height:30px }
+.steps > div{ position:absolute; top:0; width:150px; height:30px }
+.steps b{ position:absolute; top:0; left:0; width:150px; height:3px; border-radius:2px; background:var(--hair); display:block }
+.steps s{
+  position:absolute; top:14px; left:0; white-space:nowrap; text-decoration:none;
+  font-size:9.5px; color:var(--faint);
+  font-family:'SpaceMonoLocal','Space Mono',monospace; font-weight:700;
+  text-transform:uppercase; letter-spacing:.09em;
+}
+.steps .on b{ background:var(--accent) }
+.steps .on s{ color:var(--ink) }
+.steps a{ text-decoration:none; cursor:pointer }
+.steps a:hover s{ color:var(--accent-d) }
+
+.visit{
+  position:absolute; left:121px; top:206px; height:26px; padding:0 18px;
+  border-radius:13px; background:var(--ink); display:flex; align-items:center;
+  font-size:9.5px; color:#F6EFE5;
+}
+.when{ position:absolute; left:249px; top:212px; font-size:13.5px; line-height:16px; color:var(--mut) }
+.saved{ position:absolute; right:48px; top:213px; text-align:right; font-size:9.5px; color:var(--faint) }
+
+/* ── 左：户型比对面板 ───────────────────────────────────── */
+.panel{
+  position:absolute; left:121px; top:252px; width:760px; height:548px;
+  background:var(--white); border:1px solid var(--hair); border-radius:var(--r-card);
+}
+.gtitle{ position:absolute; font-size:9.5px; color:var(--mono-c) }
+.divider{ position:absolute; height:1px; background:var(--hair) }
+
+.tcard{
+  position:absolute; top:58px; width:221px; height:240px;
+  border-radius:12px; border:1px solid var(--line); background:var(--white);
+  cursor:pointer; text-align:left; padding:0; font-family:inherit;
+  transition:border-color .18s ease, background .18s ease, box-shadow .2s ease;
+}
+.tcard:hover{ border-color:var(--mut) }
+.tcard[aria-pressed="true"]{ border:1.5px solid var(--accent); background:var(--sel) }
+.tcard:focus-visible{ outline:2px solid var(--accent); outline-offset:2px }
+.tcard .plan{
+  position:absolute; left:16px; top:16px; width:150px; height:106px;
+  background:#F7F4EF; border:1px solid var(--hair-2); border-radius:6px; overflow:hidden;
+}
+.tcard .plan svg{ display:block; width:150px; height:106px }
+.tcard .radio{
+  position:absolute; left:185px; top:20px; width:20px; height:20px; border-radius:50%;
+  border:1.5px solid var(--line); background:transparent;
+}
+.tcard[aria-pressed="true"] .radio{ border-color:var(--ink); background:var(--ink) }
+.tcard[aria-pressed="true"] .radio::after{
+  content:''; position:absolute; left:5.5px; top:5.5px; width:7px; height:7px;
+  border-radius:50%; background:var(--white);
+}
+.tcard .tname{ position:absolute; left:16px; top:138px; font-size:10px; color:var(--ink) }
+.tcard .rooms{ position:absolute; left:16px; top:164px; font-size:12.5px; color:var(--mut) }
+.tcard .door { position:absolute; left:16px; top:184px; font-size:12.5px; font-weight:500; color:var(--ink) }
+.tcard .mark {
+  position:absolute; left:16px; top:206px; width:189px;
+  font-size:12px; line-height:16px; color:var(--hint);
+}
+.tcard .mark.ok{ color:var(--ok); font-weight:500 }
+/* 这三张图是按哪一项挑的 —— 不说明的话，换了状况图跟着变会像是随机的 */
+.tracknote{ position:absolute; right:32px; top:30px; max-width:420px; text-align:right;
+  font-size:8.5px; line-height:12px; color:var(--hint) }
+.tracknote.warn{ color:#C0442B }
+.fits{ position:absolute; left:32px; top:508px; width:696px;
+  font-size:12px; line-height:16px; color:var(--mut) }
+.fits b{ font-weight:500; color:var(--accent-d) }
+.fits.ok b{ color:var(--ok) }
+
+.none{
+  position:absolute; left:32px; top:318px; width:696px; height:56px;
+  border-radius:12px; border:1px dashed var(--line); background:transparent;
+  cursor:pointer; text-align:left; padding:0; font-family:inherit;
+  transition:border-color .18s ease, background .18s ease;
+}
+.none:hover{ border-color:var(--mut) }
+.none[aria-pressed="true"]{ border:1.5px solid var(--accent); border-style:solid; background:var(--sel) }
+.none:focus-visible{ outline:2px solid var(--accent); outline-offset:2px }
+.none .nt{ position:absolute; left:24px; top:14px; font-size:13.5px; font-weight:500; color:var(--ink) }
+.none .ns{ position:absolute; left:24px; top:32px; font-size:12px; color:var(--hint) }
+.none .ng{ position:absolute; right:24px; top:20px; font-size:12.5px; font-weight:500; color:var(--accent-d) }
+
+/* ── 第 2 步开头的岔路口（2026-09-16）────────────────────
+   项目最初的设想是"上传任意平面 → 解析 → 生成"，00-可行性判断.md 判过：
+   难的只有「图 → 干净的墙体几何」，而难在「任意」两个字。这一版先不做，
+   但**入口要留着** —— 看不见入口的话，整套系统看起来就只是九张画死的平面。
+
+   ⚠ 这一版做成**盖在面板上的一层**，不是插在三张卡上面 ——
+   这一屏是死坐标排的（卡 58..298、None 318..374、分隔线 402、实测 440），
+   要在上面塞一行得把整块往下推 76px，而面板底 800 下面只剩到 858 那个
+   Continue 按钮，推不动。盖一层则一个坐标都不用动。
+   只在第一次进这一步时拦一道，选完就不再出现 —— 这一版的用户随时会被
+   叫走，不该每次回到这一屏都重问一遍。 */
+.gate2{ position:absolute; inset:0; z-index:5; background:var(--white);
+  border-radius:var(--r-card); padding:30px 32px; overflow:auto }
+.gate2 h2{ margin:0; font-size:17px; font-weight:600; color:var(--ink) }
+.gate2 > p{ margin:6px 0 0; font-size:12.5px; color:var(--mut) }
+.g2row{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:20px }
+.g2card{ text-align:left; padding:18px 20px; border-radius:12px; cursor:pointer;
+  background:var(--white); border:1px solid var(--line); font-family:inherit;
+  transition:border-color .18s ease, background .18s ease, box-shadow .2s ease }
+.g2card:hover{ border-color:var(--mut); box-shadow:0 8px 20px rgba(80,66,48,.10) }
+.g2card:focus-visible{ outline:2px solid var(--accent); outline-offset:2px }
+.g2card b{ display:block; font-size:13.5px; font-weight:600; color:var(--ink) }
+.g2card span{ display:block; margin-top:6px; font-size:12px; line-height:17px; color:var(--mut) }
+.g2nb{ margin-top:18px; padding:18px 20px; border-radius:12px;
+  background:var(--soft); border:1px solid var(--hair-2) }
+.g2nb h3{ margin:0 0 8px; font-size:13.5px; font-weight:600; color:var(--ink) }
+.g2nb ol{ margin:0; padding-left:18px; font-size:12px; line-height:19px; color:var(--mut) }
+.g2nb ol b{ color:var(--ink) }
+.g2nb ol .hard{ color:var(--accent-d); font-weight:600 }
+.g2nb p{ margin:10px 0 0; font-size:12px; line-height:17px; color:var(--mut) }
+.g2go{ margin-top:14px; font-family:inherit; font-size:12.5px; font-weight:500;
+  color:var(--ink); background:var(--chipbg); border:1px solid var(--line);
+  border-radius:999px; padding:9px 18px; cursor:pointer }
+.g2go:hover{ border-color:var(--mut) }
+.g2go:focus-visible{ outline:2px solid var(--accent); outline-offset:2px }
+
+/* 加了依据来源之后一行放不下（991 > 696），换成两行。
+   面板也跟着从 504 长到 548 —— Figma 那张也要同步。 */
+.mrow{ position:absolute; left:32px; top:440px; width:696px;
+  display:flex; flex-wrap:wrap; gap:10px; row-gap:10px }
+.mchip{
+  height:30px; border-radius:15px; background:var(--chipbg);
+  display:flex; align-items:center; gap:7px; padding:0 14px;
+  transition:box-shadow .18s ease;
+}
+/* 不合法的时候红一下线，旁边写清楚为什么 —— 不拦输入，拦着比标出来更烦 */
+.mchip input.bad{ color:#C0442B }
+.mchip .why{ font-style:normal; font-size:10px; color:#C0442B; white-space:nowrap; margin-left:2px }
+.mchip:focus-within{ box-shadow:0 0 0 2px var(--accent) }
+.mchip > span{ font-size:12.5px; color:var(--mut); white-space:nowrap }
+.mchip > b{ font-size:12.5px; font-weight:500; color:var(--mut) }
+.mchip input{
+  border:0; background:transparent; outline:none; padding:0;
+  font-family:inherit; font-size:12.5px; font-weight:500; color:var(--ink);
+}
+.mchip input::placeholder{ color:var(--hint); font-weight:400 }
+/* 依据来源：做成药丸里的一小段后缀，点一下循环。
+   不另起一行，是为了不动 Figma 定下的面板高度。 */
+.mchip .bs{
+  margin-left:2px; padding:0 8px; height:20px; border-radius:10px; border:0;
+  background:rgba(0,0,0,.05); cursor:pointer; white-space:nowrap;
+  font-family:'SpaceMonoLocal','Space Mono',monospace; font-weight:700;
+  text-transform:uppercase; letter-spacing:.09em; font-size:8.5px;
+  color:var(--mut); transition:background .16s ease, color .16s ease;
+}
+.mchip .bs:hover{ background:rgba(0,0,0,.10); color:var(--ink) }
+.mchip .bs:focus-visible{ outline:2px solid var(--accent); outline-offset:1px }
+.mchip .bs[data-b="measured"]{ color:var(--ink) }
+.mchip .bs[data-b="told"]{ color:var(--mut) }
+.mchip .bs[data-b="records"]{ color:var(--hint) }
+.mchip .bs[hidden]{ display:none }
+
+/* ── 右：档案回显 ───────────────────────────────────────── */
+.file{
+  position:absolute; left:924px; top:252px; width:468px; height:380px;
+  background:var(--white); border:1px solid var(--hair); border-radius:var(--r-card);
+}
+.file .lab{ position:absolute; left:26px; top:24px; font-size:9.5px; color:var(--mono-c) }
+.file .state{
+  position:absolute; right:26px; top:18px; height:22px; padding:0 12px;
+  border-radius:11px; border:1px solid var(--accent-d); display:flex; align-items:center;
+  font-size:9.5px; color:var(--accent-d); white-space:nowrap;
+}
+.file .who{ position:absolute; left:26px; top:56px; margin:0; font-size:21px; line-height:25px; font-weight:600; letter-spacing:-.01em }
+.file .who.empty{ color:var(--hint); font-weight:400 }
+.file .meta{ position:absolute; left:26px; top:88px; margin:0; font-size:13px; line-height:16px; color:var(--mut) }
+.file .hair{ position:absolute; left:26px; width:416px; height:1px; background:var(--hair) }
+.file .row{ position:absolute; left:26px; width:416px; height:16px }
+.file .row .k{ position:absolute; left:0; top:3px; font-size:9.5px; color:var(--faint) }
+.file .row .v{
+  position:absolute; right:0; top:0; max-width:300px; font-size:13px; line-height:16px;
+  font-weight:500; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.file .row .v.blank{ font-weight:400; color:var(--hint) }
+.file .pct{ position:absolute; left:26px; top:326px; font-size:9.5px; color:var(--mono-c) }
+.file .track{ position:absolute; left:26px; top:348px; width:416px; height:6px; border-radius:3px; background:var(--chipbg); overflow:hidden }
+.file .track i{ display:block; height:6px; width:0; border-radius:3px; background:var(--accent); transition:width .35s cubic-bezier(.22,1,.36,1) }
+
+/* ── 右下：对话坞 ───────────────────────────────────────── */
+.dock{ position:absolute; left:924px; top:633px; width:468px; height:156px; background:var(--soft); border-radius:var(--r-card) }
+.dock .av{ position:absolute; left:26px; top:30px; width:34px; height:34px; border-radius:50% }
+.dock .msgs{
+  position:absolute; left:74px; top:26px; width:368px; height:60px;
+  overflow-y:auto; overscroll-behavior:contain;
+  font-size:13.5px; line-height:20px; color:var(--mut); scrollbar-width:thin;
+}
+.dock .msgs p{ margin:0 0 8px }
+.dock .msgs p:last-child{ margin-bottom:0 }
+.dock .msgs p.me{ color:var(--ink); font-weight:500 }
+.dock .msgs p.ok{ color:var(--accent-d) }
+.composer{
+  position:absolute; left:26px; top:96px; width:416px; height:44px;
+  background:var(--white); border:1px solid var(--hair); border-radius:22px;
+  display:flex; align-items:center;
+}
+.composer input{
+  flex:1; min-width:0; height:42px; border:0; background:transparent; outline:none;
+  padding:0 8px 0 22px; font-family:inherit; font-size:13.5px; color:var(--ink);
+}
+.composer input::placeholder{ color:var(--hint) }
+.send{
+  width:32px; height:32px; margin-right:6px; flex:none; border-radius:50%; border:0;
+  background:var(--ink); color:var(--accent); display:grid; place-items:center; cursor:pointer;
+  font-size:14px; line-height:1; font-family:inherit; transition:transform .14s ease, opacity .2s ease;
+}
+.send:hover{ transform:scale(1.06) }
+.send:disabled{ opacity:.45; cursor:default; transform:none }
+.send:focus-visible{ outline:2px solid var(--accent); outline-offset:2px }
+.dots i{
+  display:inline-block; width:4px; height:4px; margin-right:3px; border-radius:50%;
+  background:var(--faint); animation:blip 1.05s infinite ease-in-out;
+}
+.dots i:nth-child(2){ animation-delay:.14s }
+.dots i:nth-child(3){ animation-delay:.28s }
+@keyframes blip{ 0%,60%,100%{ opacity:.25 } 30%{ opacity:1 } }
+
+/* 被自然语言改动的地方闪一下 */
+@keyframes flash{ 0%{ background:rgba(237,113,25,.18) } 100%{ background:transparent } }
+.justfilled{ animation:flash .9s ease-out }
+
+.next{
+  position:absolute; left:1112px; top:858px; width:286px; height:44px;
+  border-radius:22px; background:var(--ink); border:0; cursor:pointer;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 20px 0 22px; font-family:inherit;
+  transition:transform .14s ease, box-shadow .2s ease, opacity .2s ease;
+}
+.next span{ font-size:13.5px; font-weight:600; color:#F6EFE5 }
+.next em{ font-style:normal; color:var(--accent); font-size:15px }
+.next:hover{ transform:translateY(-1px); box-shadow:0 8px 20px rgba(40,32,22,.22) }
+.next:disabled{ opacity:.4; cursor:default; transform:none; box-shadow:none }
+.next:focus-visible{ outline:2px solid var(--accent); outline-offset:3px }
+.nextnote{
+  position:absolute; left:1112px; top:910px; width:286px; margin:0;
+  font-size:11.5px; color:var(--mut); text-align:right; opacity:0; transition:opacity .25s ease;
+}
+.nextnote.show{ opacity:1 }
+
+@media (prefers-reduced-motion:reduce){ *{ animation-duration:.001ms !important; transition-duration:.001ms !important } }
+
+/* 签完字之后的横幅。位置在录入面板正上方，和「上下文带」同一行高度 */
+.lockbar{ position:absolute; left:121px; top:884px; width:900px;
+  font-size:9px; line-height:13px; color:#B0570F; letter-spacing:.06em;
+  text-transform:none; }
+</style>
+</head>
+
+<body>
+<div class="stagewrap" id="stagewrap">
+<div class="stage" id="stage">
+
+  <img class="logo" src="assets/logo.png" alt="MNEMOSYNE">
+  <a class="exit" href="./flow-carer.html" aria-label="Back to step 1">
+    <svg width="14" height="10" viewBox="0 0 14 10" fill="none" aria-hidden="true">
+      <path d="M5 1 1 5l4 4M1 5h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </a>
+  <p class="exit-label mono">SAVE&amp;EXIT</p>
+
+  <h1 class="title">Which of these is her flat?</h1>
+  <p class="sub">Pick the closest. I check your measurements against it.</p>
+
+  <div class="stepchip"><i></i><span class="mono">STEP 2 OF 5</span></div>
+
+  <nav class="steps" aria-label="Progress">
+    <div class="on" style="left:0"><b></b><a href="./flow-carer.html"><s>PROFILE</s></a></div>
+    <div class="on" style="left:162px"><b></b><s>THEIR HOME</s></div>
+    <div style="left:324px"><b></b><s>LAYOUTS</s></div>
+    <div style="left:486px"><b></b><s>PREVIEW</s></div>
+    <div style="left:648px"><b></b><s>HANDOVER</s></div>
+  </nav>
+
+  <div class="visit mono">FIRST FILE</div>
+  <p class="when" id="when">&nbsp;</p>
+  <p class="saved mono" id="saved">AUTOSAVED &nbsp;·&nbsp; NOTHING SIGNED YET</p>
+
+  <!-- ══ 左：三型并排比对 ══════════════════════════════════ -->
+  <section class="panel" aria-label="Closest standard type">
+    <p class="gtitle mono" style="left:32px;top:30px">CLOSEST STANDARD TYPE</p>
+    <p class="tracknote mono" id="trackNote">&nbsp;</p>
+
+    <button type="button" class="tcard" id="t-A" style="left:32px"  aria-pressed="false">
+      <span class="plan" data-plan="A"></span><span class="radio"></span>
+      <span class="tname mono">TYPE A</span>
+      <span class="rooms" data-rooms="A">&nbsp;</span>
+      <span class="door"  data-dim="A">&nbsp;</span>
+      <span class="mark"  data-mark="A">&nbsp;</span>
+    </button>
+    <button type="button" class="tcard" id="t-B" style="left:269px" aria-pressed="false">
+      <span class="plan" data-plan="B"></span><span class="radio"></span>
+      <span class="tname mono">TYPE B</span>
+      <span class="rooms" data-rooms="B">&nbsp;</span>
+      <span class="door"  data-dim="B">&nbsp;</span>
+      <span class="mark"  data-mark="B">&nbsp;</span>
+    </button>
+    <button type="button" class="tcard" id="t-C" style="left:506px" aria-pressed="false">
+      <span class="plan" data-plan="C"></span><span class="radio"></span>
+      <span class="tname mono">TYPE C</span>
+      <span class="rooms" data-rooms="C">&nbsp;</span>
+      <span class="door"  data-dim="C">&nbsp;</span>
+      <span class="mark"  data-mark="C">&nbsp;</span>
+    </button>
+
+    <button type="button" class="none" id="tNone" aria-pressed="false">
+      <span class="nt">None of these</span>
+      <span class="ns">Describe her flat and I will note it as unverified</span>
+      <span class="ng">Describe it &nbsp;→</span>
+    </button>
+
+    <div class="divider" style="left:32px;top:402px;width:696px"></div>
+    <p class="gtitle mono" style="left:32px;top:418px">WHAT YOU MEASURED TODAY</p>
+
+    <div class="mrow">
+      <label class="mchip"><span>Doorway</span><em class="why"></em>
+        <input id="m-door" data-k="doorway" inputmode="numeric" style="width:34px" placeholder="—"><b>mm</b><button type="button" class="bs" id="b-doorway" data-bk="bDoorway" hidden></button></label>
+      <label class="mchip"><span>Corridor</span><em class="why"></em>
+        <input id="m-corr" data-k="corridor" inputmode="numeric" style="width:34px" placeholder="—"><b>mm</b><button type="button" class="bs" id="b-corridor" data-bk="bCorridor" hidden></button></label>
+      <label class="mchip"><span>Bath</span><em class="why"></em>
+        <input id="m-bath" data-k="bath" style="width:78px" placeholder="—"><button type="button" class="bs" id="b-bath" data-bk="bBath" hidden></button></label>
+      <label class="mchip"><span>Turning space</span>
+        <input id="m-turn" data-k="turning" style="width:52px" placeholder="—"><button type="button" class="bs" id="b-turning" data-bk="bTurning" hidden></button></label>
+    </div>
+
+    <!-- 真正该做的比对：你量到的 vs 她需要的。两个数都是真的 ——
+         量的是你量的，需求是第 1 步她的状况推出来的。
+         之前拿「房型标准门洞」当基准，那个数是编的。 -->
+    <p class="fits" id="fits">&nbsp;</p>
+  </section>
+
+  <!-- ══ 右：档案回显 ══════════════════════════════════════ -->
+  <aside class="file" aria-label="Client file" aria-live="polite">
+    <p class="lab mono">CLIENT FILE</p>
+    <div class="state mono" id="state">NOT SAVED YET</div>
+    <p class="who empty" id="fWho">No name yet</p>
+    <p class="meta" id="fMeta">Nothing recorded</p>
+    <div class="hair" style="top:122px"></div>
+
+    <div class="row" style="top:144px"><span class="k mono">STANDARD TYPE</span>  <span class="v blank" id="vStd">not chosen</span></div>
+    <div class="row" style="top:170px"><span class="k mono">DOORWAY</span>        <span class="v blank" id="vDoor">—</span></div>
+    <div class="row" style="top:196px"><span class="k mono">CORRIDOR</span>       <span class="v blank" id="vCorr">—</span></div>
+    <div class="row" style="top:222px"><span class="k mono">TURNING SPACE</span>  <span class="v blank" id="vTurn">—</span></div>
+    <div class="row" style="top:248px"><span class="k mono">HOME TYPE</span>      <span class="v blank" id="vHome">—</span></div>
+    <!-- 同意范围那一行删了，换成第 1 步推出来的需求 ——
+         这一屏正在量的就是这几个尺寸，要求摆在旁边才对得上。 -->
+    <div class="row" style="top:274px"><span class="k mono">SHE NEEDS</span>      <span class="v blank" id="vNeed">—</span></div>
+
+    <div class="hair" style="top:310px"></div>
+    <p class="pct mono" id="pct">FILE 0% COMPLETE &nbsp;·&nbsp; NOTHING SIGNED YET</p>
+    <div class="track"><i id="bar"></i></div>
+  </aside>
+
+  <!-- ══ 右下：对话（配角） ════════════════════════════════ -->
+  <div class="dock">
+    <img class="av" src="assets/logo.png" alt="">
+    <div class="msgs" id="msgs">
+      <p id="lead">Her flat is not one of these? Tell me what is different and I will note it against the file.</p>
+    </div>
+    <form class="composer" id="composer">
+      <input id="say" autocomplete="off" placeholder="Ask MNEMO, or describe the flat…" aria-label="Ask MNEMO, or describe the flat">
+      <button class="send" id="send" type="submit" aria-label="Send">→</button>
+    </form>
+  </div>
+
+  <button class="next" id="next" type="button"><span>Continue — layouts</span><em>→</em></button>
+  <p class="nextnote" id="nextnote"></p>
+
+</div>
+</div>
+
+<script src="assets/llm.js?v=20260917"></script>
+<script src="assets/nlu-rules.js"></script>
+<script src="assets/carer-core.js?v=20260917"></script>
+<script>
+(function(){
+'use strict';
+var C = window.MNEMO_CARER, $ = C.$, data = C.data;
+
+/* 三个户型的门洞是硬数据。卡片最后一行的结论由它和实测值算出来，
+   不是写死的文案 —— 这一屏的全部意义就在这里。 */
+/* 户型的门洞尺寸原来写死成 760/800/850 —— 那三个数是编的，
+   家属版的 PLAN_SETS 里根本没有门洞这一项。现在卡片只说这套图
+   真有的东西（房间数 / 面积 / 开间），够不够她用挪到实测值那一排去判断。 */
+
+/* 三张房型卡下面那行小字。
+   现在说的是这套平面属于哪一档、这一型有多大 —— 而不是拿一个
+   编出来的门洞去和她比。 */
+function markFor(k){
+  /* 开间已经在上面那行显示了，这里只补面积，别重复 */
+  return { text: C.planType(k).area, ok:false };
+}
+
+/* 按「哪一项最严重」把三张缩略图换成对应那一套。
+   平面模板在 assets/carer-layouts.html 里，thumb-<分流>-<户型>。 */
+var planLoadFailed = false;
+function paintPlans(){
+  var track = C.track();
+  if (planLoadFailed){
+    var el0 = document.getElementById('trackNote');
+    if (el0) el0.innerHTML = 'Plans could not load — open this through the local server, not by double-clicking the file';
+    if (el0) el0.classList.add('warn');
+    return;
+  }
+  ['A','B','C'].forEach(function(k){
+    var host = document.querySelector('.plan[data-plan="' + k + '"]');
+    if (!host) return;
+    var tpl = document.getElementById('thumb-' + track + '-' + k)
+           || document.getElementById('thumb-mobility-' + k);
+    host.innerHTML = tpl ? tpl.innerHTML : '';
+    var t = C.planType(k);
+    var r = document.querySelector('[data-rooms="' + k + '"]');
+    var d = document.querySelector('[data-dim="' + k + '"]');
+    if (r) r.textContent = t.rooms;
+    if (d) d.textContent = t.dim;
+  });
+
+  /* 这一套是按哪一项挑的，得说出来 —— 不说的话三套图长得不一样
+     会让人以为是随机的。并列时也讲明白，因为这一版没有追问那一步。 */
+  var lab = C.TRACK_LABEL[track]['en'];
+  var tied = C.trackTied(), el = document.getElementById('trackNote');
+  if (!el) return;
+  if (C.needWeight('mobility') < 0 && C.needWeight('vision') < 0 && C.needWeight('memory') < 0)
+    el.textContent = 'Nothing recorded yet — showing the mobility set';
+  else if (tied.length > 1)
+    el.textContent = (tied.map(function(x){ return C.TRACK_LABEL[x].en; }).join(' and ') + ' scored the same — showing the ' + lab + ' set');
+  else
+    el.textContent = ('Chosen for her ' + lab);
+}
+
+/* 你量到的够不够她用。只有两个数都真的存在才说话：
+   门洞是你量的，要求是第 1 步她的状况推出来的。缺一个就闭嘴。 */
+function paintFits(){
+  var el = $('fits'); if (!el) return;
+  var n = C.needs();
+  if (!n){
+    el.innerHTML = 'Record how she gets around and I will tell you whether what you measured is enough.';
+    el.classList.remove('ok');
+    return;
+  }
+  var bits = [], allOk = true;
+  function cmp(lab, got, want){
+    if (!(got > 0) || !want) return;
+    if (got >= want) bits.push(lab + ' <b>' + got + '</b> ≥ the ' + want + ' she needs');
+    else { allOk = false;
+      bits.push(lab + ' <b>' + got + '</b> — ' + (want - got) + ' mm short of ' + want); }
+  }
+  cmp('Doorway',  parseInt(data.doorway,10),  n.door);
+  cmp('Corridor', parseInt(data.corridor,10), n.corridor);
+  if (!bits.length){
+    el.innerHTML = 'No doorway or corridor measured yet.';
+    el.classList.remove('ok');
+    return;
+  }
+  el.innerHTML = bits.join(' &nbsp;·&nbsp; ');
+  el.classList.toggle('ok', allOk);
+}
+
+/* 三套缩略图和第 3/4 步的方案图放在同一个文件里，运行时取。
+   取不到就留空框，不弹错 —— 和第 3 步一样的处理。 */
+fetch('assets/carer-layouts.html')
+  .then(function(r){ return r.ok ? r.text() : Promise.reject(0); })
+  .then(function(html){
+    var holder = document.createElement('div');
+    holder.style.display = 'none';
+    holder.innerHTML = html;
+    document.body.appendChild(holder);
+    paintPlans();
+  })
+  .catch(function(){
+    /* fetch 在 file:// 下会被 CORS 挡掉 —— 双击 HTML 打开就是这个下场。
+       原来只是静默走占位，用户看到三个空框，不知道发生了什么。 */
+    planLoadFailed = true;
+    paintPlans();
+  });
+
+/* ── 第 2 步开头的岔路口（2026-09-16）────────────────────
+   上传那条留着入口，但这一版只做了「从最接近的标准户型开始」。
+   点上传给的是那条链路和不做的理由（逐字取自 00-可行性判断.md），
+   不是一句"暂未开放"。选过一次就记下来，不再拦。 */
+var G2_KEY = 'mnemo:carer:forked';
+function g2Done(){ try{ return sessionStorage.getItem(G2_KEY) === '1'; }catch(e){ return false; } }
+function g2Mark(){ try{ sessionStorage.setItem(G2_KEY,'1'); }catch(e){} }
+
+var NB_STEPS = [
+  ['Upload the picture',                 'already works', 0],
+  ['Picture \u2192 clean wall geometry',  'the hard one',  1],
+  ['Set the scale',                      'a picture carries no real dimensions', 0],
+  ['Measure areas, doorways, corridors', 'polygon maths, not hard', 0],
+  ['Geometry \u2192 3D',                  'extrude the walls, not hard', 0]
+];
+function g2Card(title, sub, fn){
+  var b = document.createElement('button');
+  b.type = 'button'; b.className = 'g2card';
+  var t = document.createElement('b'); t.textContent = title;
+  var p = document.createElement('span'); p.textContent = sub;
+  b.appendChild(t); b.appendChild(p);
+  b.addEventListener('click', fn);
+  return b;
+}
+/* 岔路口盖着的时候，页头问的还是「哪一个是她的家」—— 和屏幕上问的不是
+   一件事。换掉，关掉时再还原。 */
+var G2_TITLE = { t:'', s:'' };
+function g2Title(on){
+  var t = document.querySelector('.title'), sub = document.querySelector('.sub');
+  if (!t || !sub) return;
+  if (on){
+    G2_TITLE.t = t.textContent; G2_TITLE.s = sub.textContent;
+    t.textContent = 'How should we start?';
+    sub.textContent = 'One of these is not built yet. Open it and I will tell you what it would take.';
+  } else if (G2_TITLE.t){
+    t.textContent = G2_TITLE.t; sub.textContent = G2_TITLE.s;
+  }
+}
+function g2Build(){
+  if (g2Done()) return;
+  var panel = document.querySelector('.panel'); if (!panel) return;
+  g2Title(true);
+  var g = document.createElement('div');
+  g.className = 'gate2'; g.id = 'gate2';
+  var h = document.createElement('h2'); h.textContent = 'Two ways to get her home in here.';
+  g.appendChild(h);
+  var row = document.createElement('div'); row.className = 'g2row';
+  row.appendChild(g2Card('Upload her plan', 'A photo or a PDF of the floor plan.', g2NotBuilt));
+  row.appendChild(g2Card('Start from the closest standard type',
+    'Three types that match what you recorded. Pick the nearest.', g2Close));
+  g.appendChild(row);
+  panel.appendChild(g);
+}
+function g2Close(){
+  g2Mark();
+  g2Title(false);
+  var g = document.getElementById('gate2'); if (g) g.remove();
+}
+function g2NotBuilt(){
+  var g = document.getElementById('gate2'); if (!g) return;
+  if (g.querySelector('.g2nb')) return;
+  var box = document.createElement('div'); box.className = 'g2nb';
+  var h = document.createElement('h3'); h.textContent = 'Not built yet.';
+  box.appendChild(h);
+  var ol = document.createElement('ol');
+  NB_STEPS.forEach(function(r){
+    var li = document.createElement('li');
+    var b = document.createElement('b'); b.textContent = r[0];
+    var sp = document.createElement('span');
+    if (r[2]) sp.className = 'hard';
+    sp.textContent = '  \u2014  ' + r[1];
+    li.appendChild(b); li.appendChild(sp); ol.appendChild(li);
+  });
+  box.appendChild(ol);
+  var p1 = document.createElement('p');
+  p1.innerHTML = 'Step 2 is hard because of the word <b>any</b>. Every practice draws walls, '
+    + 'doors and dimension chains differently, and a phone photo of a printed drawing looks '
+    + 'nothing like the clean datasets these models are tested on.';
+  box.appendChild(p1);
+  var p2 = document.createElement('p');
+  p2.textContent = 'This is planning a home for someone who cannot move freely. Get a corridor '
+    + 'wrong by 100 mm and the wheelchair does not fit. Where safety is involved, asking when '
+    + 'unsure is better than guessing quietly \u2014 so this version works from types that have '
+    + 'already been drawn and checked, and you record what you measured against them.';
+  box.appendChild(p2);
+  var go = document.createElement('button');
+  go.type = 'button'; go.className = 'g2go';
+  go.textContent = 'Start from the closest standard type instead';
+  go.addEventListener('click', g2Close);
+  box.appendChild(go);
+  g.appendChild(box);
+}
+g2Build();
+
+/* ── 选户型 ───────────────────────────────────────────── */
+['A','B','C'].forEach(function(k){
+  $('t-' + k).addEventListener('click', function(){
+    data.homeStd = (data.homeStd === 'Type ' + k) ? '' : 'Type ' + k;
+    C.stamp(); C.render();
+  });
+});
+$('tNone').addEventListener('click', function(){
+  data.homeStd = (data.homeStd === 'Non-standard') ? '' : 'Non-standard';
+  C.stamp(); C.render();
+  if (data.homeStd) $('say').focus();
+});
+
+/* ── 实测值 ───────────────────────────────────────────── */
+var minputs = {};
+Array.prototype.forEach.call(document.querySelectorAll('.mchip input'), function(el){
+  var k = el.getAttribute('data-k');
+  minputs[k] = el;
+  el.value = data[k] || '';
+  el.addEventListener('input', function(){
+    /* 尺寸字段过一遍校验：abc / -500 / 12.5 / 999999 原来全都照收，
+       999999 还会得出「够她用」—— 一个六米宽的门。 */
+    var r = C.checkNum(k, el.value);
+    data[k] = r.v;
+    el.classList.toggle('bad', !r.ok);
+    el.title = r.ok ? '' : r.why;
+    var lab = el.parentNode.querySelector('.why');
+    if (lab) lab.textContent = r.ok ? '' : r.why;
+    C.stamp(); C.render();
+  });
+});
+function bKey(k){ return 'b' + k.charAt(0).toUpperCase() + k.slice(1); }
+
+function fillM(k, v){
+  /* 自然语言填进来的数也要过一遍校验，和手打的一视同仁 */
+  if (C.LIMITS[k]){
+    var chk = C.checkNum(k, v);
+    if (!chk.ok || !chk.v) return false;
+    v = chk.v;
+  }
+  if (!v || data[k] === String(v)) return false;
+  data[k] = String(v);
+  /* 填了数就得有依据。默认「你量的」—— 这是最常见也最强的那一档，
+     但医护随时能点一下改，所以不算替她做判断。 */
+  if (!data[bKey(k)]) data[bKey(k)] = 'measured';
+  if (minputs[k]){ minputs[k].value = data[k]; C.flash(minputs[k].parentNode); }
+  return true;
+}
+
+/* 依据来源按钮：点一下循环 measured → told → records */
+Array.prototype.forEach.call(document.querySelectorAll('.mchip .bs'), function(btn){
+  btn.addEventListener('click', function(e){
+    e.preventDefault();
+    var bk = btn.getAttribute('data-bk');
+    data[bk] = C.basisNext(data[bk] || 'measured');
+    C.stamp(); C.render();
+  });
+});
+
+function paintBasis(){
+  [['doorway','bDoorway'],['corridor','bCorridor'],['bath','bBath'],['turning','bTurning']]
+  .forEach(function(pair){
+    var btn = document.getElementById('b' + '-' + pair[0]);
+    if (!btn) return;
+    var has = !!data[pair[0]];
+    btn.hidden = !has;
+    if (!has){ data[pair[1]] = ''; return; }
+    if (!data[pair[1]]) data[pair[1]] = 'measured';
+    btn.textContent = C.basisLabel(data[pair[1]], false);
+    btn.setAttribute('data-b', data[pair[1]]);
+    btn.title = 'Click to change how you know this: measured, told, or from records';
+  });
+}
+
+var LABEL = {
+  en:{ homeStd:'the closest type', doorway:'doorway', corridor:'corridor', bath:'bath', turning:'turning space' }
+};
+
+C.boot({
+  usesExtract: false,
+  verb: { en:'Noted —' },
+
+  parse: function(text){
+    var p = C.parsePerson(text);   /* 随时可以补一句人的信息，不用退回上一步 */
+
+    var ty = text.match(/\btype\s*([ABC])\b/i) || text.match(/([ABC])\s*型/) || text.match(/(?:甲|乙|丙)型/);
+    if (ty){
+      var letter = ty[1] ? ty[1].toUpperCase() : ({'甲':'A','乙':'B','丙':'C'})[ty[0][0]];
+      if (letter) p.homeStd = 'Type ' + letter;
+    }
+    if (/none of (these|them)|都不像|都不对|不是这三个|没有一个像/i.test(text)) p.homeStd = 'Non-standard';
+
+    function mm(re){ var m = text.match(re); return m ? m[1] : null; }
+    var d = mm(/(?:doorway|door|门洞|门宽)[^0-9]{0,12}(\d{3,4})/i);   if (d) p.doorway = d;
+    var c = mm(/(?:corridor|hallway|走廊|过道)[^0-9]{0,12}(\d{3,4})/i); if (c) p.corridor = c;
+    var b = text.match(/(?:bath(?:room)?|浴室|卫生间)[^0-9]{0,12}(\d{3,4}\s*[x×]\s*\d{3,4})/i);
+    if (b) p.bath = b[1].replace(/\s*[x×]\s*/, ' × ');
+
+    /* 「没有回转空间」也是一条记录，不是留空 */
+    if (/no turning (space|circle)|nowhere to turn|转不开|没有回转|无回转/i.test(text)) p.turning = 'none';
+    else { var t = mm(/(?:turning|turn circle|回转|转身)[^0-9]{0,12}(?:ø|Ø)?\s*(\d{3,4})/i); if (t) p.turning = 'Ø' + t; }
+
+    /* 说了来源就一起记下来。「她女儿说门洞大概 800」和
+       「我量了门洞 800」在记录上不是一回事。 */
+    if (/\b(she|he|they|her daughter|her son|family|told me|says?|said)\b/i.test(text)
+        || /说的?|告诉我|口述/.test(text)) p.basis = 'told';
+    if (/from (the )?records?|last time|previous|档案里|上次记录|上回/i.test(text)) p.basis = 'records';
+    if (/\bI measured\b|measured it|我量的?|量了/i.test(text)) p.basis = 'measured';
+
+    /* 这一屏在量尺寸，「800」这种数字不该被 parsePerson 当成年龄 */
+    if (p.doorway || p.corridor) delete p.age;
+    return p;
+  },
+
+  apply: function(patch){
+    var names = LABEL.en, hit = [];
+    if (patch.homeStd && patch.homeStd !== data.homeStd){
+      data.homeStd = patch.homeStd;
+      hit.push(names.homeStd);
+      C.flash(patch.homeStd === 'Non-standard' ? $('tNone') : $('t-' + patch.homeStd.slice(-1)));
+    }
+    ['doorway','corridor','bath','turning'].forEach(function(k){
+      if (patch[k] && fillM(k, patch[k])){
+        hit.push(names[k]);
+        if (patch.basis) data[bKey(k)] = patch.basis;
+      }
+    });
+    if (hit.length){ C.stamp(); C.render(); }
+    return hit;
+  },
+
+  question: function(){
+    return 'Which standard type is closest to her flat, and what did you measure?';
+  },
+
+  ctx: function(){
+    var b = ['Step 2 of 5: a care worker is picking the standard home type closest to the resident\'s flat'];
+    if (data.name)     b.push('resident: ' + data.name);
+    if (data.home)     b.push('home: ' + data.home);
+    if (data.doorway)  b.push('measured doorway: ' + data.doorway + ' mm');
+    if (data.corridor) b.push('measured corridor: ' + data.corridor + ' mm');
+    b.push('the three types have 760, 800 and 850 mm doorways');
+    return b.join('; ');
+  },
+
+  tail: function(){
+    return 'Noted. Put in whatever you actually measured — doorway, corridor, turning circle — and I work from that.';
+  },
+
+  miss: function(){
+    return 'I could not tell which measurement that was. Typing it into the row below is quicker.';
+  },
+
+  render: function(){
+    C.setV($('vStd'),  data.homeStd, 'not chosen');
+    C.setV($('vDoor'), data.doorway ? data.doorway + ' mm' : '');
+    C.setV($('vCorr'), data.corridor ? data.corridor + ' mm' : '');
+    C.setV($('vTurn'), data.turning);
+    C.setV($('vHome'), data.home);
+    C.setV($('vNeed'), C.needsShort(), 'not derived yet');
+    paintPlans();
+    paintFits();
+
+    ['A','B','C'].forEach(function(k){
+      var el = document.querySelector('[data-mark="' + k + '"]');
+      var m = markFor(k);
+      el.textContent = m.text;
+      el.classList.toggle('ok', m.ok);
+      $('t-' + k).setAttribute('aria-pressed', String(data.homeStd === 'Type ' + k));
+    });
+    $('tNone').setAttribute('aria-pressed', String(data.homeStd === 'Non-standard'));
+
+    paintBasis();
+    $('next').disabled = !data.homeStd;
+    $('when').innerHTML = (data.name || 'New file') +
+      ' &nbsp;·&nbsp; ' + (data.home || 'home type not recorded');
+  },
+
+  next: { href:'./flow-carer-3.html', label:'Step 3' }
+});
+})();
+</script>
+</body>
+</html>

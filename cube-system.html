@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MNEMOSYNE — Cube System</title>
+
+<style>
+/* 本地字体：和 index / research / project / library 共用，不依赖网络 */
+@font-face{ font-family:'InterLocal'; src:url('assets/fonts/inter-var.woff2') format('woff2-variations');
+  font-weight:100 900; font-style:normal; font-display:block }
+@font-face{ font-family:'SpaceMonoLocal'; src:url('assets/fonts/space-mono-700.woff2') format('woff2');
+  font-weight:700; font-style:normal; font-display:block }
+</style>
+
+<style>
+/* ============================================================
+   MNEMOSYNE · Cube System
+   对应 Figma frame 562:65 — 1440 × 3564
+   坐标 / 字号 / 字距 / 色值全部取自该 frame 的实测值，由 gencube.py 转写。
+
+   为什么这一页用「固定画布 + 整体缩放」，而不是 project 那种响应式：
+   这一页是**制图**，不是版块。12 张轴测图落在 x=194/472/738/998、
+   207/441/759/1071、194/489/779/1063 这种不成列的位置上，
+   04 那四张旁边还挂着尺寸标注线（刻度线精确到小数点后一位）。
+   一重排，标注线就和图脱开了，整节的意思就没了。
+   所以和 research.html 一样：把 1440 画布整体缩到视口宽度，比例一定对。
+   ============================================================ */
+:root{
+  --bg:#EFECE6;          /* 页面底色 */
+  --ink:#1C1A17;         /* 大标题 */
+  --body:#6B6661;        /* 正文 */
+  --eyebrow:#8C8780;     /* CUBE SYSTEM */
+  --orange:#ED7119;      /* 节号 + 箭头 */
+  --hair:#CCC7BD;        /* 分节细线 */
+  --num:#D6D1C7;         /* 01 / 02 / 03 这三个大数字 */
+  --cap:#595752;         /* 图注 */
+  --chip-bg:#E7E2DA; --chip-bd:#CCC7BD; --chip-tx:#45423D;
+  --nav:#141414; --nav-dim:#9E9991; --caps:#F5F3EF; --dim:#8F8B85;
+  --sans:'InterLocal','Inter',system-ui,-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+  --mono:'SpaceMonoLocal','Space Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --stage:1440px; --pad:56px; --nav-h:76px;
+}
+*{ box-sizing:border-box }
+html{ background:var(--bg); scroll-behavior:smooth }
+body{
+  margin:0; background:var(--bg); color:var(--body);
+  font-family:var(--sans); -webkit-font-smoothing:antialiased;
+  overflow-x:clip; scrollbar-gutter:stable;
+}
+
+/* ---------- 导航（全站同一套） ---------- */
+.nav{ position:fixed; top:0; left:0; right:0; z-index:60; height:var(--nav-h); background:var(--nav) }
+.nav-in{ width:min(100%, var(--stage)); margin-inline:auto; height:100%;
+  padding-inline:var(--pad); display:flex; align-items:center; justify-content:space-between }
+.nav-r{ display:flex; align-items:center; gap:32px }
+.brand{ display:block; text-decoration:none; line-height:0 }
+.brand img{ display:block; width:92.9px; height:36px; object-fit:contain }
+.contact{ font-family:var(--sans); font-weight:500; font-size:13px; line-height:16px;
+  color:var(--nav-dim); text-decoration:none; transition:color .22s ease }
+.contact:hover{ color:var(--caps) }
+.burger{ width:24px; height:18px; padding:0; background:none; border:0; cursor:pointer;
+  display:flex; flex-direction:column; justify-content:space-between }
+.burger i{ display:block; height:2px; border-radius:1px; background:var(--caps);
+  transition:transform .26s ease, opacity .2s ease }
+.burger[aria-expanded="true"] i:nth-child(1){ transform:translateY(8px) rotate(45deg) }
+.burger[aria-expanded="true"] i:nth-child(2){ opacity:0 }
+.burger[aria-expanded="true"] i:nth-child(3){ transform:translateY(-8px) rotate(-45deg) }
+
+.menu{ position:fixed; inset:0; z-index:55; display:flex; align-items:center;
+  background:rgba(14,13,15,.32);
+  -webkit-backdrop-filter:blur(22px) saturate(1.25); backdrop-filter:blur(22px) saturate(1.25);
+  opacity:0; visibility:hidden; transition:opacity .5s ease, visibility 0s linear .5s }
+.menu[data-open="true"]{ opacity:1; visibility:visible; transition:opacity .5s ease, visibility 0s linear 0s }
+.menu ul{ width:min(100%, var(--stage)); margin-inline:auto; padding:0 56px; list-style:none }
+.menu a{ display:flex; align-items:baseline; gap:22px; padding:7px 0; text-decoration:none;
+  font-size:clamp(30px, 4.6vw, 56px); font-weight:700; letter-spacing:-.02em; line-height:1.28;
+  color:var(--caps); width:max-content; opacity:0; transform:translateY(26px);
+  transition:opacity .5s ease, transform .6s cubic-bezier(.2,.6,.2,1), color .25s ease }
+.menu[data-open="true"] a{ opacity:1; transform:none }
+.menu[data-open="true"] li:nth-child(1) a{ transition-delay:.10s }
+.menu[data-open="true"] li:nth-child(2) a{ transition-delay:.16s }
+.menu[data-open="true"] li:nth-child(3) a{ transition-delay:.22s }
+.menu[data-open="true"] li:nth-child(4) a{ transition-delay:.28s }
+.menu[data-open="true"] li:nth-child(5) a{ transition-delay:.34s }
+.menu[data-open="true"] li:nth-child(6) a{ transition-delay:.40s }
+.menu a:hover{ color:var(--orange) }
+.menu a[aria-disabled="true"]{ color:rgba(245,243,239,.34); pointer-events:none }
+.menu a[aria-current="page"]{ color:var(--orange) }
+.menu .no{ flex:none; width:46px; font-family:var(--mono); font-weight:700;
+  font-size:12px; letter-spacing:1.2px; color:var(--dim) }
+
+/* ---------- 1440 画布 ---------- */
+.wrap{ position:relative; width:100%; overflow:hidden }
+.canvas{ position:relative; width:1440px; height:3564px; margin-inline:auto; background:var(--bg);
+  transform-origin:top center; transform:scale(var(--k,1)) }
+.canvas > *{ position:absolute; margin:0 }
+
+/* ---------- 文字 ---------- */
+.eyebrow{ font-weight:600; font-size:13px; letter-spacing:3.64px; color:var(--eyebrow); white-space:nowrap }
+.h1{ font-weight:700; font-size:56px; line-height:116%; letter-spacing:-.56px; color:var(--ink) }
+.lede{ font-size:16px; line-height:180%; color:var(--body) }
+.sec{ font-weight:600; font-size:13px; letter-spacing:2.86px; color:var(--orange); white-space:nowrap }
+.num{ font-weight:700; font-size:40px; line-height:48px; color:var(--num) }
+.wtt{ font-weight:700; font-size:18px; line-height:22px; letter-spacing:1.08px; color:var(--ink); white-space:nowrap }
+.wbd{ font-size:13.5px; line-height:172%; color:var(--body) }
+.cap{ font-weight:600; font-size:12px; line-height:16px; letter-spacing:1.2px;
+      color:var(--cap); text-align:center }
+.sub{ font-size:11.5px; line-height:16px; color:var(--body); text-align:center }
+.arr{ font-weight:700; font-size:20px; line-height:24px; color:var(--orange) }
+.note{ font-size:13px; line-height:16px; color:var(--body); white-space:nowrap }
+.end{ font-weight:700; font-size:20px; line-height:24px; color:var(--ink) }
+
+/* ---------- 元件 ---------- */
+.rule{ background:var(--hair) }
+.chip{ background:var(--chip-bg); border:1px solid var(--chip-bd); border-radius:14px;
+  font-weight:600; font-size:12px; color:var(--chip-tx);
+  display:flex; align-items:center; justify-content:center; white-space:nowrap }
+/* 300 mm 是这套系统的基准尺寸，所以只有它是实心橙的 */
+.chip.on{ background:var(--orange); border-color:var(--orange); color:#fff }
+.im{ display:block; object-fit:contain }
+
+/* 正片叠底（Figma 里这三张的 blend mode 是 MULTIPLY）。
+   mix-blend-mode 只在最近的「隔离上下文」里生效，而 .canvas 上有 transform:scale()，
+   它自己就构成一个隔离上下文 —— 所以 .canvas 必须自带 background:var(--bg)（见上），
+   否则叠底等于没写。 */
+.mult{ mix-blend-mode:multiply }
+
+/* 只有 07 那两张照片有圆角，写在行内 style 里（Figma 实测 20） */
+</style>
+</head>
+
+<body>
+
+<header class="nav">
+  <div class="nav-in">
+    <a class="brand" href="./index.html" aria-label="MNEMOSYNE">
+      <img src="assets/logo-dark.png" alt="MNEMOSYNE">
+    </a>
+    <div class="nav-r">
+      <a class="contact" href="mailto:zhoushichen0311@gmail.com">Contact</a>
+      <button class="burger" id="burger" aria-expanded="false" aria-controls="menu" aria-label="Menu">
+        <i></i><i></i><i></i>
+      </button>
+    </div>
+  </div>
+  <nav class="menu" id="menu" data-open="false" aria-label="Sections">
+    <ul>
+      <li><a href="./index.html#about"><span class="no">01</span>About</a></li>
+      <li><a href="./research.html"><span class="no">02</span>Research</a></li>
+      <li><a href="./project.html"><span class="no">03</span>Project</a></li>
+      <li><a href="./library.html"><span class="no">04</span>Library</a></li>
+      <li><a href="./cube-system.html" aria-current="page"><span class="no">05</span>Cube System</a></li>
+      <li><a href="./home-file-empty.html"><span class="no">06</span>Home File</a></li>
+    </ul>
+  </nav>
+</header>
+
+<div class="wrap">
+  <div class="canvas" id="canvas">
+<div class="eyebrow" style="left:152px;top:150px">CUBE SYSTEM</div>
+<div class="h1" style="left:152px;top:192px;width:660px">One 300 mm Cube.<br>Every Room.</div>
+<div class="lede" style="left:152px;top:352px">The cube is not just a form. It is a construction system for adaptation, customisation<br>and retrofit: one module that becomes walls, storage and furniture, and comes apart<br>as easily as it goes together.</div>
+<div class="rule" style="left:152px;top:500px;width:1136px;height:1px"></div>
+<div class="sec" style="left:152px;top:518px">01 — WHY CUBE</div>
+<div class="num" style="left:152px;top:566px">01</div>
+<div class="wtt" style="left:152px;top:620px">ADAPTATION</div>
+<div class="wbd" style="left:152px;top:652px">Rooms rebuild as needs change,<br>without construction work.</div>
+<div class="num" style="left:538px;top:566px">02</div>
+<div class="wtt" style="left:538px;top:620px">CUSTOMISATION</div>
+<div class="wbd" style="left:538px;top:652px">Panels, functions and sizes mix<br>per person, not per catalogue.</div>
+<div class="num" style="left:924px;top:566px">03</div>
+<div class="wtt" style="left:924px;top:620px">RETROFIT</div>
+<div class="wbd" style="left:924px;top:652px">Installs inside existing homes.<br>No one has to move out.</div>
+<div class="rule" style="left:152px;top:760px;width:1136px;height:1px"></div>
+<div class="sec" style="left:152px;top:778px">02 — BASIC CUBE</div>
+<img class="im" src="assets/cube/cube-a.webp" alt="Cube type A" loading="lazy" decoding="async" style="left:194px;top:818px;width:195px;height:208px">
+<img class="im" src="assets/cube/cube-b.webp" alt="Cube type B" loading="lazy" decoding="async" style="left:472px;top:815px;width:191px;height:208px">
+<img class="im" src="assets/cube/cube-c.webp" alt="Cube type C" loading="lazy" decoding="async" style="left:738px;top:816px;width:212px;height:216px">
+<img class="im" src="assets/cube/cube-d.webp" alt="Cube type D" loading="lazy" decoding="async" style="left:998px;top:816px;width:311px;height:208px">
+<div class="cap" style="left:152px;top:1044px;width:269px">Type A</div>
+<div class="cap" style="left:433px;top:1044px;width:269px">Type B</div>
+<div class="cap" style="left:709px;top:1044px;width:269px">Type C</div>
+<div class="cap" style="left:1019px;top:1044px;width:269px">Type D</div>
+<div class="rule" style="left:152px;top:1120px;width:1136px;height:1px"></div>
+<div class="sec" style="left:152px;top:1138px">03 — MODULE ASSEMBLY</div>
+<img class="im" src="assets/cube/asm-frame.webp" alt="Basic frame" loading="lazy" decoding="async" style="left:207px;top:1251px;width:146px;height:153px">
+<img class="im" src="assets/cube/asm-panel.webp" alt="Panels clipping onto the frame" loading="lazy" decoding="async" style="left:441px;top:1193px;width:259px;height:268px">
+<img class="im" src="assets/cube/asm-bar.webp" alt="Function bar" loading="lazy" decoding="async" style="left:759px;top:1171px;width:214px;height:311px">
+<img class="im" src="assets/cube/asm-cube.webp" alt="Finished basic cube" loading="lazy" decoding="async" style="left:1071px;top:1254px;width:143px;height:150px">
+<div class="arr" style="left:396px;top:1315px">&rarr;</div>
+<div class="arr" style="left:709px;top:1315px">&rarr;</div>
+<div class="arr" style="left:1003px;top:1315px">&rarr;</div>
+<div class="cap" style="left:152px;top:1503px;width:254px">Basic Frame</div>
+<div class="cap" style="left:441px;top:1503px;width:254px">Panel</div>
+<div class="cap" style="left:740px;top:1503px;width:254px">Function Bar</div>
+<div class="cap" style="left:1019px;top:1503px;width:254px">Basic Cube</div>
+<div class="rule" style="left:152px;top:1558px;width:1136px;height:1px"></div>
+<div class="sec" style="left:152px;top:1576px">04 — RANGE OF SIZES</div>
+<div class="note" style="left:152px;top:1612px">Basic size &middot; interior structure &middot; deconstruction &middot; variants</div>
+<img class="im" src="assets/cube/size-basic.webp" alt="Basic size with 300 mm dimension" loading="lazy" decoding="async" style="left:187px;top:1696px;width:281px;height:201.5px">
+<img class="im" src="assets/cube/size-interior.webp" alt="Interior structure with 200 mm dimension" loading="lazy" decoding="async" style="left:498px;top:1718px;width:222px;height:171px">
+<img class="im" src="assets/cube/size-decon.webp" alt="Deconstruction with 85 / 200 / 85 breakdown" loading="lazy" decoding="async" style="left:773px;top:1645px;width:232px;height:279px">
+<img class="im" src="assets/cube/size-height.webp" alt="Height variant with 350 / 450 mm dimensions" loading="lazy" decoding="async" style="left:1068px;top:1677px;width:237px;height:237px">
+<div class="cap" style="left:152px;top:1935px;width:269px">Basic Size</div>
+<div class="sub" style="left:152px;top:1955px;width:269px">Standard outer dimension</div>
+<div class="cap" style="left:441px;top:1935px;width:269px">Interior Structure</div>
+<div class="sub" style="left:441px;top:1955px;width:269px">Reduced internal height</div>
+<div class="cap" style="left:730px;top:1935px;width:269px">Deconstruction</div>
+<div class="sub" style="left:730px;top:1955px;width:269px">Component height breakdown</div>
+<div class="cap" style="left:1019px;top:1935px;width:269px">Height Variant</div>
+<div class="sub" style="left:1019px;top:1955px;width:269px">Extended height assembly</div>
+<div class="rule" style="left:152px;top:1999px;width:1136px;height:1px"></div>
+<div class="sec" style="left:152px;top:2016px">05 — MODULAR FURNITURE FAMILY</div>
+<img class="im mult" src="assets/cube/fam.webp" alt="The modular furniture family laid out on the cube grid" loading="lazy" decoding="async" style="left:152px;top:2068px;width:1153px;height:574px">
+<div class="rule" style="left:152px;top:2686px;width:1136px;height:1px"></div>
+<div class="sec" style="left:152px;top:2709px">06 — MODULE-TO-MODULE ASSEMBLY</div>
+<img class="im mult" src="assets/cube/m2m-a.webp" alt="How two modules lock together" loading="lazy" decoding="async" style="left:267px;top:2741px;width:302px;height:358px">
+<img class="im mult" src="assets/cube/m2m-b.webp" alt="Modules assembled into a corner" loading="lazy" decoding="async" style="left:637px;top:2755px;width:503px;height:330px">
+<div class="rule" style="left:152px;top:3128px;width:1136px;height:1px"></div>
+<div class="sec" style="left:152px;top:3152px">07 — PHYSICAL MODEL · 3D-PRINTED PROTOTYPE</div>
+<img class="im" src="assets/cube/proto-a.webp" alt="3D-printed prototype: assembly method" loading="lazy" decoding="async" style="left:179px;top:3186px;width:308px;height:239px;border-radius:20px">
+<img class="im" src="assets/cube/proto-panel.webp" alt="3D-printed prototype: the panel and connector parts" loading="lazy" decoding="async" style="left:539px;top:3186px;width:338px;height:240px;border-radius:20px">
+<img class="im" src="assets/cube/proto-b.webp" alt="3D-printed prototype: module assembly" loading="lazy" decoding="async" style="left:929px;top:3186px;width:352px;height:240px;border-radius:20px">
+<div class="cap" style="left:152px;top:3438px;width:362px">Assembly method</div>
+<div class="cap" style="left:538px;top:3438px;width:362px">Panel system</div>
+<div class="cap" style="left:924px;top:3438px;width:362px">Module assembly</div>
+<div class="end" style="left:152px;top:3494px">Printed, panelled and assembled by hand: the system holds physically, not only on screen.</div>
+  </div>
+</div>
+
+<script>
+/* 画布缩放：把 1440 的画布整体缩到视口宽度。
+   和 research.html 逐字相同 —— 视口比 1440 窄时才缩，宽时不放大（免得图糊）。
+   外层 .wrap 的高度要跟着改，否则页面底部会多出一大块空白
+   （transform 不改变元素占的版面高度）。 */
+(function(){
+  var canvas = document.getElementById('canvas'),
+      wrap   = canvas.parentNode,
+      W = 1440, H = 3564;
+
+  /* ⚠ 纯按宽度缩放在手机上会自己反过来咬人：
+     393 的屏幕算出来 k = 0.27，画布里 13px 的正文变成 3.5px ——
+     整张图还在，一个字都读不了，等于没有内容。
+     这一页是照着 Figma 1440 画板逐坐标转写的，重排成手机版等于重画整页，
+     所以退一步：给缩放一个**可读下限**，低于下限就不再缩，改成横向可以拖。
+     宁可一次看半张能读的，也不要一整张读不了的。
+     和医护版那几页（assets/carer-core.js）用的是同一套做法和同一组数。 */
+  var MIN_K = 0.72;    /* 13px → 9.4px。再低就不用看了 */
+  var PAN_MAX = 1024;  /* 只有窄过这个宽度才启用下限。
+                          1024 是最窄的常见笔记本宽度，它自己算出来的 k 是 0.711，
+                          正好压在下限边上 —— 不设这道闸，电脑端窗口一拖窄
+                          就会跳进"横向拖动"模式。 */
+
+  /* 初值必须是 false，不能是 null：电脑端一进来 panned 就是 false，
+     写 null 的话第一次 fit() 会走"状态变了"的分支，把 transform-origin /
+     margin 这几个行内样式清一遍 —— 清空本身无害，但那次赋值会让这张
+     缩放画布重新栅格化，图标描边的抗锯齿跟着变。电脑端这几行一次都别执行。
+     （research.html 里同样的写法实测差了 32 万像素，肉眼看不出来但确实变了。） */
+  var wasPanned = false;
+
+  function fit(){
+    var raw = Math.min(1, window.innerWidth / W);
+    var panned = raw < MIN_K && window.innerWidth < PAN_MAX;
+    var k = panned ? MIN_K : raw;
+    document.documentElement.style.setProperty('--k', k);
+
+    if (panned !== wasPanned){
+      applyPan(panned, k);
+      wasPanned = panned;
+    }
+    if (panned) canvas.style.marginRight = (W * k - W) + 'px';
+    wrap.style.height = (H * k) + 'px';
+    hint(panned);
+  }
+
+  function applyPan(panned, k){
+    if (panned){
+      /* transform 不改变布局尺寸：画布的布局宽度永远是 1440，
+         缩放只影响画出来的样子。所以要做两件事，少一件都会出问题：
+           1) 原点从 top center 改成 top left，并停掉 margin-inline:auto ——
+              否则画面被居中画在 1440 的框里，左边先滚过一大片空白；
+           2) 用负的 margin-right 把布局宽度收回到 1440*k ——
+              否则滚动条按 1440 算，右边多出一截滚不到东西的空白。 */
+      canvas.style.transformOrigin = 'top left';
+      canvas.style.marginLeft  = '0';
+      wrap.style.overflowX = 'auto';
+      wrap.style.webkitOverflowScrolling = 'touch';
+    } else {
+      canvas.style.transformOrigin = '';
+      canvas.style.marginLeft  = '';
+      canvas.style.marginRight = '';
+      wrap.style.overflowX = '';
+    }
+  }
+
+  /* 一行提示，只在被拖模式下出现。
+     ⚠ 不能插在 .wrap 前面：这一页的导航是 position:fixed，插进文档流的话
+     提示条正好被压在导航底下，一个字都看不见（第一版就是这样）。
+     改成钉在屏幕底部的一条，既不挤版面，滚到哪都看得见；
+     横向拖过一次就自己收起来 —— 它的任务完成了。 */
+  var hintGone = false;
+  function hint(on){
+    var el = document.getElementById('panhint');
+    if (!on || hintGone){ if (el) el.remove(); return; }
+    if (el) return;
+    el = document.createElement('button');
+    el.id = 'panhint';
+    el.type = 'button';
+    el.textContent = 'Scroll as usual — drag sideways for the rest of the width';
+    el.style.cssText = 'position:fixed;left:12px;right:12px;bottom:12px;z-index:80;'
+      + 'margin:0;padding:11px 14px;border:0;border-radius:18px;'
+      + 'font:inherit;font-size:12px;line-height:1.4;text-align:center;'
+      + 'color:#F4F0E8;background:rgba(26,25,23,.88);cursor:pointer;'
+      + 'box-shadow:0 6px 20px rgba(0,0,0,.24)';
+    var go = function(){ hintGone = true; if (el.parentNode) el.remove(); };
+    el.addEventListener('click', go);
+    wrap.addEventListener('scroll', go, { once:true, passive:true });
+    document.body.appendChild(el);
+  }
+
+  fit();
+  addEventListener('resize', fit);
+})();
+
+/* 汉堡菜单（全站同一套） */
+(function(){
+  var b = document.getElementById('burger'), m = document.getElementById('menu'), open = false;
+  function set(v){
+    open = v;
+    b.setAttribute('aria-expanded', open ? 'true' : 'false');
+    m.dataset.open = open ? 'true' : 'false';
+    document.body.style.overflow = open ? 'hidden' : '';
+  }
+  b.addEventListener('click', function(e){ e.stopPropagation(); set(!open); });
+  m.addEventListener('click', function(){ set(false); });
+  document.addEventListener('click', function(e){ if (!e.target.closest('.nav')) set(false); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') set(false); });
+})();
+</script>
+
+</body>
+</html>

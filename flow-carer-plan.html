@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MNEMOSYNE — Their home</title>
+
+<!-- ============================================================
+     MNEMO · 医护人员版 · 第 2 步：上传平面图
+     ------------------------------------------------------------
+     逻辑照搬 v2\flow.html 第 1 步（dropzone → 读图 → 1:100 平面）。
+     版式照搬 v3\flow-carer.html（1440×960 舞台、同一套坐标与 token、
+     左表单 / 右档案卡 / 右下对话 dock / 右下角 Continue）。
+
+     和 v2、和本人版都不同的两件事，都是医护记录本身的要求：
+       1) 图纸必须记来源。谁给的、哪来的，直接决定这张图能不能作数。
+          这和档案里已有的 BASIS（measured / told / records）是一个概念。
+       2) 必须能「今天先不传」。医护第一次上门经常拿不到图纸，
+          流程不能卡在这里 —— 但要留一条明确的待办，而不是悄悄跳过。
+
+     未接后端的地方标了 TODO，没有假装已经能用。
+     ============================================================ -->
+
+<style>
+@font-face{
+  font-family:'InterLocal';
+  src:url('assets/fonts/inter-var.woff2') format('woff2-variations');
+  font-weight:100 900; font-style:normal; font-display:block;
+}
+@font-face{
+  font-family:'SpaceMonoLocal';
+  src:url('assets/fonts/space-mono-700.woff2') format('woff2');
+  font-weight:700; font-style:normal; font-display:block;
+}
+</style>
+
+<style>
+:root{
+  --cream-a:#F8ECDC; --cream-b:#F1ECE5;
+  --ink:#1A1917; --mut:#736E66; --faint:#948F87; --hint:#B0A99D; --mono-c:#8A8378;
+  --hair:#DEDAD2; --line:#CFC8BB; --hair-2:#ECE7DE;
+  --white:#FFFFFF; --soft:#F1EAE0; --chipbg:#E7DED1;
+  --accent:#ED7119; --accent-d:#B0570F;
+  --ok:#4F6A48;
+  --r-card:14px;
+}
+*,*::before,*::after{ box-sizing:border-box }
+[hidden]{ display:none !important }
+p{ margin:0 }
+html{ -webkit-text-size-adjust:100%; background:var(--cream-b) }
+body{
+  margin:0;
+  font-family:'InterLocal','Inter',system-ui,-apple-system,'Segoe UI','PingFang SC',sans-serif;
+  color:var(--ink);
+  background:
+    url('assets/bg/bg-family-carer.webp') center center / cover no-repeat fixed,
+    linear-gradient(160deg,var(--cream-a) 0%,var(--cream-b) 100%);
+  -webkit-font-smoothing:antialiased; min-height:100dvh; overflow-x:hidden;
+}
+.mono{
+  font-family:'SpaceMonoLocal','Space Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-weight:700; text-transform:uppercase; letter-spacing:.09em;
+}
+
+.stagewrap{ width:100%; display:flex; justify-content:center; overflow:hidden }
+.stage{ position:relative; width:1440px; height:960px; transform-origin:top center;
+  transform:scale(var(--k,1)); flex:none }
+
+.logo{ position:absolute; left:34px; top:38px; width:68px; height:68px; object-fit:contain }
+.exit{ position:absolute; left:40px; top:847px; width:56px; height:56px; border-radius:50%;
+  background:var(--white); border:1px solid var(--hair); display:grid; place-items:center;
+  color:var(--mut); text-decoration:none; cursor:pointer }
+.exit:hover{ box-shadow:0 6px 16px rgba(80,66,48,.14); color:var(--ink) }
+.exit-label{ position:absolute; left:31px; top:910px; width:74px; text-align:center;
+  font-size:8.5px; color:var(--mono-c) }
+
+.title{ position:absolute; left:121px; top:36px; margin:0; font-size:31px; line-height:37px;
+  font-weight:700; letter-spacing:-.02em }
+.sub{ position:absolute; left:121px; top:80px; font-size:13.5px; line-height:18px; color:var(--mut) }
+
+.stepchip{ position:absolute; right:48px; top:47px; height:28px; padding:0 16px;
+  border-radius:14px; background:var(--white); border:1px solid var(--hair);
+  display:flex; align-items:center; gap:8px }
+.stepchip i{ width:8px; height:8px; border-radius:50%; background:var(--accent); flex:none }
+.stepchip span{ font-size:11px; color:var(--mut) }
+
+.steps{ position:absolute; left:121px; top:152px; width:948px; height:30px }
+.steps > div{ position:absolute; top:0; width:150px; height:30px }
+.steps b{ display:block; width:150px; height:3px; border-radius:2px; background:var(--chipbg) }
+.steps s{ display:block; margin-top:9px; text-decoration:none; font-size:9px;
+  font-family:'SpaceMonoLocal','Space Mono',monospace; font-weight:700;
+  text-transform:uppercase; letter-spacing:.09em; color:var(--mono-c) }
+.steps .done b{ background:var(--accent) }
+.steps .on b{ background:var(--accent) }
+.steps .on s{ color:var(--ink) }
+
+.visit{ position:absolute; left:121px; top:203px; height:24px; padding:0 14px; border-radius:12px;
+  background:var(--ink); color:#fff; display:flex; align-items:center; font-size:9px }
+.when{ position:absolute; left:231px; top:206px; font-size:12.5px; color:var(--mut) }
+.saved{ position:absolute; right:48px; top:207px; font-size:9px; color:var(--mono-c) }
+
+/* ── 左：录入 ─────────────────────────────────────────── */
+.panel{ position:absolute; left:121px; top:252px; width:760px; height:610px;
+  background:var(--white); border:1px solid var(--hair); border-radius:var(--r-card) }
+.gtitle{ position:absolute; font-size:9.5px; color:var(--mono-c) }
+.divider{ position:absolute; height:1px; background:var(--hair) }
+
+/* 落图区 */
+.drop{ position:absolute; left:32px; top:58px; width:696px; height:286px;
+  border:1.5px dashed var(--line); border-radius:12px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  cursor:pointer; background:#FDFBF8; transition:border-color .18s ease, background .18s ease }
+.drop:hover{ border-color:var(--accent); background:#FDF4EA }
+.drop.is-over{ border-color:var(--accent); border-style:solid; background:#FDF0E4 }
+.drop .dt{ font-size:17px; font-weight:600; margin-top:16px }
+.drop .ds{ font-size:13px; color:var(--mut); margin-top:6px }
+.drop .cubes{ display:flex; gap:6px }
+.drop .cubes i{ width:22px; height:22px; border-radius:5px; background:var(--chipbg); display:block }
+.drop .cubes i:nth-child(2){ background:#E8D6BE }
+.drop .cubes i:nth-child(3){ background:#DCD4C6 }
+.drop .btns{ display:flex; gap:10px; margin-top:20px }
+.dbtn{ height:36px; padding:0 18px; border-radius:18px; border:1px solid var(--line);
+  background:var(--white); font-family:inherit; font-size:13px; color:var(--ink); cursor:pointer }
+.dbtn:hover{ border-color:var(--ink) }
+.dbtn.primary{ background:var(--ink); color:#fff; border-color:var(--ink) }
+.drop .fmt{ display:flex; gap:8px; margin-top:18px }
+.drop .fmt span{ font-size:8.5px; color:var(--mono-c) }
+
+/* 读图中 */
+.reading{ position:absolute; left:32px; top:58px; width:696px; height:286px;
+  border:1.5px solid var(--accent); border-radius:12px; background:#FDF7F1;
+  display:flex; flex-direction:column; align-items:center; justify-content:center }
+.reading .rt{ font-size:17px; font-weight:600 }
+.reading .rs{ font-size:13px; color:var(--mut); margin-top:6px }
+.reading .track{ width:320px; height:5px; border-radius:3px; background:var(--chipbg);
+  margin-top:20px; overflow:hidden }
+.reading .track i{ display:block; height:100%; width:0; background:var(--accent);
+  transition:width .5s cubic-bezier(.16,1,.3,1) }
+
+/* 读完：平面 */
+.planbox{ position:absolute; left:32px; top:58px; width:696px; height:286px;
+  border:1px solid var(--hair); border-radius:12px; background:#FCFAF7;
+  display:grid; place-items:center; overflow:hidden }
+.planbox svg{ display:block; width:96%; height:auto; max-height:266px }
+.planhead{ position:absolute; left:32px; top:352px; width:696px;
+  display:flex; align-items:baseline; gap:12px }
+.planhead .pn{ font-size:14px; font-weight:600 }
+.planhead .pm{ font-size:12.5px; color:var(--mut) }
+.planhead .re{ margin-left:auto; font-family:inherit; font-size:12px; color:var(--accent-d);
+  background:none; border:0; cursor:pointer; text-decoration:underline; padding:0 }
+
+/* 来源 */
+.chiprow{ position:absolute; display:flex; gap:10px; flex-wrap:wrap }
+.chip{ height:30px; padding:0 14px; border-radius:15px; border:1px solid var(--line);
+  background:var(--white); font-family:inherit; font-size:12.5px; color:var(--mut);
+  cursor:pointer; display:inline-flex; align-items:center }
+.chip:hover{ border-color:var(--mut); color:var(--ink) }
+.chip[aria-pressed="true"]{ background:var(--chipbg); border-color:var(--ink); color:var(--ink); font-weight:500 }
+.chip:focus-visible{ outline:2px solid var(--accent); outline-offset:2px }
+
+.need{ position:absolute; font-size:11.5px; color:var(--accent-d) }
+
+/* 没有图纸 */
+.later{ position:absolute; left:32px; width:696px; display:flex; align-items:center; gap:12px }
+.later .lt{ font-size:12.5px; color:var(--mut) }
+.later .lb{ height:30px; padding:0 14px; border-radius:15px; border:1px dashed var(--line);
+  background:none; font-family:inherit; font-size:12.5px; color:var(--mut); cursor:pointer }
+.later .lb:hover{ border-color:var(--ink); color:var(--ink) }
+.later .lb[aria-pressed="true"]{ border-style:solid; border-color:var(--ok); color:var(--ok); font-weight:500 }
+
+.count{ position:absolute; left:32px; top:586px; font-size:9.5px; color:var(--mono-c) }
+
+/* ── 右：档案卡 ───────────────────────────────────────── */
+.file{ position:absolute; left:924px; top:252px; width:468px; height:380px;
+  background:var(--white); border:1px solid var(--hair); border-radius:var(--r-card) }
+.file .lab{ position:absolute; left:26px; top:24px; font-size:9.5px; color:var(--mono-c) }
+.file .state{ position:absolute; right:26px; top:18px; height:22px; padding:0 12px;
+  border-radius:11px; border:1px solid var(--accent-d); display:flex; align-items:center;
+  font-size:9.5px; color:var(--accent-d); white-space:nowrap }
+.file .who{ position:absolute; left:26px; top:56px; margin:0; font-size:21px; line-height:25px;
+  font-weight:600; letter-spacing:-.01em }
+.file .meta{ position:absolute; left:26px; top:88px; margin:0; font-size:13px; line-height:16px; color:var(--mut) }
+.file .hair{ position:absolute; left:26px; width:416px; height:1px; background:var(--hair) }
+.file .row{ position:absolute; left:26px; width:416px; height:16px }
+.file .row .k{ position:absolute; left:0; top:2px; font-size:9px; color:var(--mono-c) }
+.file .row .v{ position:absolute; right:0; top:0; max-width:250px; text-align:right;
+  font-size:13px; line-height:16px; font-weight:500; color:var(--ink);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.file .row .v.blank{ font-weight:400; color:var(--hint) }
+.file .row .v.good{ color:var(--ok) }
+.file .pct{ position:absolute; left:26px; top:326px; font-size:9.5px; color:var(--mono-c) }
+.file .track{ position:absolute; left:26px; top:348px; width:416px; height:4px;
+  border-radius:2px; background:var(--chipbg); overflow:hidden }
+.file .track i{ display:block; height:100%; width:40%; background:var(--accent);
+  transition:width .4s cubic-bezier(.16,1,.3,1) }
+
+/* ── 右下：对话 dock ──────────────────────────────────── */
+.dock{ position:absolute; left:924px; top:633px; width:468px; height:156px;
+  background:var(--soft); border:1px solid var(--hair); border-radius:var(--r-card) }
+.dock .av{ position:absolute; left:26px; top:30px; width:34px; height:34px; border-radius:50% }
+.dock .msgs{ position:absolute; left:74px; top:26px; width:368px; height:60px;
+  overflow-y:auto; font-size:13.5px; line-height:20px; color:var(--mut); scrollbar-width:thin }
+.dock .msgs p{ margin:0 0 8px }
+.dock .msgs p:last-child{ margin-bottom:0 }
+.dock .msgs p.me{ color:var(--ink); font-weight:500 }
+.dock .composer{ position:absolute; left:26px; top:96px; width:416px; height:44px;
+  background:var(--white); border:1px solid var(--hair); border-radius:22px;
+  display:flex; align-items:center }
+.dock .composer input{ flex:1; min-width:0; height:42px; border:0; background:transparent;
+  outline:none; padding:0 6px 0 18px; font-family:inherit; font-size:13.5px; color:var(--ink) }
+.dock .composer input::placeholder{ color:var(--hint) }
+.dock .send{ width:32px; height:32px; margin-right:6px; flex:none; border:0; border-radius:50%;
+  background:var(--ink); color:#fff; cursor:pointer; font-size:14px; line-height:1; font-family:inherit }
+
+/* ── 下一步 ───────────────────────────────────────────── */
+.next{ position:absolute; left:1112px; top:858px; width:286px; height:44px;
+  border:0; border-radius:22px; background:var(--ink); color:#fff; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; gap:10px;
+  font-family:inherit; font-size:14px; font-weight:600 }
+.next em{ font-style:normal; color:var(--accent) }
+.next:disabled{ background:var(--chipbg); color:var(--hint); cursor:not-allowed }
+.next:disabled em{ color:var(--hint) }
+.nextnote{ position:absolute; left:1112px; top:910px; width:286px; margin:0;
+  font-size:11px; line-height:15px; color:var(--accent-d); text-align:center;
+  opacity:0; transition:opacity .2s ease }
+.nextnote.show{ opacity:1 }
+</style>
+</head>
+<body>
+<div class="stagewrap" id="stagewrap">
+<div class="stage" id="stage">
+
+  <img class="logo" src="assets/logo.png" alt="MNEMOSYNE">
+
+  <a class="exit" href="./index.html" aria-label="Save and exit">
+    <svg width="14" height="10" viewBox="0 0 14 10" fill="none" aria-hidden="true">
+      <path d="M5 1 1 5l4 4M1 5h12" stroke="currentColor" stroke-width="1.6"
+            stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </a>
+  <p class="exit-label mono">SAVE&amp;EXIT</p>
+
+  <h1 class="title">Their home.</h1>
+  <p class="sub">The floor plan, and where it came from. Both go on the record.</p>
+
+  <div class="stepchip"><i></i><span class="mono">STEP 2 OF 5</span></div>
+
+  <nav class="steps" aria-label="Progress">
+    <div class="done" style="left:0"><b></b><s>PROFILE</s></div>
+    <div class="on"   style="left:162px"><b></b><s>THEIR HOME</s></div>
+    <div style="left:324px"><b></b><s>LAYOUTS</s></div>
+    <div style="left:486px"><b></b><s>PREVIEW</s></div>
+    <div style="left:648px"><b></b><s>HANDOVER</s></div>
+  </nav>
+
+  <div class="visit mono">FIRST FILE</div>
+  <p class="when" id="when">&nbsp;</p>
+  <p class="saved mono" id="saved">AUTOSAVED &nbsp;·&nbsp; NOTHING SIGNED YET</p>
+
+  <!-- ══ 左：落图 + 来源 ═══════════════════════════════════ -->
+  <section class="panel" aria-label="Their floor plan">
+
+    <p class="gtitle" style="left:32px;top:30px">FLOOR PLAN</p>
+
+    <!-- 未上传 -->
+    <div class="drop" id="drop" role="button" tabindex="0" aria-label="Add the floor plan">
+      <div class="cubes" aria-hidden="true"><i></i><i></i><i></i></div>
+      <p class="dt" id="dt">Drop the floor plan here</p>
+      <p class="ds" id="ds">A drawing from the family, a scan from the records, or a photo you take now.</p>
+      <div class="btns">
+        <button class="dbtn primary" type="button" id="b-file">Browse files</button>
+        <button class="dbtn" type="button" id="b-cam">Photograph it</button>
+      </div>
+      <div class="fmt" aria-hidden="true">
+        <span class="mono">PDF</span><span class="mono">JPG</span>
+        <span class="mono">PNG</span><span class="mono">HEIC</span>
+      </div>
+    </div>
+
+    <!-- 读图中 -->
+    <div class="reading" id="reading" hidden>
+      <p class="rt" id="r-title">Reading the drawing…</p>
+      <p class="rs" id="r-sub">Finding walls, doors and openings.</p>
+      <div class="track"><i id="r-bar"></i></div>
+    </div>
+
+    <!-- 读完 -->
+    <div class="planbox" id="planbox" hidden>
+      <svg viewBox="46 118 700 476" role="img"
+                   aria-label="Parsed floor plan: 54 square metres, four rooms, one entrance on the east side, two south-facing windows">
+                <g opacity=".13">
+                  <rect x="97"  y="284" width="260" height="227" fill="#F2B82F"/>
+                  <rect x="357" y="132" width="113" height="152" fill="#A99AC8"/>
+                  <rect x="471" y="227" width="151" height="57"  fill="#A54F4F"/>
+                  <rect x="357" y="284" width="265" height="152" fill="#7399C7"/>
+                  <rect x="357" y="436" width="113" height="75"  fill="#7399C7"/>
+                  <rect x="470" y="436" width="152" height="75"  fill="#8DA973"/>
+                </g>
+                <g stroke="#A8A39C" stroke-width="1" fill="none">
+                  <path d="M357 291.5 H301.5"/>
+                  <path d="M301.5 291.5 C301.5 322.2 326.4 347 357 347"/>
+                  <path d="M440.5 284.5 V228.5"/>
+                  <path d="M440.5 228.5 C409.6 228.5 384.5 253.6 384.5 284.5"/>
+                </g>
+                <g stroke="#292624" stroke-width="2.4" fill="none">
+                  <path d="M622 227 L622 511.5 L96 511.5 L96 284 L357 284 L357 132 L470.5 132 L470.5 227 Z"/>
+                  <path d="M357 285 V510.5"/>
+                  <path d="M470.5 228 V284 H358"/>
+                  <path d="M471 284 H622"/>
+                </g>
+                <g fill="#fff">
+                  <rect x="516.8" y="282.6" width="104" height="3.6"/>
+                  <rect x="384"   y="282.6" width="57"  height="3.6"/>
+                  <rect x="355.2" y="291.5" width="3.6" height="55.5"/>
+                  <rect x="620.2" y="294"   width="3.6" height="52"/>
+                </g>
+                <g>
+                  <rect x="182"   y="506"   width="109"  height="10"  fill="#fff"/>
+                  <rect x="182"   y="508.2" width="109"  height="1.5" fill="#292624"/>
+                  <rect x="182"   y="513"   width="109"  height="1.5" fill="#292624"/>
+                  <rect x="528.7" y="506"   width="51.3" height="10"  fill="#fff"/>
+                  <rect x="528.7" y="508.2" width="51.3" height="1.5" fill="#292624"/>
+                  <rect x="528.7" y="513"   width="51.3" height="1.5" fill="#292624"/>
+                </g>
+                <g text-anchor="middle" font-family="InterLocal, Inter, sans-serif"
+                   font-size="11.5" font-weight="600" fill="#383630">
+                  <text x="413.5" y="212">BATHROOM</text>
+                  <text x="546.5" y="261">STORAGE</text>
+                  <text x="224.5" y="405">BEDROOM</text>
+                  <text x="489.5" y="398">LIVINGROOM</text>
+                  <text x="546.5" y="477">KITCHEN</text>
+                </g>
+                <path d="M660 320 H634 M641 313 L634 320 L641 327"
+                      stroke="#ED7119" stroke-width="2" fill="none"
+                      stroke-linecap="round" stroke-linejoin="round"/>
+                <rect x="658" y="309" width="75" height="22" rx="11" fill="#FCEFE2" stroke="#EED3BA"/>
+                <text x="695.5" y="324" text-anchor="middle" font-size="8" fill="#8C4D1A"
+                      font-family="SpaceMonoLocal, monospace" font-weight="700" letter-spacing=".6">ENTRANCE</text>
+                <g stroke="#9E9991" stroke-width="1">
+                  <path d="M96 573 H622 M96 567.8 V577.8 M622 567.8 V577.8"/>
+                  <path d="M66 132 V511 M61 132 H71 M61 511 H71"/>
+                </g>
+                <rect x="335" y="565" width="48" height="15" fill="#fff"/>
+                <text x="359" y="576" text-anchor="middle" font-size="8.5" fill="#736E66"
+                      font-family="SpaceMonoLocal, monospace" font-weight="700">9.6 m</text>
+                <text x="66" y="322" text-anchor="middle" font-size="8.5" fill="#736E66"
+                      font-family="SpaceMonoLocal, monospace" font-weight="700"
+                      transform="rotate(-90 66 322)">6.6 m</text>
+                <text x="622" y="592" text-anchor="end" font-size="8.5" fill="#9E9891"
+                      font-family="SpaceMonoLocal, monospace" font-weight="700">SCALE 1:100</text>
+              </svg>
+    </div>
+    <div class="planhead" id="planhead" hidden>
+      <span class="pn" id="p-name">—</span>
+      <span class="pm" id="p-meta">—</span>
+      <button class="re" type="button" id="p-re">Replace</button>
+    </div>
+
+    <div class="divider" style="left:32px;top:384px;width:696px"></div>
+
+    <!-- 来源 —— 医护记录的硬要求 -->
+    <p class="gtitle" style="left:32px;top:404px">WHERE IT CAME FROM</p>
+    <div class="chiprow" id="src" style="left:32px;top:428px">
+      <button class="chip" type="button" data-v="Family provided" aria-pressed="false">Family provided</button>
+      <button class="chip" type="button" data-v="From our records" aria-pressed="false">From our records</button>
+      <button class="chip" type="button" data-v="Photographed on site" aria-pressed="false">Photographed on site</button>
+      <button class="chip" type="button" data-v="Landlord or housing" aria-pressed="false">Landlord or housing</button>
+    </div>
+    <p class="need" id="srcneed" style="left:32px;top:470px" hidden>Pick where it came from — the plan is not usable on the record without it.</p>
+
+    <div class="divider" style="left:32px;top:500px;width:696px"></div>
+
+    <!-- 今天拿不到图纸的两条出路 -->
+    <div class="later" style="top:522px">
+      <span class="lt">No plan today?</span>
+      <button class="lb" type="button" id="b-measure" aria-pressed="false">Measure on site instead</button>
+      <button class="lb" type="button" id="b-later" aria-pressed="false">Add it later — flag it</button>
+    </div>
+
+    <p class="count mono" id="count">NOTHING ON THE RECORD YET</p>
+  </section>
+
+  <!-- ══ 右：档案卡 ═══════════════════════════════════════ -->
+  <aside class="file" aria-label="Client file">
+    <p class="lab mono">CLIENT FILE</p>
+    <p class="state mono" id="state">NOT SAVED YET</p>
+
+    <p class="who" id="who">Ying Zhang</p>
+    <p class="meta" id="meta">72 &nbsp;·&nbsp; Ground-floor flat, Camden</p>
+
+    <div class="hair" style="top:126px"></div>
+
+    <div class="row" style="top:148px"><span class="k mono">FLOOR PLAN</span> <span class="v blank" id="vPlan">not added</span></div>
+    <div class="row" style="top:176px"><span class="k mono">SOURCE</span>     <span class="v blank" id="vSrc">—</span></div>
+    <div class="row" style="top:204px"><span class="k mono">FLOOR AREA</span> <span class="v blank" id="vArea">—</span></div>
+    <div class="row" style="top:232px"><span class="k mono">ROOMS</span>      <span class="v blank" id="vRooms">—</span></div>
+    <div class="row" style="top:260px"><span class="k mono">ENTRANCE</span>   <span class="v blank" id="vDoor">—</span></div>
+    <div class="row" style="top:288px"><span class="k mono">SCALE</span>      <span class="v blank" id="vScale">—</span></div>
+
+    <div class="hair" style="top:310px"></div>
+    <p class="pct mono" id="pct">HOME 0% COMPLETE &nbsp;·&nbsp; NOTHING SIGNED YET</p>
+    <div class="track"><i id="bar" style="width:0"></i></div>
+  </aside>
+
+  <!-- ══ 右下：对话 ═══════════════════════════════════════ -->
+  <div class="dock">
+    <img class="av" src="assets/logo.png" alt="">
+    <div class="msgs" id="msgs">
+      <p id="lead">If the drawing is not to scale, tell me one length you measured and I will work the rest out.</p>
+    </div>
+    <form class="composer" id="composer">
+      <input id="say" autocomplete="off" placeholder="Ask MNEMO, or type what you measured…"
+             aria-label="Ask MNEMO, or type what you measured">
+      <button class="send" id="send" type="submit" aria-label="Send">→</button>
+    </form>
+  </div>
+
+  <button class="next" id="next" type="button" disabled>
+    <span>Continue — layouts</span><em>→</em>
+  </button>
+  <p class="nextnote" id="nextnote"></p>
+
+</div>
+</div>
+
+<input type="file" id="file" accept="image/*,.pdf" hidden>
+<input type="file" id="cam"  accept="image/*" capture="environment" hidden>
+
+<script>
+(function(){
+'use strict';
+var $ = function(id){ return document.getElementById(id); };
+
+/* ── 舞台等比缩放：和 flow-carer.html 同一套 ────────────── */
+var stage = $('stage'), wrap = $('stagewrap');
+function fit(){
+  var k = Math.min(1, innerWidth / 1440);
+  stage.style.setProperty('--k', k);
+  wrap.style.height = (stage.offsetHeight * k) + 'px';
+}
+addEventListener('resize', fit); fit();
+
+/* 保存时间戳按真实时间，不写死 */
+(function(){
+  var d = new Date(), p = function(n){ return (n < 10 ? '0' : '') + n; };
+  $('saved').innerHTML = 'AUTOSAVED ' + p(d.getHours()) + ':' + p(d.getMinutes()) +
+                         ' &nbsp;·&nbsp; NOTHING SIGNED YET';
+  var DAY = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  var MON = ['January','February','March','April','May','June','July',
+             'August','September','October','November','December'];
+  $('when').textContent = DAY[d.getDay()] + ' ' + d.getDate() + ' ' + MON[d.getMonth()];
+})();
+
+/* ── 状态 ─────────────────────────────────────────────── */
+var st = { plan:null, source:'', later:'', reading:false };
+
+function fmtSize(b){
+  if (b == null) return '';
+  return b < 1048576 ? (b/1024).toFixed(0) + ' KB' : (b/1048576).toFixed(1) + ' MB';
+}
+function shortName(name, max){
+  max = max || 24;
+  if (name.length <= max) return name;
+  var dot = name.lastIndexOf('.');
+  var ext = dot > 0 ? name.slice(dot) : '';
+  var base = dot > 0 ? name.slice(0, dot) : name;
+  var keep = Math.max(6, max - ext.length - 1);
+  var head = Math.ceil(keep * 0.6);
+  return base.slice(0, head) + '…' + base.slice(-(keep - head)) + ext;
+}
+function say(html, cls){
+  var p = document.createElement('p');
+  if (cls) p.className = cls;
+  p.innerHTML = html;
+  $('msgs').appendChild(p);
+  $('msgs').scrollTop = $('msgs').scrollHeight;
+}
+
+/* ── 档案卡回显 ───────────────────────────────────────── */
+function set(id, val, good){
+  var el = $(id);
+  el.textContent = val || '—';
+  el.classList.toggle('blank', !val);
+  el.classList.toggle('good', !!good && !!val);
+}
+function render(){
+  set('vPlan', st.plan ? shortName(st.plan.name, 22) : (st.later ? st.later : ''), !!st.plan);
+  if (!st.plan && !st.later) $('vPlan').textContent = 'not added';
+  set('vSrc',   st.source);
+  set('vArea',  st.plan ? '54 m²' : '');
+  set('vRooms', st.plan ? '4' : '');
+  set('vDoor',  st.plan ? 'East side' : '');
+  set('vScale', st.plan ? '1:100' : '');
+
+  /* 完成度：图纸 + 来源 两件事，各占一半。没有第三件，别凑数。 */
+  var n = (st.plan ? 1 : 0) + (st.source ? 1 : 0);
+  var pctv = st.later && !st.plan ? 0 : Math.round(n / 2 * 100);
+  $('pct').innerHTML = 'HOME ' + pctv + '% COMPLETE &nbsp;·&nbsp; NOTHING SIGNED YET';
+  $('bar').style.width = pctv + '%';
+
+  $('count').textContent =
+    st.plan ? (st.source ? 'PLAN AND SOURCE ON THE RECORD' : 'PLAN ON THE RECORD · SOURCE MISSING')
+            : (st.later ? 'FLAGGED — ' + st.later.toUpperCase() : 'NOTHING ON THE RECORD YET');
+
+  $('srcneed').hidden = !(st.plan && !st.source);
+
+  /* 继续的条件：要么图纸+来源都有，要么明确说了今天不传。
+     两者都不满足就不放行 —— 但话说在按钮下面，不用弹窗拦人。 */
+  var ok = (st.plan && st.source) || !!st.later;
+  $('next').disabled = !ok;
+  $('nextnote').classList.toggle('show', !ok && (st.plan || st.reading));
+  $('nextnote').textContent = st.plan && !st.source ? 'Pick where the plan came from' : '';
+}
+
+/* ── 读图 ─────────────────────────────────────────────── */
+var BEATS = [
+  ['Reading the drawing…',  'Finding walls, doors and openings.',        18],
+  ['Measuring.',            'Working out room areas and door widths.',   58],
+  ['Checking clearances.',  'Turning circles and corridor widths.',      92]
+];
+function handleFile(f){
+  if (st.reading) return;
+  var name = (f && f.name) || 'floorplan.jpg';
+  var size = f ? fmtSize(f.size) : '';
+  st.reading = true;
+  st.later = '';
+  $('b-measure').setAttribute('aria-pressed','false');
+  $('b-later').setAttribute('aria-pressed','false');
+
+  $('drop').hidden = true;
+  $('planbox').hidden = true;
+  $('planhead').hidden = true;
+  $('reading').hidden = false;
+  say('<b>' + shortName(name) + '</b>' + (size ? ' · ' + size : ''), 'me');
+
+  var i = 0;
+  (function step(){
+    var b = BEATS[i];
+    $('r-title').textContent = b[0];
+    $('r-sub').textContent   = b[1];
+    $('r-bar').style.width   = b[2] + '%';
+    i++;
+    setTimeout(i < BEATS.length ? step : done, 850);
+  })();
+
+  function done(){
+    st.reading = false;
+    st.plan = { name:name, size:size };
+    $('reading').hidden = true;
+    $('planbox').hidden = false;
+    $('planhead').hidden = false;
+    $('p-name').textContent = shortName(name, 30);
+    $('p-meta').textContent = (size ? size + ' · ' : '') + '54 m² · 4 rooms · 1 entrance · 1:100';
+    say('Clear scan. 54 m², four rooms, one entrance on the east side, two south-facing windows. ' +
+        'Now tell me where it came from.');
+    render();
+    var first = document.querySelector('#src .chip');
+    if (first) first.focus({ preventScroll:true });
+  }
+  render();
+}
+
+/* ── 落图区交互 ───────────────────────────────────────── */
+$('b-file').addEventListener('click', function(e){ e.stopPropagation(); $('file').click(); });
+$('b-cam').addEventListener('click',  function(e){ e.stopPropagation(); $('cam').click(); });
+$('drop').addEventListener('click', function(e){ if (!e.target.closest('button')) $('file').click(); });
+$('drop').addEventListener('keydown', function(e){
+  if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); $('file').click(); }
+});
+$('file').addEventListener('change', function(){ handleFile(this.files[0]); });
+$('cam').addEventListener('change',  function(){ handleFile(this.files[0]); });
+
+['dragenter','dragover'].forEach(function(ev){
+  $('drop').addEventListener(ev, function(e){ e.preventDefault(); e.stopPropagation();
+    $('drop').classList.add('is-over'); });
+});
+['dragleave','drop'].forEach(function(ev){
+  $('drop').addEventListener(ev, function(e){ e.preventDefault(); e.stopPropagation();
+    $('drop').classList.remove('is-over'); });
+});
+$('drop').addEventListener('drop', function(e){
+  handleFile(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]);
+});
+window.addEventListener('dragover', function(e){ e.preventDefault(); });
+window.addEventListener('drop',     function(e){ e.preventDefault(); });
+
+$('p-re').addEventListener('click', function(){
+  st.plan = null; st.source = '';
+  Array.prototype.forEach.call(document.querySelectorAll('#src .chip'), function(c){
+    c.setAttribute('aria-pressed','false');
+  });
+  $('planbox').hidden = true; $('planhead').hidden = true; $('drop').hidden = false;
+  render();
+});
+
+/* ── 来源 ─────────────────────────────────────────────── */
+$('src').addEventListener('click', function(e){
+  var b = e.target.closest('.chip'); if (!b) return;
+  var on = b.getAttribute('aria-pressed') === 'true';
+  Array.prototype.forEach.call(this.querySelectorAll('.chip'), function(c){
+    c.setAttribute('aria-pressed','false');
+  });
+  b.setAttribute('aria-pressed', on ? 'false' : 'true');
+  st.source = on ? '' : b.dataset.v;
+  if (st.source) say('Source recorded: ' + st.source.toLowerCase() + '.');
+  render();
+});
+
+/* ── 今天不传 ─────────────────────────────────────────── */
+function pickLater(btn, label, line){
+  var on = btn.getAttribute('aria-pressed') === 'true';
+  $('b-measure').setAttribute('aria-pressed','false');
+  $('b-later').setAttribute('aria-pressed','false');
+  btn.setAttribute('aria-pressed', on ? 'false' : 'true');
+  st.later = on ? '' : label;
+  if (st.later) say(line);
+  render();
+}
+/* TODO 现场测量流程还没建（v2 里也是占位）。这里只记下这条待办， */
+/*      不假装它已经能走。 */
+$('b-measure').addEventListener('click', function(){
+  pickLater(this, 'To measure on site',
+    'Noted — you will measure on site. I will ask for the room sizes at the next visit.');
+});
+$('b-later').addEventListener('click', function(){
+  pickLater(this, 'Plan to follow',
+    'Flagged. The file will show “plan to follow” until someone adds it, and nothing can be signed off before then.');
+});
+
+/* ── 对话 ─────────────────────────────────────────────── */
+/* TODO 这里还没接 assets/llm.js。第 1 步走的是 carer-core.js + MNEMO_LLM，
+   等这一页并进主流程时应该一起接上，不要再单独写一套。 */
+var CANNED = [
+  [/scale|比例|not to scale|尺寸/i,
+   'It does not need to be to scale. Give me one length you measured — a doorway is usually 760–850 mm — and I scale the rest off it.'],
+  [/door|doorway|门/i,
+   'Doorway widths are the first thing I check. Tell me the narrowest one you measured and I will flag every route that fails it.'],
+  [/no plan|没有|cannot get|can.t get/i,
+   'Then use one of the two buttons below. Flagging it is better than guessing — a wrong plan is worse than no plan.'],
+  [/source|where.*came|来源/i,
+   'Family-provided drawings are often older than the flat as it stands now. If it looks out of date, photograph the rooms instead and mark it as taken on site.']
+];
+$('composer').addEventListener('submit', function(e){
+  e.preventDefault();
+  var t = $('say').value.trim(); if (!t) return;
+  $('say').value = '';
+  say(t, 'me');
+  var out = 'Noted — it will sit with this file.';
+  for (var i = 0; i < CANNED.length; i++) if (CANNED[i][0].test(t)){ out = CANNED[i][1]; break; }
+  setTimeout(function(){ say(out); }, 320);
+});
+
+/* ── 下一步 ───────────────────────────────────────────── */
+$('next').addEventListener('click', function(){
+  if (!this.disabled) location.href = './flow-carer-3.html';
+});
+
+render();
+})();
+</script>
+</body>
+</html>

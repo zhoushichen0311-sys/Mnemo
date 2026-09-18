@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MNEMOSYNE — Open a new file</title>
+
+<!-- ============================================================
+     MNEMO · 医护人员版 · 第 1 步（Profile）
+     ------------------------------------------------------------
+     对应 Figma：2342:65「CARER · 1 Profile（表单主导 · 对话为辅）」
+     坐标全部照搬 1440×960 画板，用一个 stage 等比缩放到窗口宽度，
+     所以任何窗口下看到的都和 Figma 一模一样。
+
+     和家属版 / 本人版的关键差别（不是文案差别，是结构差别）：
+       · 家属版左栏是对话，一次一题；这里左栏是表单，一屏一组
+       · 对话框降级到右下角的 dock，可以用但不必用
+       · 右侧档案卡是「回显」，跟着左边输入实时变
+       · 顶部有 FIRST FILE / AUTOSAVED / NOTHING SIGNED YET
+         —— 这是她第一次用系统，正在建自己的第一份服务对象档案
+
+     自然语言：和另外两版走同一个 assets/llm.js
+       MNEMO_LLM.route(text, question) → 判断这句是答案还是搭话
+       MNEMO_LLM.extract(text)         → 抽 name / age / gender
+       MNEMO_LLM.chat(text, ctx)       → 自由问答
+     llm.js 不在 / 断网 / 超时 → 一律退回本地关键词解析，页面不卡。
+     ============================================================ -->
+
+<style>
+/* 本地字体：不依赖网络，不阻塞渲染 */
+@font-face{
+  font-family:'InterLocal';
+  src:url('assets/fonts/inter-var.woff2') format('woff2-variations');
+  font-weight:100 900; font-style:normal; font-display:block;
+}
+@font-face{
+  font-family:'SpaceMonoLocal';
+  src:url('assets/fonts/space-mono-700.woff2') format('woff2');
+  font-weight:700; font-style:normal; font-display:block;
+}
+</style>
+
+<style>
+:root{
+  /* 与 flow.html 同源的底色 */
+  --cream-a:#F8ECDC; --cream-b:#F1ECE5;
+
+  --ink:#1A1917;      /* 正文 */
+  --mut:#736E66;      /* 次要 */
+  --faint:#948F87;    /* 更次要 */
+  --hint:#B0A99D;     /* 占位 / 未填 */
+  --mono-c:#8A8378;   /* mono 小标 */
+
+  --hair:#DEDAD2;     /* 卡片描边 */
+  --line:#CFC8BB;     /* 输入下划线 */
+  --hair-2:#ECE7DE;
+
+  --white:#FFFFFF;
+  --soft:#F1EAE0;     /* dock 底 */
+  --chipbg:#E7DED1;   /* 已选 chip / 进度槽 */
+
+  --accent:#ED7119;
+  --accent-d:#B0570F; /* 深一档，用在小字上保证对比度 */
+
+  --r-card:14px;
+}
+
+*,*::before,*::after{ box-sizing:border-box }
+/* 所有 <p> 都是绝对定位 + 明确 top，浏览器默认的 1em 上边距会把
+   mono 小标整体压低 9.5px，和 Figma 对不上。 */
+p{ margin:0 }
+
+html{ -webkit-text-size-adjust:100%; background:var(--cream-b) }
+body{
+  margin:0;
+  font-family:'InterLocal','Inter',system-ui,-apple-system,'Segoe UI','PingFang SC',sans-serif;
+  color:var(--ink);
+  background:
+    url('assets/bg/bg-family-carer.webp') center center / cover no-repeat fixed,
+    linear-gradient(160deg,var(--cream-a) 0%,var(--cream-b) 100%);
+  -webkit-font-smoothing:antialiased;
+  min-height:100dvh;
+  overflow-x:hidden;
+}
+.mono{
+  font-family:'SpaceMonoLocal','Space Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-weight:700; text-transform:uppercase; letter-spacing:.09em;
+}
+
+/* ── 舞台：1440×960 等比缩放，保证和 Figma 逐像素一致 ────── */
+.stagewrap{ width:100%; display:flex; justify-content:center; overflow:hidden }
+.stage{
+  position:relative;
+  width:1440px; height:960px;
+  transform-origin:top center;
+  transform:scale(var(--k,1));
+  flex:none;
+}
+
+/* ── 左侧固定件 ─────────────────────────────────────────── */
+.logo{ position:absolute; left:34px; top:38px; width:68px; height:68px; object-fit:contain }
+
+.exit{
+  position:absolute; left:40px; top:847px; width:56px; height:56px;
+  border-radius:50%; background:var(--white); border:1px solid var(--hair);
+  display:grid; place-items:center; color:var(--mut);
+  text-decoration:none; cursor:pointer;
+  transition:box-shadow .2s ease, color .18s ease, transform .14s ease;
+}
+.exit:hover{ box-shadow:0 6px 16px rgba(80,66,48,.14); color:var(--ink) }
+.exit:active{ transform:scale(.95) }
+.exit:focus-visible{ outline:2px solid var(--accent); outline-offset:3px }
+.exit-label{
+  position:absolute; left:43px; top:908px; margin:0;
+  font-size:7.5px; color:var(--mut); letter-spacing:.06em;
+}
+
+/* ── 顶部 ───────────────────────────────────────────────── */
+h1.title{
+  position:absolute; left:140px; top:44px; margin:0; width:900px;
+  font-size:34px; line-height:1.1; letter-spacing:-.022em; font-weight:700;
+}
+p.sub{
+  position:absolute; left:140px; top:94px; margin:0; width:700px;
+  font-size:14.5px; line-height:21px; color:var(--mut);
+}
+
+.stepchip{
+  position:absolute; left:1218px; top:52px; width:174px; height:36px;
+  border-radius:18px; background:var(--white); border:1px solid var(--hair);
+  display:flex; align-items:center; gap:10px; padding-left:20px;
+}
+.stepchip i{ width:8px; height:8px; border-radius:50%; background:var(--accent); flex:none }
+.stepchip span{ font-size:11px; color:var(--mut) }
+
+/* ── 步骤条 ─────────────────────────────────────────────── */
+.steps{ position:absolute; left:121px; top:152px; width:948px; height:30px }
+.steps > div{ position:absolute; top:0; width:150px; height:30px }
+.steps b{
+  position:absolute; top:0; left:0; width:150px; height:3px; border-radius:2px;
+  background:var(--hair); display:block;
+}
+.steps s{
+  position:absolute; top:14px; left:0; white-space:nowrap; text-decoration:none;
+  font-size:9.5px; color:var(--faint);
+  font-family:'SpaceMonoLocal','Space Mono',monospace;
+  font-weight:700; text-transform:uppercase; letter-spacing:.09em;
+}
+.steps .on b{ background:var(--accent) }
+.steps .on s{ color:var(--ink) }
+
+/* ── 上下文带 ───────────────────────────────────────────── */
+.visit{
+  position:absolute; left:121px; top:206px; height:26px;
+  padding:0 18px; border-radius:13px; background:var(--ink);
+  display:flex; align-items:center;
+  font-size:9.5px; color:#F6EFE5;
+}
+.when{
+  position:absolute; left:249px; top:212px;
+  font-size:13.5px; line-height:16px; color:var(--mut);
+}
+.saved{
+  position:absolute; right:48px; top:213px; text-align:right;
+  font-size:9.5px; color:var(--faint);
+}
+
+/* ── 左：录入面板 ───────────────────────────────────────── */
+.panel{
+  /* 高度从 520 加到 610：删掉了转介/案号/同意三格，换进来行动·视力·记忆
+     三行 chips，净增 90px。底边 862，Continue 在 x=1112 的右侧，不打架。 */
+  position:absolute; left:121px; top:252px; width:760px; height:610px;
+  background:var(--white); border:1px solid var(--hair);
+  border-radius:var(--r-card);
+}
+.gtitle{ position:absolute; font-size:9.5px; color:var(--mono-c) }
+.divider{ position:absolute; height:1px; background:var(--hair) }
+
+.f{ position:absolute }
+.f > label, .flab{
+  display:block; height:15px; margin:0;
+  font-size:12px; line-height:15px; font-weight:500; color:var(--mut);
+}
+.flab{ position:absolute }
+.f > input{
+  display:block; margin-top:7px; width:100%; height:26px;
+  border:0; border-bottom:1px solid var(--line); border-radius:0;
+  background:transparent; padding:0 0 8px;
+  font-family:inherit; font-size:15px; line-height:18px; color:var(--ink);
+  outline:none;
+}
+.f > input::placeholder{ color:var(--hint); font-weight:400 }
+.f > input:not(:placeholder-shown){ font-weight:500 }
+.f > input:focus{ border-bottom:2px solid var(--accent); padding-bottom:7px }
+/* 填了不合法的数就红一下线，但不拦着人继续打 —— 拦输入比标出来更烦 */
+.f > input.bad{ border-bottom-color:#C0442B }
+/* 被自然语言填进去的字段闪一下，让人看见发生了什么 */
+@keyframes fieldfill{ 0%{ background:rgba(237,113,25,.16) } 100%{ background:transparent } }
+.f.justfilled > input{ animation:fieldfill .9s ease-out }
+
+.chiprow{ position:absolute; display:flex; gap:10px }
+.chip{
+  height:32px; padding:0 15px; border-radius:16px;
+  border:1px solid var(--line); background:transparent;
+  font-family:inherit; font-size:13px; color:var(--mut);
+  cursor:pointer; white-space:nowrap;
+  transition:background .16s ease, color .16s ease, border-color .16s ease;
+}
+.chip:hover{ border-color:var(--mut); color:var(--ink) }
+.chip[aria-pressed="true"]{
+  background:var(--chipbg); border-color:transparent;
+  color:var(--ink); font-weight:500;
+}
+.chip:focus-visible{ outline:2px solid var(--accent); outline-offset:2px }
+
+/* ── 行动 / 视力 / 记忆 ─────────────────────────────────────
+   一行 = 左边标签(含 BASIS 小钮) + 右边一排 chips。
+   标签区 152px，chips 区 544px，够放最长的一组（行动 6 个）。
+   flex-wrap 是兜底：字体渲染差一点也不会溢出卡片。 */
+.nrow{ position:absolute; left:32px; width:696px; height:46px }
+.nrow .flab{ position:absolute; left:0; top:2px; width:148px }
+.nrow .bs{
+  position:absolute; left:0; top:22px; height:16px; padding:0;
+  border:0; background:transparent; cursor:pointer;
+  font-size:8px; color:var(--hint); letter-spacing:.09em;
+  font-family:'SpaceMonoLocal','Space Mono',monospace; font-weight:700;
+}
+.nrow .bs:hover{ color:var(--accent-d) }
+.nrow .bs.set{ color:var(--mut) }
+.nrow .bs:focus-visible{ outline:2px solid var(--accent); outline-offset:2px }
+.nrow .chiprow{
+  position:absolute; left:152px; top:0; width:544px;
+  flex-wrap:wrap; gap:8px;
+}
+/* 这一组的 chip 比上面的小一号 —— 一行要放六个 */
+.nrow .chip{ height:28px; padding:0 12px; font-size:12px }
+
+/* 勾完立刻回显推出来的尺寸要求。放在小标同一行的右端，
+   因为它就是这一组的**后果** —— 不该等到第 3 步才看见。 */
+.derive{
+  position:absolute; right:32px; top:378px; max-width:420px; text-align:right;
+  font-size:8.5px; line-height:12px; color:var(--hint);
+}
+.derive.on{ color:var(--accent-d) }
+
+/* ── 一键填写（2026-09-16）───────────────────────────────
+   这一屏要填 11 格。每演示一次就得从姓名敲到记忆那一行，
+   老师要看的是后面的平面和 3D。右上角一个小入口，点开是三位示例老人。
+   位置贴着「RECORDED BY · YOU」那条小标，不动 Figma 里已有的任何坐标。 */
+.useex{
+  position:absolute; right:32px; top:26px; font-size:9.5px;
+  color:var(--accent-d); background:none; border:0; padding:2px 0;
+  cursor:pointer; font-family:inherit;
+}
+.useex:hover{ text-decoration:underline }
+.useex:focus-visible{ outline:2px solid var(--accent); outline-offset:3px }
+.expop{
+  position:absolute; right:32px; top:50px; width:296px; z-index:6;
+  background:var(--white); border:1px solid var(--hair); border-radius:12px;
+  box-shadow:0 14px 34px rgba(80,66,48,.17); padding:8px;
+}
+.expop .ex-h{ position:static; padding:6px 10px 8px; font-size:9.5px; color:var(--mono-c) }
+.expop button{
+  display:block; width:100%; text-align:left; font-family:inherit;
+  background:none; border:0; border-radius:9px; padding:9px 10px; cursor:pointer;
+}
+.expop button:hover{ background:var(--soft) }
+.expop button:focus-visible{ outline:2px solid var(--accent); outline-offset:-2px }
+.expop button b{ display:block; font-size:13px; font-weight:600; color:var(--ink) }
+.expop button span{ display:block; margin-top:2px; font-size:11px; color:var(--mut) }
+.expop .ex-f{ position:static; padding:8px 10px 4px; font-size:10.5px;
+  line-height:15px; color:var(--faint) }
+
+.count{ position:absolute; left:32px; top:586px; font-size:9.5px; color:var(--mono-c) }
+.skip{
+  position:absolute; right:32px; top:583px;
+  font-size:13px; font-weight:500; color:var(--accent-d);
+  background:none; border:0; padding:0; cursor:pointer; font-family:inherit;
+}
+.skip:hover{ text-decoration:underline }
+
+/* ── 右：档案回显卡 ─────────────────────────────────────── */
+.file{
+  position:absolute; left:924px; top:252px; width:468px; height:380px;
+  background:var(--white); border:1px solid var(--hair);
+  border-radius:var(--r-card);
+}
+.file .lab{ position:absolute; left:26px; top:24px; font-size:9.5px; color:var(--mono-c) }
+.file .state{
+  position:absolute; right:26px; top:18px; height:22px;
+  padding:0 12px; border-radius:11px; border:1px solid var(--accent-d);
+  display:flex; align-items:center;
+  font-size:9.5px; color:var(--accent-d); white-space:nowrap;
+}
+.file .who{
+  position:absolute; left:26px; top:56px; margin:0;
+  font-size:21px; line-height:25px; font-weight:600; letter-spacing:-.01em;
+}
+.file .who.empty{ color:var(--hint); font-weight:400 }
+.file .meta{
+  position:absolute; left:26px; top:88px; margin:0;
+  font-size:13px; line-height:16px; color:var(--mut);
+}
+.file .hair{ position:absolute; left:26px; width:416px; height:1px; background:var(--hair) }
+
+.file .row{ position:absolute; left:26px; width:416px; height:16px }
+.file .row .k{
+  position:absolute; left:0; top:3px; font-size:9.5px; color:var(--faint);
+}
+.file .row .v{
+  position:absolute; right:0; top:0; max-width:300px;
+  font-size:13px; line-height:16px; font-weight:500; color:var(--ink);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  transition:color .2s ease;
+}
+.file .row .v.blank{ font-weight:400; color:var(--hint) }
+
+.file .pct{ position:absolute; left:26px; top:326px; font-size:9.5px; color:var(--mono-c) }
+.file .track{
+  position:absolute; left:26px; top:348px; width:416px; height:6px;
+  border-radius:3px; background:var(--chipbg); overflow:hidden;
+}
+.file .track i{
+  display:block; height:6px; width:0; border-radius:3px;
+  background:var(--accent); transition:width .35s cubic-bezier(.22,1,.36,1);
+}
+
+/* ── 右下：对话坞（配角，但功能完整） ───────────────────── */
+.dock{
+  position:absolute; left:924px; top:633px; width:468px; height:156px;
+  background:var(--soft); border-radius:var(--r-card);
+}
+.dock .av{ position:absolute; left:26px; top:30px; width:34px; height:34px; border-radius:50% }
+.dock .msgs{
+  position:absolute; left:74px; top:26px; width:368px; height:60px;
+  overflow-y:auto; overscroll-behavior:contain;
+  font-size:13.5px; line-height:20px; color:var(--mut);
+  scrollbar-width:thin;
+}
+.dock .msgs p{ margin:0 0 8px }
+.dock .msgs p:last-child{ margin-bottom:0 }
+.dock .msgs p.me{ color:var(--ink); font-weight:500 }
+.dock .msgs p.ok{ color:var(--accent-d) }
+
+.composer{
+  position:absolute; left:26px; top:96px; width:416px; height:44px;
+  background:var(--white); border:1px solid var(--hair); border-radius:22px;
+  display:flex; align-items:center;
+}
+.composer input{
+  flex:1; min-width:0; height:42px; border:0; background:transparent; outline:none;
+  padding:0 8px 0 22px; font-family:inherit; font-size:13.5px; color:var(--ink);
+}
+.composer input::placeholder{ color:var(--hint) }
+.send{
+  width:32px; height:32px; margin-right:6px; flex:none;
+  border-radius:50%; border:0; background:var(--ink); color:var(--accent);
+  display:grid; place-items:center; cursor:pointer;
+  font-size:14px; line-height:1; font-family:inherit;
+  transition:transform .14s ease, opacity .2s ease;
+}
+.send:hover{ transform:scale(1.06) }
+.send:disabled{ opacity:.45; cursor:default; transform:none }
+.send:focus-visible{ outline:2px solid var(--accent); outline-offset:2px }
+
+/* 想的时候三个点 */
+.dots i{
+  display:inline-block; width:4px; height:4px; margin-right:3px;
+  border-radius:50%; background:var(--faint);
+  animation:blip 1.05s infinite ease-in-out;
+}
+.dots i:nth-child(2){ animation-delay:.14s }
+.dots i:nth-child(3){ animation-delay:.28s }
+@keyframes blip{ 0%,60%,100%{ opacity:.25 } 30%{ opacity:1 } }
+
+/* ── 继续 ───────────────────────────────────────────────── */
+.next{
+  position:absolute; left:1112px; top:858px; width:286px; height:44px;
+  border-radius:22px; background:var(--ink); border:0; cursor:pointer;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 20px 0 22px; font-family:inherit;
+  transition:transform .14s ease, box-shadow .2s ease;
+}
+.next span{ font-size:13.5px; font-weight:600; color:#F6EFE5 }
+.next em{ font-style:normal; color:var(--accent); font-size:15px }
+.next:hover{ transform:translateY(-1px); box-shadow:0 8px 20px rgba(40,32,22,.22) }
+/* ⚠️ 2026-09-17：这一条原来没有。第 1 步之前不拦，所以没人写过禁用态；
+   现在要拦了，没这一条的话按钮看起来还是亮的、点了没反应 ——
+   那比不拦更糟。取值和第 2/3/5 步完全一样。 */
+.next:disabled{ opacity:.4; cursor:default; transform:none; box-shadow:none }
+.next:focus-visible{ outline:2px solid var(--accent); outline-offset:3px }
+.nextnote{
+  position:absolute; left:1112px; top:910px; width:286px; margin:0;
+  font-size:11.5px; color:var(--mut); text-align:right; opacity:0;
+  transition:opacity .25s ease;
+}
+.nextnote.show{ opacity:1 }
+
+@media (prefers-reduced-motion:reduce){
+  *{ animation-duration:.001ms !important; transition-duration:.001ms !important }
+}
+
+/* 签完字之后的横幅。位置在录入面板正上方，和「上下文带」同一行高度 */
+.lockbar{ position:absolute; left:121px; top:884px; width:900px;
+  font-size:9px; line-height:13px; color:#B0570F; letter-spacing:.06em;
+  text-transform:none; }
+</style>
+</head>
+
+<body>
+<div class="stagewrap" id="stagewrap">
+<div class="stage" id="stage">
+
+  <img class="logo" src="assets/logo.png" alt="MNEMOSYNE">
+
+  <a class="exit" href="./index.html" aria-label="Save and exit">
+    <svg width="14" height="10" viewBox="0 0 14 10" fill="none" aria-hidden="true">
+      <path d="M5 1 1 5l4 4M1 5h12" stroke="currentColor" stroke-width="1.6"
+            stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </a>
+  <p class="exit-label mono">SAVE&amp;EXIT</p>
+
+  <h1 class="title">Open a new file.</h1>
+  <p class="sub">Your details first, then theirs. Fill them in any order.</p>
+
+  <div class="stepchip"><i></i><span class="mono">STEP 1 OF 5</span></div>
+
+  <nav class="steps" aria-label="Progress">
+    <div class="on" style="left:0"><b></b><s>PROFILE</s></div>
+    <div style="left:162px"><b></b><s>THEIR HOME</s></div>
+    <div style="left:324px"><b></b><s>LAYOUTS</s></div>
+    <div style="left:486px"><b></b><s>PREVIEW</s></div>
+    <div style="left:648px"><b></b><s>HANDOVER</s></div>
+  </nav>
+
+  <div class="visit mono">FIRST FILE</div>
+  <p class="when" id="when">&nbsp;</p>
+  <p class="saved mono" id="saved">AUTOSAVED 09:12 &nbsp;·&nbsp; NOTHING SIGNED YET</p>
+
+  <!-- ══ 左：录入 ══════════════════════════════════════════ -->
+  <section class="panel" aria-label="Open a new file">
+
+    <p class="gtitle mono" style="left:32px;top:30px">RECORDED BY &nbsp;·&nbsp; YOU</p>
+    <!-- 一键填写：三位示例老人，资料在 assets/personas.js -->
+    <button type="button" class="useex mono" id="useex" aria-expanded="false"
+            aria-controls="expop">USE AN EXAMPLE FILE &nbsp;▾</button>
+    <div class="expop" id="expop" hidden role="group" aria-label="Example residents"></div>
+
+    <div class="f" style="left:32px;top:58px;width:216px">
+      <label for="k-name">Your name</label>
+      <input id="k-name" data-k="carerName" autocomplete="off" placeholder="Alice McCain">
+    </div>
+    <div class="f" style="left:272px;top:58px;width:216px">
+      <label for="k-role">Your role</label>
+      <input id="k-role" data-k="carerRole" autocomplete="off" placeholder="Care worker">
+    </div>
+    <div class="f" style="left:512px;top:58px;width:216px">
+      <label for="k-team">Team</label>
+      <input id="k-team" data-k="carerTeam" autocomplete="off" placeholder="Elmfield Community Team">
+    </div>
+
+    <div class="divider" style="left:32px;top:140px;width:696px"></div>
+
+    <p class="gtitle mono" style="left:32px;top:168px">THE PERSON YOU ARE VISITING</p>
+
+    <div class="f" style="left:32px;top:196px;width:340px">
+      <label for="k-pname">Name</label>
+      <input id="k-pname" data-k="name" autocomplete="off" placeholder="Ying Zhang">
+    </div>
+    <div class="f" style="left:396px;top:196px;width:100px">
+      <label for="k-age">Age</label>
+      <input id="k-age" data-k="age" inputmode="numeric" autocomplete="off" placeholder="72">
+    </div>
+    <div class="f" style="left:520px;top:196px;width:176px">
+      <label for="k-gender">Gender</label>
+      <input id="k-gender" data-k="gender" autocomplete="off" placeholder="She / her">
+    </div>
+
+    <div class="f" style="left:32px;top:276px;width:216px">
+      <label for="k-lives">Lives with</label>
+      <input id="k-lives" data-k="lives" autocomplete="off" placeholder="Alone">
+    </div>
+    <div class="f" style="left:272px;top:276px;width:216px">
+      <label for="k-home">Home type</label>
+      <input id="k-home" data-k="home" autocomplete="off" placeholder="Ground-floor flat">
+    </div>
+
+    <!-- ── 她怎么动、怎么看、怎么记 ─────────────────────────
+         这一组不是补充信息，是整套方案的**起点**：门洞该 850 还是
+         不作要求，取决于她坐不坐轮椅。在这之前第 2/3/4 步用的
+         尺寸都只是写死的常数。选项和权重与家属版完全一致。
+         右上角实时回显推导结果，勾完立刻看得到后果。 -->
+    <div class="divider" style="left:32px;top:352px;width:696px"></div>
+    <p class="gtitle mono" style="left:32px;top:378px">HOW SHE MOVES, SEES AND REMEMBERS</p>
+    <p class="derive mono" id="derive">NO MOBILITY RECORDED YET</p>
+
+    <div class="nrow" style="top:408px">
+      <p class="flab">Getting around</p>
+      <button type="button" class="bs mono" data-b="bMobility">HOW?</button>
+      <div class="chiprow" data-need="mobility" role="group" aria-label="Getting around"></div>
+    </div>
+    <div class="nrow" style="top:462px">
+      <p class="flab">Eyesight</p>
+      <button type="button" class="bs mono" data-b="bVision">HOW?</button>
+      <div class="chiprow" data-need="vision" role="group" aria-label="Eyesight"></div>
+    </div>
+    <div class="nrow" style="top:516px">
+      <p class="flab">Memory</p>
+      <button type="button" class="bs mono" data-b="bMemory">HOW?</button>
+      <div class="chiprow" data-need="memory" role="group" aria-label="Memory"></div>
+    </div>
+
+    <div class="divider" style="left:32px;top:570px;width:696px"></div>
+    <!-- 2026-09-17：原文是「YOU CAN LEAVE THE REST AND COME BACK」——
+         现在第 1 步要填满才放行，那句话就成了假的。文案改成由 render() 现写。 -->
+    <p class="count mono" id="count">0 OF 11 FILLED</p>
+    <button type="button" class="skip" id="skip">Skip the rest for now</button>
+  </section>
+
+  <!-- ══ 右：档案回显 ══════════════════════════════════════ -->
+  <aside class="file" aria-label="Client file" aria-live="polite">
+    <p class="lab mono">CLIENT FILE</p>
+    <div class="state mono" id="state">NOT SAVED YET</div>
+
+    <p class="who empty" id="fWho">No name yet</p>
+    <p class="meta" id="fMeta">Nothing recorded</p>
+
+    <div class="hair" style="top:122px"></div>
+
+    <div class="row" style="top:144px"><span class="k mono">RECORDED BY</span>    <span class="v blank" id="vCarer">—</span></div>
+    <div class="row" style="top:170px"><span class="k mono">ROLE</span>           <span class="v blank" id="vRole">—</span></div>
+    <div class="row" style="top:196px"><span class="k mono">TEAM</span>           <span class="v blank" id="vTeam">—</span></div>
+    <!-- 转介 / 案号 / 同意三行换成了她的状况 —— 行数不变，右卡不用改高 -->
+    <div class="row" style="top:222px"><span class="k mono">GETTING AROUND</span> <span class="v blank" id="vMob">—</span></div>
+    <div class="row" style="top:248px"><span class="k mono">EYESIGHT</span>       <span class="v blank" id="vVis">—</span></div>
+    <div class="row" style="top:274px"><span class="k mono">MEMORY</span>         <span class="v blank" id="vMem">—</span></div>
+
+    <div class="hair" style="top:310px"></div>
+    <p class="pct mono" id="pct">FILE 0% COMPLETE &nbsp;·&nbsp; NOTHING SIGNED YET</p>
+    <div class="track"><i id="bar"></i></div>
+  </aside>
+
+  <!-- ══ 右下：对话（可以用，但不必用） ════════════════════ -->
+  <div class="dock">
+    <img class="av" src="assets/logo.png" alt="">
+    <div class="msgs" id="msgs">
+      <p id="lead">Not sure what to put? Ask me. Or just type what you saw and I will file it in the right place.</p>
+    </div>
+    <form class="composer" id="composer">
+      <input id="say" autocomplete="off" placeholder="Ask MNEMO, or type an answer…"
+             aria-label="Ask MNEMO, or type an answer">
+      <button class="send" id="send" type="submit" aria-label="Send">→</button>
+    </form>
+  </div>
+
+  <button class="next" id="next" type="button">
+    <span>Continue — their home</span><em>→</em>
+  </button>
+  <p class="nextnote" id="nextnote"></p>
+
+</div>
+</div>
+
+<script src="assets/llm.js?v=20260917"></script>
+<script src="assets/nlu-rules.js"></script>
+<script src="assets/personas.js?v=20260917"></script>
+<!-- ── F5 = 这份重来（2026-09-17）─────────────────────────
+     医护版是表单式的，carer-core.js 一加载就把 sessionStorage 回填进表单。
+     那在**翻页**时是必须的 —— 这一版是五个独立页面，每次「下一步」
+     都是真正的页面加载，不回填流程根本走不通；
+     但在**刷新第 1 步**时是错的 —— 家属版和本人版都是单页，
+     F5 就是回到第一问、什么都没有。
+
+     performance 的 navigation type 能把这两件事分开：
+       'reload'        F5 / Ctrl+R / location.reload()   → 清
+       'navigate'      点链接、从身份页跳过来           → 留
+       'back_forward'  浏览器前进后退                   → 留
+
+     只有第 1 步这么做。第 2–5 步刷新也清的话，会卡在一个没有数据、
+     什么都画不出来的页面上。
+     ⬆ 必须写在 carer-core.js **之前** —— 那个文件在文末就「立刻读档」了。 -->
+<script>
+(function(){
+  try{
+    var e = performance.getEntriesByType && performance.getEntriesByType('navigation')[0];
+    var t = e ? e.type
+          : (performance.navigation && performance.navigation.type === 1 ? 'reload' : 'navigate');
+    if (t !== 'reload') return;
+    ['mnemo:carer', 'mnemo:carer:thought', 'mnemo:carer:forked']
+      .forEach(function(k){ sessionStorage.removeItem(k); });
+  }catch(err){}
+})();
+</script>
+<script src="assets/carer-core.js?v=20260917"></script>
+<script>
+(function(){
+'use strict';
+var C = window.MNEMO_CARER, $ = C.$, data = C.data;
+
+/* 这一屏自己数的 9 格（右卡那条进度条数的是整份档案的 12 格，
+   两个分母不一样是故意的：这屏填完了，档案还没填完）。 */
+/* 11 格 = 这一屏的分母。转介/案号/同意已删，换进行动·视力·记忆。 */
+var MINE = ['carerName','carerRole','carerTeam','name','age','gender','lives','home',
+            'mobility','vision','memory'];
+
+/* ── 表单 ─────────────────────────────────────────────── */
+var inputs = {};
+Array.prototype.forEach.call(document.querySelectorAll('.f input'), function(el){
+  var k = el.getAttribute('data-k');
+  inputs[k] = el;
+  el.value = data[k] || '';
+  /* 长度上限：原来一个都没有，姓名贴进 4400 字会把右卡标题撑到 2556px */
+  if (C.MAXLEN[k]) el.setAttribute('maxlength', C.MAXLEN[k]);
+  el.addEventListener('input', function(){
+    if (k === 'age'){
+      /* 年龄原来照收 200 岁、abc、-5 */
+      var r = C.checkNum('age', el.value);
+      data.age = r.v;
+      el.classList.toggle('bad', !r.ok);
+      el.title = r.ok ? '' : r.why;
+    } else {
+      data[k] = el.value.trim();
+    }
+    C.stamp(); C.render();
+  });
+});
+
+/* ── 三组状况的 chips ──────────────────────────────────
+   选项和权重都在内核的 C.NEEDS 里（与家属版同一份），
+   这里只负责把它们画出来、记下勾了哪些。多选。 */
+Array.prototype.forEach.call(document.querySelectorAll('.chiprow[data-need]'), function(row){
+  var kind = row.dataset.need;
+  C.NEEDS[kind].forEach(function(opt){
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'chip';
+    b.dataset.kind = kind; b.dataset.val = opt[0];
+    b.textContent = opt[0];                /* 文字由 paintChips 按语言重画 */
+    b.title = opt[1];                      /* 悬停看完整说法 */
+    b.setAttribute('aria-pressed','false');
+    b.addEventListener('click', function(){
+      C.listToggle(kind, opt[0]);
+      /* 勾了具体问题就不该同时还写着「没问题」，反之亦然 */
+      var none = kind === 'mobility' ? 'Unaided' : 'No issues';
+      var picked = C.listGet(kind);
+      if (opt[0] === none && picked.length > 1)
+        data[kind] = none;
+      else if (opt[0] !== none && picked.indexOf(none) > -1)
+        data[kind] = picked.filter(function(x){ return x !== none; }).join(',');
+      /* 第一次勾上就默认「你亲眼看到的」—— 医护在现场，这是最常见的情况 */
+      var bk = 'b' + kind.charAt(0).toUpperCase() + kind.slice(1);
+      if (data[kind] && !data[bk]) data[bk] = 'measured';
+      if (!data[kind]) data[bk] = '';
+      C.stamp(); C.render();
+    });
+    row.appendChild(b);
+  });
+});
+
+/* BASIS：这一组你是怎么知道的。点一下换一档。 */
+Array.prototype.forEach.call(document.querySelectorAll('.bs[data-b]'), function(btn){
+  btn.addEventListener('click', function(){
+    var k = btn.dataset.b;
+    var kind = k.slice(1,2).toLowerCase() + k.slice(2);
+    if (!data[kind]) return;               /* 还没勾任何一项就没有「怎么知道的」 */
+    data[k] = C.basisNext(data[k] || 'measured');
+    C.stamp(); C.render();
+  });
+});
+
+function paintChips(){
+  Array.prototype.forEach.call(document.querySelectorAll('.chip[data-kind]'), function(b){
+    b.setAttribute('aria-pressed', String(C.listHas(b.dataset.kind, b.dataset.val)));
+    /* 切到中文时按钮文字也要跟着换 —— data-val 里存的始终是英文，
+       落库的值不受语言影响。 */
+    b.textContent = C.needShort(b.dataset.val);
+    b.title = C.needLong(b.dataset.kind, b.dataset.val);
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('.bs[data-b]'), function(btn){
+    var k = btn.dataset.b;
+    var kind = k.slice(1,2).toLowerCase() + k.slice(2);
+    var on = !!data[kind];
+    btn.textContent = on ? C.basisLabel(data[k] || 'measured', false, 'seen')
+                         : ('HOW?');
+    btn.classList.toggle('set', on);
+    btn.disabled = !on;
+    btn.style.visibility = on ? 'visible' : 'hidden';
+  });
+
+  /* 推导回显 —— 勾完立刻看得到后果 */
+  var n = C.needs(), el = $('derive');
+  el.textContent = C.needsLine().toUpperCase();
+  el.classList.toggle('on', !!n);
+}
+
+/* 一组多选里最严重的那一项，用完整说法（右卡一行只放得下一个） */
+function worst(kind){
+  var picked = C.listGet(kind), rows = C.NEEDS[kind], best = null, bw = -1;
+  picked.forEach(function(v){
+    rows.forEach(function(r){ if (r[0] === v && r[2] > bw){ bw = r[2]; best = r[0]; } });
+  });
+  return best ? C.needLong(kind, best) : '';
+}
+
+function fill(k, v){
+  if (!v) return false;
+  v = String(v).trim();
+  if (!v || data[k] === v) return false;
+  data[k] = v;
+  if (inputs[k]){ inputs[k].value = v; C.flash(inputs[k].parentNode); }
+  return true;
+}
+
+/* ── 顶部日期 ─────────────────────────────────────────── */
+(function(){
+  var d = new Date();
+  var wd = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][d.getDay()];
+  var mo = ['January','February','March','April','May','June','July',
+            'August','September','October','November','December'][d.getMonth()];
+  /* 「next visit 14:00 · Camden」删掉了 —— 这是她的第一份档案，
+     没有下一户，Camden 这个区也从来没有采集过。 */
+  $('when').innerHTML = wd + ' ' + d.getDate() + ' ' + mo +
+    ' &nbsp;·&nbsp; setting up your first client file';
+})();
+
+$('skip').addEventListener('click', function(){ $('next').focus(); });
+
+/* ── 这一屏认哪些话 · 怎么落地 · 怎么回显 ─────────────── */
+var LABEL = {
+  en:{ carerName:'your name', carerRole:'your role', carerTeam:'your team',
+       name:'their name', age:'age', gender:'gender', lives:'lives with',
+       home:'home type', mobility:'how she gets around',
+       vision:'her eyesight', memory:'her memory' }
+};
+
+var ASK = {
+  carerName:'What is your name?', carerRole:'What is your role?',
+  carerTeam:'Which team are you with?', name:'What is their name?',
+  age:'How old are they?', gender:'What are their pronouns?',
+  lives:'Who do they live with?', home:'What kind of home is it?',
+  mobility:'How does she get around indoors?',
+  vision:'And her eyesight?', memory:'And her memory?'
+};
+
+C.boot({
+  usesExtract: true,
+
+  parse: function(text){ return C.parsePerson(text); },
+
+  apply: function(patch){
+    var names = LABEL.en, hit = [];
+    for (var k in names) if (patch[k] && fill(k, patch[k])) hit.push(names[k]);
+    if (hit.length){ C.stamp(); C.render(); }
+    return hit;
+  },
+
+  question: function(){
+    for (var i = 0; i < MINE.length; i++) if (!data[MINE[i]]) return ASK[MINE[i]];
+    return 'Anything else about this person before we look at their home?';
+  },
+
+  ctx: function(){
+    var b = ['Step 1 of 5: a care worker is opening a new client file'];
+    if (data.carerName) b.push('recorded by: ' + data.carerName +
+                               (data.carerRole ? ' (' + data.carerRole + ')' : ''));
+    if (data.name)  b.push('resident: ' + data.name);
+    if (data.age)   b.push('age: ' + data.age);
+    if (data.home)  b.push('home: ' + data.home);
+    if (data.lives) b.push('lives with: ' + data.lives);
+    if (data.mobility) b.push('gets around: ' + data.mobility);
+    if (data.vision)   b.push('eyesight: ' + data.vision);
+    if (data.memory)   b.push('memory: ' + data.memory);
+    var n = C.needs();
+    if (n) b.push('so the home must give: ' + C.needsLine(false));
+    return b.join('; ');
+  },
+
+  miss: function(){
+    return 'I could not place that. Type it straight into a field on the left — that always works.';
+  },
+
+  render: function(){
+    paintChips();
+    C.setV($('vCarer'),   data.carerName);
+    C.setV($('vRole'),    data.carerRole);
+    C.setV($('vTeam'),    data.carerTeam);
+    /* 右卡显示最严重的那一项 —— 一行放不下整串，完整清单在左边 */
+    C.setV($('vMob'), worst('mobility'));
+    C.setV($('vVis'), worst('vision'));
+    C.setV($('vMem'), worst('memory'));
+
+    /* ── 填满才放行（2026-09-17）───────────────────────────
+       之前一格不填也能点「Continue」。第 2/3/5 步都是拦的
+       （比如第 2 步 $('next').disabled = !data.homeStd），只有第 1 步和第 4 步漏了。
+       家属版和本人版是一问一答，这 11 个问题一个都跳不过去，
+       所以这一版也要 11 格全填。
+
+       灰按钮不给理由是最难受的，所以把**差哪几项**写出来：
+       这页本来就有一条 .nextnote（就在按钮正下方），直接用它。
+       字段名用上面那张 LABEL 表（中文版移除后只剩英文一套）。 */
+    var names = LABEL.en;
+    var left  = [];
+    for (var i = 0; i < MINE.length; i++){
+      if (data[MINE[i]]) continue;
+      left.push(names[MINE[i]] || MINE[i]);
+    }
+    var n = MINE.length - left.length;
+
+    $('count').innerHTML = n + ' OF ' + MINE.length + ' FILLED' +
+      (left.length
+        ? ('&nbsp;\u00b7&nbsp; ' + ((left.length + ' STILL NEEDED')))
+        : ('&nbsp;\u00b7&nbsp; ' + ('READY FOR THEIR HOME')));
+
+    var btn  = $('next'), note = $('nextnote');
+    if (btn) btn.disabled = left.length > 0;
+    if (note){
+      if (!n){
+        /* 刚进来，11 格一个都没填 —— 此时报「还差你的姓名、你的职位…」
+           等于把左边表单又读了一遍，还会折成两行。这种时候只说一句。 */
+        note.textContent = 'Fill in the file on the left to continue.';
+        note.classList.add('show');
+      } else if (left.length){
+        /* 填了一半，这时候「到底差哪几格」才是真的难找。只列前三个。 */
+        var head = left.slice(0, 3).join(', ');
+        var more = left.length > 3
+          ? ((', and ' + (left.length - 3) + ' more'))
+          : '';
+        note.textContent = ('Still to fill: ') + head + more;
+        note.classList.add('show');
+      } else {
+        note.textContent = '';
+        note.classList.remove('show');
+      }
+    }
+  },
+
+  next: { href:'./flow-carer-2.html', label:'Step 2' }
+});
+
+/* ═══ 一键填写（2026-09-16）═══════════════════════════════════
+   点右上角那个小入口 → 三位示例老人 → 这一屏 11 格一次填满。
+   填的是同一个 data 对象、同一个 C.render()，和手填一模一样，
+   所以一键填写不会填出手填填不出的东西。
+
+   ⚠️ 三组状况的「怎么知道的」一律写成 records（FROM RECORDS），
+   不写 measured。measured 在这一版读作「你亲眼看到的」——
+   这些数据来自一份示例档案，不是她在现场看到的，不能这么标。
+   三位老人的资料、哪些是编的，都在 assets/personas.js 顶上写着。 */
+(function(){
+  var P = window.MNEMO_PERSONAS;
+  var btn = $('useex'), pop = $('expop');
+  if (!P || !btn || !pop) return;
+
+  var head = document.createElement('p');
+  head.className = 'ex-h mono';
+  head.textContent = 'THREE EXAMPLE RESIDENTS';
+  pop.appendChild(head);
+
+  P.list.forEach(function(p){
+    var b = document.createElement('button');
+    b.type = 'button';
+    var t = document.createElement('b');    t.textContent = p.name + ', ' + p.age;
+    var s = document.createElement('span'); s.textContent = p.head;
+    b.appendChild(t); b.appendChild(s);
+    b.addEventListener('click', function(){ useExample(p); close(); });
+    pop.appendChild(b);
+  });
+
+  var foot = document.createElement('p');
+  foot.className = 'ex-f';
+  foot.textContent = 'These are examples, not real clients. '
+                   + 'Everything they fill in is editable.';
+  pop.appendChild(foot);
+
+  function open(){ pop.hidden = false; btn.setAttribute('aria-expanded','true'); }
+  function close(){ pop.hidden = true;  btn.setAttribute('aria-expanded','false'); }
+  btn.addEventListener('click', function(e){
+    e.stopPropagation();
+    if (pop.hidden) open(); else close();
+  });
+  document.addEventListener('click', function(e){
+    if (!pop.hidden && !pop.contains(e.target) && e.target !== btn) close();
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape' && !pop.hidden){ close(); btn.focus(); }
+  });
+
+  function useExample(p){
+    var R = P.recorder;
+    fill('carerName', R.carerName);
+    fill('carerRole', R.carerRole);
+    fill('carerTeam', R.carerTeam);
+    fill('name',   p.name);
+    fill('age',    p.age);
+    fill('gender', p.pron);
+    fill('lives',  P.map.carer.lives[p.lives] || p.lives);
+    fill('home',   p.home);
+    [['mobility','mob'], ['vision','vis'], ['memory','mem']].forEach(function(pair){
+      var kind = pair[0];
+      var list = P.words(p, 'carer', pair[1]);
+      /* 存的是逗号分隔的短标签串 —— 和 C.listToggle 落库的格式一致 */
+      data[kind] = list.join(',');
+      var bk = 'b' + kind.charAt(0).toUpperCase() + kind.slice(1);
+      data[bk] = list.length ? 'records' : '';
+    });
+    C.stamp(); C.render();
+    C.push('Filled in from the example file for ' + p.name
+         + '. It is an example, not a real client — change anything on the left.');
+  }
+})();
+})();
+</script>
+</body>
+</html>

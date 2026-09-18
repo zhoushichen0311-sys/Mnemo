@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MNEMOSYNE — Core System</title>
+
+<style>
+/* 本地字体：和 index / research / project / library / cube-system 共用，不依赖网络 */
+@font-face{ font-family:'InterLocal'; src:url('assets/fonts/inter-var.woff2') format('woff2-variations');
+  font-weight:100 900; font-style:normal; font-display:block }
+@font-face{ font-family:'SpaceMonoLocal'; src:url('assets/fonts/space-mono-700.woff2') format('woff2');
+  font-weight:700; font-style:normal; font-display:block }
+</style>
+
+<style>
+/* ============================================================
+   MNEMOSYNE · Core System
+   对应 Figma frame 563:65 —— 1440 × 2793
+   坐标 / 字号 / 字距 / 色值全部取自该 frame 的实测值。
+
+   为什么这一页用「常规响应式」（--stage / --pad + 媒体查询），
+   而不是 research / cube-system 那种「固定画布 + 整体缩放」：
+   这一页的骨架是**规则网格** —— 五张等宽流程卡、四张等宽分析图、
+   两张等宽对比卡、四行等长评分条，列位都落在 152 / 1136 这条正文栏上。
+   而且它文字量很大（五段说明 + 八条图注），整体缩放会把 11.5px 的正文
+   在手机上缩成 3px，等于没法读。
+   唯一一处「构图」是 04 —— 三张图有意错位叠着（大图从 1680 起，
+   两张小图从 1744 起）。那一块单独做成一个锁死比例的盒子，
+   里面用百分比定位，整块等比缩放，错位关系不会散。
+   ============================================================ */
+:root{
+  --bg:#EFECE6;          /* 页面底色 */
+  --nav:#141414;
+  --eyebrow:#8C8780;     /* CORE SYSTEM */
+  --title:#1C1A17;       /* 大标题 / 强调句 */
+  --body:#6B6661;        /* 正文 */
+  --accent:#ED7119;      /* 橙：章节号 / 箭头 / after 值 */
+  --caps:#F5F3EF;
+  --nav-dim:#9E9991;
+  --meta:#8C8780;
+  --card:#F6F4EE;        /* 卡片底色 */
+  --card-bd:#D6D1C7;     /* 卡片描边 */
+  --hair:#CCC7BD;        /* 章节分隔细线 */
+  --track:#DBD7CF;       /* 评分条底槽 */
+  --before:#B8A894;      /* 评分条 before（灰） */
+  --lab:#4D4A45;         /* 评分条左侧标签 */
+  --fail:#9E472E;        /* BEFORE 的 0 分 */
+  --shot-bg:#E0DDD5;     /* 图还没加载出来时的占位底色 */
+
+  --sans:'InterLocal','Inter',system-ui,-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+  --mono:'SpaceMonoLocal','Space Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+
+  --stage:1440px;
+  --pad:152px;
+  --nav-h:76px;
+}
+*{ box-sizing:border-box }
+html{ background:var(--bg); scroll-behavior:smooth; scroll-padding-top:var(--nav-h) }
+body{
+  margin:0; background:var(--bg); color:var(--body);
+  font-family:var(--sans); -webkit-font-smoothing:antialiased; overflow-x:clip;
+}
+.wrap{ width:min(100%, var(--stage)); margin-inline:auto; padding-inline:var(--pad) }
+
+/* ---------- 导航（和 project / library / cube-system 逐字相同） ---------- */
+.nav{ position:fixed; top:0; left:0; right:0; z-index:60;
+      height:var(--nav-h); background:var(--nav) }
+.nav-in{
+  width:min(100%, var(--stage)); margin-inline:auto; height:100%;
+  padding-inline:56px; display:flex; align-items:center; justify-content:space-between;
+}
+.brand{ display:block; line-height:0 }
+.brand img{ display:block; width:92.9px; height:36px; object-fit:contain }
+.nav-r{ display:flex; align-items:center; gap:32px }
+.contact{ font-size:13px; font-weight:500; color:var(--nav-dim); text-decoration:none;
+          transition:color .22s ease }
+.contact:hover{ color:var(--caps) }
+.burger{ width:24px; height:18px; padding:0; background:none; border:0; cursor:pointer;
+         display:flex; flex-direction:column; justify-content:space-between }
+.burger i{ display:block; height:2px; border-radius:1px; background:var(--caps);
+           transition:transform .26s ease, opacity .2s ease }
+.burger[aria-expanded="true"] i:nth-child(1){ transform:translateY(8px) rotate(45deg) }
+.burger[aria-expanded="true"] i:nth-child(2){ opacity:0 }
+.burger[aria-expanded="true"] i:nth-child(3){ transform:translateY(-8px) rotate(-45deg) }
+
+.menu{
+  position:fixed; inset:0; z-index:55;
+  display:flex; align-items:center;
+  background:rgba(14,13,15,.32);
+  -webkit-backdrop-filter:blur(22px) saturate(1.25); backdrop-filter:blur(22px) saturate(1.25);
+  opacity:0; visibility:hidden;
+  transition:opacity .5s ease, visibility 0s linear .5s;
+}
+.menu[data-open="true"]{ opacity:1; visibility:visible;
+  transition:opacity .5s ease, visibility 0s linear 0s }
+.menu ul{ width:min(100%, var(--stage)); margin-inline:auto; padding:0 56px; list-style:none }
+.menu a{
+  display:flex; align-items:baseline; gap:22px; padding:7px 0; text-decoration:none;
+  font-size:clamp(28px, 4.2vw, 52px); font-weight:700; letter-spacing:-.02em; line-height:1.28;
+  color:var(--caps); width:max-content;
+  opacity:0; transform:translateY(26px);
+  transition:opacity .5s ease, transform .6s cubic-bezier(.2,.6,.2,1), color .25s ease;
+}
+.menu[data-open="true"] a{ opacity:1; transform:none }
+.menu[data-open="true"] li:nth-child(1) a{ transition-delay:.10s }
+.menu[data-open="true"] li:nth-child(2) a{ transition-delay:.16s }
+.menu[data-open="true"] li:nth-child(3) a{ transition-delay:.22s }
+.menu[data-open="true"] li:nth-child(4) a{ transition-delay:.28s }
+.menu[data-open="true"] li:nth-child(5) a{ transition-delay:.34s }
+.menu[data-open="true"] li:nth-child(6) a{ transition-delay:.40s }
+.menu[data-open="true"] li:nth-child(7) a{ transition-delay:.46s }
+.menu a:hover{ color:var(--accent) }
+.menu a[aria-disabled="true"]{ color:rgba(245,243,239,.34); pointer-events:none }
+.menu a[aria-current="page"]{ color:var(--accent) }
+.menu .no{ flex:none; width:46px; font-family:var(--mono); font-weight:700;
+           font-size:12px; letter-spacing:1.2px; color:var(--meta) }
+
+main{ padding-top:var(--nav-h); padding-bottom:43px }   /* 2793 − 2750 = 43 */
+
+/* ---------- 页头（和 project.html 同一组数：74 / 26 / 30） ---------- */
+.head{ padding-top:74px }                        /* 76 + 74 → 眼眉落在画板 y=150 */
+.eyebrow{ margin:0; font-size:13px; font-weight:600; line-height:16px;
+          letter-spacing:3.64px; color:var(--eyebrow) }       /* Figma 字距 28% */
+.h1{ margin:26px 0 0;                            /* 166 → 192 */
+     font-size:56px; font-weight:700; line-height:116%; letter-spacing:-.56px;
+     color:var(--title) }
+.lede{ margin:30px 0 0;                          /* 322 → 352 */
+  font-size:16px; font-weight:400; line-height:180%; color:var(--body);
+  /* ⚠ 不写 max-width:672px。本地这套 Inter 比 Figma 渲染略宽几像素，
+     照抄宽度会把某一行挤断成两行，整页往下掉近 30px，后面所有 y 全错。
+     断行本来就由 <br> 定死，宽度放开即可。index / project 都栽过这个跟头。 */
+}
+
+/* ---------- 章节壳：一条细线 + 一行橙色章节名 ---------- */
+/* ⚠ padding 是 17 不是 18。Figma 里细线 y 和章节名 y 差 18，
+   但 CSS 的 border-top 本身要占 1px，content box 从 +1 开始算，
+   所以 17 + 1 = 18 才对得上。写 18 的话整页会一节一节往下累积偏移。 */
+.sec{ border-top:1px solid var(--hair); padding-top:17px }
+/* 每节上方的留白各不相同（Figma 里就是不规则的），所以逐节写死：
+     01  438 → 508   = 70      05  2123 → 2150 = 27
+     02  724 → 790   = 66
+     03 1185 → 1237  = 53
+     04 1538 → 1590  = 53                                        */
+.sec-1{ margin-top:70px }
+.sec-2{ margin-top:66px }
+.sec-3{ margin-top:53px }
+.sec-4{ margin-top:53px }
+.sec-5{ margin-top:27px }
+.sec-h{ margin:0; font-size:13px; font-weight:600; line-height:16px;
+        letter-spacing:2.86px; color:var(--accent) }          /* Figma 字距 22% */
+
+/* ══════════════ 01 — GENERATIVE WORKFLOW ══════════════ */
+/* 五张卡 + 四个箭头。196×5 + 39×4 = 1136，正好铺满正文栏。 */
+.wf{ margin-top:32px;                            /* 542 → 574 */
+     display:grid; grid-template-columns:repeat(5, 1fr); gap:39px }
+.wf-i{ position:relative }
+/* 箭头画在右侧空档的正中。做成 ::after 而不是真元素，
+   这样窄屏换行时只要关掉这一条，网格本身不用动。 */
+.wf-i:not(:last-child)::after{
+  content:'→'; position:absolute; left:100%; top:62px; width:39px;  /* 636 − 574 = 62 */
+  text-align:center; font-size:18px; font-weight:700; line-height:22px; color:var(--accent);
+}
+.wfc{ height:150px; padding:14px 18px 0; border-radius:8px;
+      background:var(--card);
+      /* 描边用 inset 阴影而不是 border：Figma 这条是 INSIDE 对齐，
+         画在卡内、不占版面；CSS border 会把内容框挤小 2px。 */
+      box-shadow:inset 0 0 0 1px var(--card-bd) }
+.wf-n{ margin:0; font-size:22px; font-weight:700; line-height:27px; color:var(--accent) }
+/* 标题槽写死 50px（Figma 里 622 → 672）。
+   五张卡的标题有的一行有的两行，但正文一律从 672 开始 ——
+   等于 Figma 给标题留了个固定高度的槽，这里照做。 */
+.wf-t{ margin:7px 0 0; height:50px;
+       font-size:14.5px; font-weight:700; line-height:125%; color:var(--title) }
+.wf-b{ margin:0; font-size:11.5px; font-weight:400; line-height:150%; color:var(--body) }
+
+/* ══════════════ 02 — PERFORMANCE ANALYSIS ══════════════ */
+.pa{ margin-top:18px;                            /* 824 → 842 */
+     display:grid; grid-template-columns:repeat(4, 1fr); gap:19px }
+/* 底色留空。这四张图是**带透明通道**的：Figma 里矩形只有一层图片填充，
+   没有实心底，透出来的就是页面底色。给它加占位底色会在图的镂空处
+   露出一块比页面深的板子，和 Figma 不一样。 */
+.pa-fig{ position:relative; border-radius:10px; overflow:hidden;
+         aspect-ratio:270 / 204 }
+.pa-fig img{ display:block; width:100%; height:100%; object-fit:cover }
+/* 0.5px 橙色描边，Figma 里是 INSIDE 对齐。
+   直接给 <img> 写 inset 阴影没用 —— 替换元素的背景和内阴影画在图**后面**，
+   会被图盖住。所以单独盖一层 ::after。 */
+.pa-fig::after{ content:''; position:absolute; inset:0; border-radius:10px;
+                box-shadow:inset 0 0 0 .5px var(--accent); pointer-events:none }
+.pa-t{ margin:27px 0 0; font-size:14px; font-weight:700; line-height:17px;
+       letter-spacing:1.12px; color:var(--title) }            /* Figma 字距 8% */
+.pa-b{ margin:7px 0 0; font-size:12px; font-weight:400; line-height:160%; color:var(--body) }
+.pa-note{ margin:32px 0 0; font-size:14px; font-weight:600; line-height:17px; color:var(--title) }
+
+/* ══════════════ 03 — ZONE DIVISION WITH LLM ══════════════ */
+.zone{ margin-top:85px;                          /* 1271 → 1356 */
+       display:grid; grid-template-columns:700fr 368fr; gap:68px; align-items:start }
+.zone img{ display:block; width:100%; height:auto }
+.zone-t{ margin:43px 0 0;                        /* 图顶 1356 → 文顶 1399 */
+         font-size:13.5px; font-weight:400; line-height:178%; color:var(--body) }
+
+/* ══════════════ 04 — LAYOUT GENERATION ══════════════ */
+.gen-t{ margin:28px 0 0;                         /* 1624 → 1652 */
+        font-size:13.5px; font-weight:400; line-height:178%; color:var(--body) }
+/* 三张图是一组**有意错位**的构图：大图从 y1680 起，两张小图从 y1744 起。
+   而左边那段说明文字在 1652 就开始了 —— 说明和图在纵向上是重叠的，
+   只是横向错开（文字 152–536，大图从 628 起），所以这里用负 margin 把
+   图块拉回 1680。窄屏时这个负值会真的压到文字上，所以媒体查询里归零。 */
+.gen-fig{ position:relative; margin-top:-44px;   /* 1724 − 44 = 1680 */
+          width:100%; aspect-ratio:1136 / 442 }
+/* ⚠ 这里**不能**写 width/height —— `.gen-fig img` 的选择器权重(0,1,1)
+   比下面 `.g-grid` 这类单类名(0,1,0)高，会把三张图的尺寸全盖成 100%。 */
+.gen-fig img{ position:absolute; display:block; object-fit:contain }
+/* 百分比全部是「该图在 1136 × 442 这个盒子里的占比」，
+   所以整块等比缩放时三张图的错位关系一模一样。 */
+.g-grid{ left:41.9014%; top:0;        width:58.0986%; height:100% }
+.g-axo { left:0;        top:14.4796%; width:24.3838%; height:83.7104% }
+.g-code{ left:26.5845%; top:14.4796%; width:14.4366%; height:85.5204% }
+
+/* ══════════════ 05 — BEFORE VS AFTER ══════════════ */
+.ba-lede{ margin:22px 0 0; font-size:13.5px; font-weight:400; line-height:16px; color:var(--body) }
+.ba{ margin-top:28px;                            /* 2222 → 2250 */
+     display:grid; grid-template-columns:repeat(2, 1fr); gap:24px }
+.ba-c{ position:relative; height:190px; border-radius:10px; background:var(--card);
+       box-shadow:inset 0 0 0 1px var(--card-bd) }
+/* 卡内三块是**各自定位**的：眼眉 24、分数 48、说明 52 且左移到 230 ——
+   分数和说明是并排的两列，用普通文档流排不出来，所以绝对定位。 */
+.ba-c > *{ position:absolute; margin:0 }
+.ba-k{ left:26px; top:24px; font-size:12px; font-weight:600; line-height:15px;
+       letter-spacing:2.16px; color:var(--eyebrow) }          /* Figma 字距 18% */
+.ba-s{ left:26px; top:48px; font-size:54px; font-weight:700; line-height:65px }
+.ba-c.is-before .ba-s{ color:var(--fail) }
+.ba-c.is-after  .ba-s{ color:var(--accent) }
+.ba-b{ left:230px; top:52px; width:300px;
+       font-size:12.5px; font-weight:400; line-height:165%; color:var(--body) }
+
+/* ---------- 四行评分条 ---------- */
+.bars{ margin-top:50px }                         /* 2440 → 2490 */
+.bar{ display:grid; grid-template-columns:148px minmax(0,560px) 1fr; height:44px;
+      align-items:start }
+.bar-l{ font-size:13px; font-weight:600; line-height:16px; color:var(--lab) }
+/* 底槽 8px 高、圆角 4；after 那条 3.5px 高，画在底槽**下面** 1px 处
+   （Figma：底槽 y+4，after y+13），所以外壳要 16.5 高、里面各自定位。 */
+.bar-t{ position:relative; height:16.5px; margin-top:4px }
+.bar-t i{ position:absolute; display:block; left:0 }
+.bar-t .tk{ top:0; height:8px; width:100%; border-radius:4px; background:var(--track) }
+.bar-t .b4{ top:0; height:8px; border-radius:4px; background:var(--before) }
+.bar-t .b5{ top:9px; height:3.5px; border-radius:2px; background:var(--accent) }
+.bar-v{ padding-left:30px; font-size:12.5px; font-weight:600; line-height:15px;
+        color:var(--title); white-space:nowrap }
+.bar-key{ margin:4px 0 0 148px; font-size:11px; font-weight:400; line-height:13px;
+          color:var(--meta) }
+
+.end{ margin:43px 0 0; font-size:20px; font-weight:700; line-height:24px; color:var(--title) }
+
+/* ---------- 滚动淡入（和 project / library-specific 同一套） ---------- */
+.rv{ opacity:0; transform:translateY(14px);
+     transition:opacity .6s ease, transform .6s cubic-bezier(.2,.6,.2,1) }
+.rv.in{ opacity:1; transform:none }
+.wf .rv:nth-child(2){ transition-delay:.06s }
+.wf .rv:nth-child(3){ transition-delay:.12s }
+.wf .rv:nth-child(4){ transition-delay:.18s }
+.wf .rv:nth-child(5){ transition-delay:.24s }
+.pa .rv:nth-child(2){ transition-delay:.06s }
+.pa .rv:nth-child(3){ transition-delay:.12s }
+.pa .rv:nth-child(4){ transition-delay:.18s }
+@media (prefers-reduced-motion:reduce){ .rv{ opacity:1; transform:none; transition:none } }
+
+/* ---------- 窄屏 ---------- */
+@media (max-width:1300px){ :root{ --pad:56px } }
+@media (max-width:1100px){
+  .wf{ grid-template-columns:repeat(3, 1fr); gap:24px }
+  .wf-i::after{ display:none }                   /* 换行以后箭头就不成立了 */
+  .wfc{ height:auto; padding-bottom:20px }
+  .wf-t{ height:auto; margin-bottom:12px }
+  .pa{ grid-template-columns:repeat(2, 1fr) }
+  .zone{ grid-template-columns:1fr; gap:34px }
+  .zone-t{ margin-top:0 }
+  .gen-fig{ margin-top:24px }                    /* 窄屏不再往上钻，免得压到文字 */
+  .h1{ font-size:44px }
+  .bar{ grid-template-columns:120px minmax(0,1fr) auto }
+  .bar-key{ margin-left:120px }
+  /* 对比卡在这里就得改成「上下堆」。卡片一窄，卡内那段说明的
+     left:230px + width:300px 就顶出卡外去了（1000px 视口下整页横向多出 42px）。
+     所以从这一档起把卡内三块放回文档流。 */
+  .ba-c{ height:auto; padding:24px 26px 28px }
+  .ba-c > *{ position:static }
+  .ba-s{ margin:6px 0 10px }
+  .ba-b{ width:auto }
+}
+@media (max-width:760px){
+  :root{ --pad:24px }
+  .wf{ grid-template-columns:1fr }
+  .pa{ grid-template-columns:1fr }
+  .ba{ grid-template-columns:1fr }
+  .bar{ grid-template-columns:1fr; height:auto; margin-bottom:22px }
+  .bar-v{ padding-left:0; margin-top:6px }
+  .bar-key{ margin-left:0 }
+  .h1{ font-size:32px }
+  .lede{ font-size:15px }
+  .end{ font-size:17px }
+  /* 窄屏放开 Figma 里那几处硬换行，否则会断在很奇怪的地方。
+     .h1 的 br 留着 —— 那是两句话，去掉会连成 “…Engine thatPlans…”。 */
+  .lede br, .pa-b br, .zone-t br, .gen-t br, .wf-b br{ display:none }
+}
+</style>
+</head>
+
+<body>
+
+<header class="nav">
+  <div class="nav-in">
+    <a class="brand" href="./index.html" aria-label="MNEMOSYNE">
+      <img src="assets/logo-dark.png" alt="MNEMOSYNE">
+    </a>
+    <div class="nav-r">
+      <a class="contact" href="mailto:zhoushichen0311@gmail.com">Contact</a>
+      <button class="burger" id="burger" aria-expanded="false" aria-controls="menu" aria-label="Menu">
+        <i></i><i></i><i></i>
+      </button>
+    </div>
+  </div>
+  <nav class="menu" id="menu" data-open="false" aria-label="Sections">
+    <ul>
+      <li><a href="./index.html#about"><span class="no">01</span>About</a></li>
+      <li><a href="./research.html"><span class="no">02</span>Research</a></li>
+      <li><a href="./project.html"><span class="no">03</span>Project</a></li>
+      <li><a href="./library.html"><span class="no">04</span>Library</a></li>
+      <li><a href="./cube-system.html"><span class="no">05</span>Cube System</a></li>
+      <li><a href="./core-system.html" aria-current="page"><span class="no">06</span>Core System</a></li>
+      <li><a href="./home-file-empty.html"><span class="no">07</span>Home File</a></li>
+    </ul>
+  </nav>
+</header>
+
+<main>
+  <div class="wrap">
+
+    <!-- ══════════════ 页头 ══════════════ -->
+    <div class="head">
+      <p class="eyebrow">CORE SYSTEM</p>
+      <h1 class="h1">The Engine that<br>Plans the Room.</h1>
+      <p class="lede">From a floor plan and a person, the system works out where each room should go, how<br>
+        the furniture should stand, and whether the result truly serves its resident. It tests, plans,<br>
+        places and then tests again.</p>
+    </div>
+
+    <!-- ══════════════ 01 — GENERATIVE WORKFLOW ══════════════ -->
+    <section class="sec sec-1">
+      <h2 class="sec-h">01 — GENERATIVE WORKFLOW</h2>
+      <div class="wf">
+        <div class="wf-i rv">
+          <div class="wfc">
+            <p class="wf-n">1</p>
+            <h3 class="wf-t">User Profile</h3>
+            <p class="wf-b">Needs, abilities,<br>
+            daily routine</p>
+          </div>
+        </div>
+        <div class="wf-i rv">
+          <div class="wfc">
+            <p class="wf-n">2</p>
+            <h3 class="wf-t">Performance<br>Analysis</h3>
+            <p class="wf-b">Daylight · paths ·<br>
+            views · airflow</p>
+          </div>
+        </div>
+        <div class="wf-i rv">
+          <div class="wfc">
+            <p class="wf-n">3</p>
+            <h3 class="wf-t">Zone Division</h3>
+            <p class="wf-b">LLM rationalises<br>
+            the boundaries</p>
+          </div>
+        </div>
+        <div class="wf-i rv">
+          <div class="wfc">
+            <p class="wf-n">4</p>
+            <h3 class="wf-t">Furniture &amp;<br>Layout</h3>
+            <p class="wf-b">Sized by standards,<br>
+            placed by rules</p>
+          </div>
+        </div>
+        <div class="wf-i rv">
+          <div class="wfc">
+            <p class="wf-n">5</p>
+            <h3 class="wf-t">Re-evaluation</h3>
+            <p class="wf-b">Tested again,<br>
+            scored out of 10</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════ 02 — PERFORMANCE ANALYSIS ══════════════ -->
+    <section class="sec sec-2">
+      <h2 class="sec-h">02 — PERFORMANCE ANALYSIS</h2>
+      <div class="pa">
+        <div class="rv">
+          <div class="pa-fig">
+            <img src="assets/core/pa-daylight.webp" width="538" height="408"
+                 alt="Daylight simulation map of the room" decoding="async">
+          </div>
+          <h3 class="pa-t">DAYLIGHT</h3>
+          <p class="pa-b">Simulated with Cyclops to find<br>
+          the best-lit zones for each use.</p>
+        </div>
+        <div class="rv">
+          <div class="pa-fig">
+            <img src="assets/core/pa-connect.webp" width="540" height="408"
+                 alt="Connectivity map: path lengths between every point" loading="lazy" decoding="async">
+          </div>
+          <h3 class="pa-t">CONNECTIVITY</h3>
+          <p class="pa-b">Path lengths from every point<br>
+          to every point: efficiency mapped.</p>
+        </div>
+        <div class="rv">
+          <div class="pa-fig">
+            <img src="assets/core/pa-visible.webp" width="540" height="408"
+                 alt="Visibility map: sightlines across the room" loading="lazy" decoding="async">
+          </div>
+          <h3 class="pa-t">VISIBILITY</h3>
+          <p class="pa-b">What can be seen from where:<br>
+          sightlines for orientation.</p>
+        </div>
+        <div class="rv">
+          <div class="pa-fig">
+            <img src="assets/core/pa-airflow.webp" width="540" height="408"
+                 alt="Airflow map: ventilation effectiveness" loading="lazy" decoding="async">
+          </div>
+          <h3 class="pa-t">AIRFLOW</h3>
+          <p class="pa-b">Ventilation effectiveness sets<br>
+          where each room breathes best.</p>
+        </div>
+      </div>
+      <p class="pa-note">The four maps combine to give every room its best position: bedroom, living room, kitchen, corridor, bathroom.</p>
+    </section>
+
+    <!-- ══════════════ 03 — ZONE DIVISION WITH LLM ══════════════ -->
+    <section class="sec sec-3">
+      <h2 class="sec-h">03 — ZONE DIVISION WITH LLM</h2>
+      <div class="zone">
+        <img src="assets/core/zone-llm.webp" width="1400" height="362"
+             alt="From performance field to functional zones to LLM-rationalised boundaries to meshes"
+             loading="lazy" decoding="async">
+        <p class="zone-t">Grasshopper proposes the functional zones; a visual LLM<br>
+          rationalises their boundaries; the result returns to GH as<br>
+          meshes. Geometry stays computational, judgement gets<br>
+          semantic.</p>
+      </div>
+    </section>
+
+    <!-- ══════════════ 04 — LAYOUT GENERATION ══════════════ -->
+    <section class="sec sec-4">
+      <h2 class="sec-h">04 — LAYOUT GENERATION</h2>
+      <p class="gen-t">The LLM sizes furniture to formal standards for each room,<br>
+        then places it inside the zones by the design rules. A pool of<br>
+        candidate layouts is generated, ready to be scored.</p>
+      <div class="gen-fig">
+        <img class="g-grid" src="assets/core/gen-grid.webp" width="1320" height="884"
+             alt="Nine candidate layouts generated for the same room" loading="lazy" decoding="async">
+        <img class="g-axo" src="assets/core/gen-axo.webp" width="554" height="740"
+             alt="Exploded axonometric: functional zones stacked over the performance layers"
+             loading="lazy" decoding="async">
+        <img class="g-code" src="assets/core/gen-code.webp" width="328" height="756"
+             alt="The rule set and prompt sheets driving the placement" loading="lazy" decoding="async">
+      </div>
+    </section>
+
+    <!-- ══════════════ 05 — BEFORE VS AFTER ══════════════ -->
+    <section class="sec sec-5">
+      <h2 class="sec-h">05 — BEFORE VS AFTER</h2>
+      <p class="ba-lede">The same room, re-tested after generation. Before: furniture blocks the wheelchair turning radius, so the layout fails outright.</p>
+
+      <div class="ba">
+        <div class="ba-c is-before">
+          <p class="ba-k">BEFORE</p>
+          <p class="ba-s">0</p>
+          <p class="ba-b">Furniture and aisle spacing fail the Ø1500 wheelchair turning radius. No mobility support anywhere in the plan.</p>
+        </div>
+        <div class="ba-c is-after">
+          <p class="ba-k">AFTER</p>
+          <p class="ba-s">8.1</p>
+          <p class="ba-b">Spacing reworked for wheelchair access throughout; support surfaces follow the main route. Full score = 10.</p>
+        </div>
+      </div>
+
+      <div class="bars">
+        <div class="bar">
+          <span class="bar-l">Daylight</span>
+          <span class="bar-t"><i class="tk"></i><i class="b4" style="width:9%"></i><i class="b5" style="width:10%"></i></span>
+          <span class="bar-v">0.09 → 0.10 &nbsp; +0.01</span>
+        </div>
+        <div class="bar">
+          <span class="bar-l">Connectivity</span>
+          <span class="bar-t"><i class="tk"></i><i class="b4" style="width:50%"></i><i class="b5" style="width:67%"></i></span>
+          <span class="bar-v">0.50 → 0.67 &nbsp; +0.17</span>
+        </div>
+        <div class="bar">
+          <span class="bar-l">Visual</span>
+          <span class="bar-t"><i class="tk"></i><i class="b4" style="width:58%"></i><i class="b5" style="width:68%"></i></span>
+          <span class="bar-v">0.58 → 0.68 &nbsp; +0.10</span>
+        </div>
+        <div class="bar">
+          <span class="bar-l">Airflow</span>
+          <span class="bar-t"><i class="tk"></i><i class="b4" style="width:61%"></i><i class="b5" style="width:70%"></i></span>
+          <span class="bar-v">0.61 → 0.70 &nbsp; +0.09</span>
+        </div>
+        <p class="bar-key">grey = before · orange = after</p>
+      </div>
+
+      <p class="end">The engine does not stop at generating a room. It proves the room works, in numbers.</p>
+    </section>
+
+  </div>
+</main>
+
+<script>
+/* 汉堡菜单（和 project / library / cube-system 逐字相同） */
+(function(){
+  var b = document.getElementById('burger'), m = document.getElementById('menu'), open = false;
+  function set(v){
+    open = v;
+    b.setAttribute('aria-expanded', open ? 'true' : 'false');
+    m.dataset.open = open ? 'true' : 'false';
+    document.body.style.overflow = open ? 'hidden' : '';
+  }
+  b.addEventListener('click', function(e){ e.stopPropagation(); set(!open); });
+  m.addEventListener('click', function(){ set(false); });
+  document.addEventListener('click', function(e){ if (!e.target.closest('.nav')) set(false); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') set(false); });
+})();
+
+/* 滚动淡入 */
+(function(){
+  var items = document.querySelectorAll('.rv');
+  if (!('IntersectionObserver' in window)){
+    items.forEach(function(el){ el.classList.add('in'); });
+    return;
+  }
+  var io = new IntersectionObserver(function(en){
+    en.forEach(function(e){
+      if (!e.isIntersecting) return;
+      e.target.classList.add('in'); io.unobserve(e.target);
+    });
+  }, { rootMargin:'0px 0px -10% 0px', threshold:.1 });
+  items.forEach(function(el){ io.observe(el); });
+})();
+</script>
+
+</body>
+</html>

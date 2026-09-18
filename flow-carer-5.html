@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MNEMOSYNE — Sign it, then hand it over</title>
+
+<!-- ============================================================
+     MNEMO · 医护人员版 · 第 5 步（Handover）
+     ------------------------------------------------------------
+     对应 Figma：2354:65「CARER · 5 Handover」
+     外壳坐标照第 1 步：左面板 x=121 · 右卡 924,252 · 对话坞 y=633
+
+     和家属版第 5 步差最远的一屏。
+     家属版的主动作是「发出去」，四张分享卡并排；
+     这里的主动作是「签字」，发送是签完之后的事，而且
+     发给谁由本人的同意范围决定 —— 医护点不动。
+
+     链路是硬的：勾选声明 → 签字 → 才能完成。
+     签完之后 sessionStorage 里带上 signedAt，
+     回头看第 1–4 步，右上角也从 NOTHING SIGNED YET 变成 SIGNED。
+     ============================================================ -->
+
+<style>
+@font-face{ font-family:'InterLocal'; src:url('assets/fonts/inter-var.woff2') format('woff2-variations');
+  font-weight:100 900; font-style:normal; font-display:block; }
+@font-face{ font-family:'SpaceMonoLocal'; src:url('assets/fonts/space-mono-700.woff2') format('woff2');
+  font-weight:700; font-style:normal; font-display:block; }
+</style>
+
+<style>
+:root{
+  --cream-a:#F8ECDC; --cream-b:#F1ECE5;
+  --ink:#1A1917; --mut:#736E66; --faint:#948F87; --hint:#B0A99D; --mono-c:#8A8378;
+  --hair:#DEDAD2; --line:#CFC8BB; --hair-2:#ECE7DE;
+  --white:#FFFFFF; --soft:#F1EAE0; --chipbg:#E7DED1; --okbg:#E8EEE6;
+  --accent:#ED7119; --accent-d:#B0570F; --ok:#4F6A48;
+  --r-card:14px;
+}
+*,*::before,*::after{ box-sizing:border-box }
+/* 所有 <p> 都是绝对定位 + 明确 top，浏览器默认的 1em 上边距会把
+   mono 小标整体压低 9.5px，和 Figma 对不上。 */
+p,h1{ margin:0 }
+html{ -webkit-text-size-adjust:100%; background:var(--cream-b) }
+body{
+  margin:0; font-family:'InterLocal','Inter',system-ui,-apple-system,'Segoe UI','PingFang SC',sans-serif;
+  color:var(--ink); background:
+    url('assets/bg/bg-family-carer.webp') center center / cover no-repeat fixed,
+    linear-gradient(160deg,var(--cream-a) 0%,var(--cream-b) 100%);
+  -webkit-font-smoothing:antialiased; min-height:100dvh; overflow-x:hidden;
+}
+.mono{ font-family:'SpaceMonoLocal','Space Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-weight:700; text-transform:uppercase; letter-spacing:.09em; }
+
+.stagewrap{ width:100%; display:flex; justify-content:center; overflow:hidden }
+.stage{ position:relative; width:1440px; height:960px; transform-origin:top center; transform:scale(var(--k,1)); flex:none }
+
+/* ── 外壳 ───────────────────────────────────────────────── */
+.logo{ position:absolute; left:34px; top:38px; width:68px; height:68px; object-fit:contain }
+.exit{ position:absolute; left:40px; top:847px; width:56px; height:56px; border-radius:50%;
+  background:var(--white); border:1px solid var(--hair); display:grid; place-items:center;
+  color:var(--mut); text-decoration:none; cursor:pointer;
+  transition:box-shadow .2s ease, color .18s ease, transform .14s ease; }
+.exit:hover{ box-shadow:0 6px 16px rgba(80,66,48,.14); color:var(--ink) }
+.exit:active{ transform:scale(.95) }
+.exit:focus-visible{ outline:2px solid var(--accent); outline-offset:3px }
+.exit-label{ position:absolute; left:43px; top:908px; font-size:7.5px; color:var(--mut); letter-spacing:.06em }
+
+h1.title{ position:absolute; left:140px; top:44px; margin:0; width:900px;
+  font-size:34px; line-height:1.1; letter-spacing:-.022em; font-weight:700 }
+p.sub{ position:absolute; left:140px; top:94px; width:800px; font-size:14.5px; line-height:21px; color:var(--mut) }
+
+.stepchip{ position:absolute; left:1218px; top:52px; width:174px; height:36px; border-radius:18px;
+  background:var(--white); border:1px solid var(--hair); display:flex; align-items:center; gap:10px; padding-left:20px }
+.stepchip i{ width:8px; height:8px; border-radius:50%; background:var(--accent); flex:none }
+.stepchip span{ font-size:11px; color:var(--mut) }
+
+.steps{ position:absolute; left:121px; top:152px; width:948px; height:30px }
+.steps > div{ position:absolute; top:0; width:150px; height:30px }
+.steps b{ position:absolute; top:0; left:0; width:150px; height:3px; border-radius:2px; background:var(--hair); display:block }
+.steps s{ position:absolute; top:14px; left:0; white-space:nowrap; text-decoration:none; font-size:9.5px; color:var(--faint);
+  font-family:'SpaceMonoLocal','Space Mono',monospace; font-weight:700; text-transform:uppercase; letter-spacing:.09em }
+.steps .on b{ background:var(--accent) }
+.steps .on s{ color:var(--ink) }
+.steps a{ text-decoration:none; cursor:pointer }
+.steps a:hover s{ color:var(--accent-d) }
+
+.visit{ position:absolute; left:121px; top:206px; height:26px; padding:0 18px; border-radius:13px;
+  background:var(--ink); display:flex; align-items:center; font-size:9.5px; color:#F6EFE5 }
+.when{ position:absolute; left:249px; top:212px; font-size:13.5px; line-height:16px; color:var(--mut) }
+.saved{ position:absolute; right:48px; top:213px; text-align:right; font-size:9.5px; color:var(--faint) }
+.saved.signed{ color:var(--ok) }
+
+/* ── 左：签字面板 ───────────────────────────────────────── */
+.panel{ position:absolute; left:121px; top:252px; width:760px; height:566px;
+  background:var(--white); border:1px solid var(--hair); border-radius:var(--r-card) }
+.gtitle{ position:absolute; font-size:9.5px; color:var(--mono-c) }
+.basis{ position:absolute; left:32px; top:50px; width:696px; font-size:13px; line-height:16px; color:var(--mut) }
+
+/* 声明 */
+.declare{ position:absolute; left:32px; top:84px; width:696px; height:60px; border-radius:10px;
+  background:var(--soft); border:0; padding:0; font-family:inherit; text-align:left; cursor:pointer;
+  transition:background .16s ease }
+.declare:hover{ background:#EDE4D8 }
+.declare:focus-visible{ outline:2px solid var(--accent); outline-offset:2px }
+.declare .box{ position:absolute; left:18px; top:20px; width:20px; height:20px; border-radius:5px;
+  border:1.5px solid var(--line); background:transparent; display:grid; place-items:center;
+  font-size:13px; color:transparent; transition:background .16s ease, border-color .16s ease }
+.declare[aria-pressed="true"] .box{ background:var(--ink); border-color:var(--ink); color:var(--white) }
+.declare .dt{ position:absolute; left:52px; top:21px; font-size:13.5px; line-height:18px; font-weight:500; color:var(--ink) }
+
+/* 签名块 */
+.sig{ position:absolute; left:32px; top:164px; width:696px; height:92px; border-radius:10px;
+  border:1px solid var(--line); transition:border-color .2s ease, background .2s ease }
+.sig.done{ border-color:var(--ok); background:var(--okbg) }
+.sig .sl{ position:absolute; left:20px; top:20px; font-size:9.5px; color:var(--mono-c) }
+.sig .sn{ position:absolute; left:20px; top:38px; font-size:19px; line-height:24px; font-weight:600; color:var(--ink) }
+.sig .sn.empty{ color:var(--hint); font-weight:400 }
+.sig .sr{ position:absolute; left:20px; top:64px; font-size:12.5px; line-height:15px; color:var(--mut) }
+.sig .st{ position:absolute; right:20px; top:38px; font-size:10px; color:var(--mut);
+  font-family:'SpaceMonoLocal','Space Mono',monospace; font-weight:700; letter-spacing:.09em }
+.sig .sx{ position:absolute; right:20px; top:62px; font-size:11.5px; color:var(--hint) }
+.signbtn{ position:absolute; right:20px; top:28px; height:36px; padding:0 20px; border-radius:18px;
+  border:0; background:var(--ink); color:#F6EFE5; font-family:inherit; font-size:13px; font-weight:600;
+  cursor:pointer; transition:transform .14s ease, opacity .2s ease }
+.signbtn:hover{ transform:translateY(-1px) }
+.signbtn:disabled{ opacity:.35; cursor:default; transform:none }
+.signbtn:focus-visible{ outline:2px solid var(--accent); outline-offset:3px }
+
+/* 卡住的东西 */
+.block{ position:absolute; left:32px; top:276px; width:696px; height:56px; border-radius:10px;
+  border:1px dashed var(--accent-d) }
+.block.clear{ border-color:var(--hair); border-style:solid }
+.block .bt{ position:absolute; left:24px; top:14px; font-size:13.5px; line-height:16px; font-weight:500; color:var(--accent-d) }
+.block.clear .bt{ color:var(--mut); font-weight:400 }
+.block .bs{ position:absolute; left:24px; top:32px; font-size:12px; line-height:15px; color:var(--mut) }
+.block .bg{ position:absolute; right:24px; top:20px; font-size:12.5px; font-weight:500; color:var(--accent-d);
+  background:none; border:0; padding:0; font-family:inherit; cursor:pointer }
+.block .bg:hover{ text-decoration:underline }
+.block.clear .bg{ display:none }
+
+.divider{ position:absolute; height:1px; background:var(--hair) }
+
+.prow{ position:absolute; left:32px; width:696px; height:26px }
+.prow .pn{ position:absolute; left:0; top:0; width:160px; font-size:13px; line-height:16px;
+  font-weight:500; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.prow .pr{ position:absolute; left:170px; top:1px; width:140px; font-size:12px; line-height:15px;
+  color:var(--faint); white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.prow .pp{ position:absolute; left:320px; top:1px; width:290px; font-size:12px; line-height:15px;
+  color:var(--mut); white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.prow .pl{ position:absolute; right:0; top:-4px; height:26px; padding:0 13px; border-radius:13px;
+  display:flex; align-items:center; font-size:11.5px; font-weight:500;
+  background:var(--okbg); color:var(--ok) }
+.prow .pl.warn{ background:transparent; border:1px solid var(--accent-d); color:var(--accent-d) }
+.prow .pl.off{ background:transparent; border:1px solid var(--line); color:var(--hint) }
+
+/* ── 右：即将归档的内容 ─────────────────────────────────── */
+.file{ position:absolute; left:924px; top:252px; width:468px; height:380px;
+  background:var(--white); border:1px solid var(--hair); border-radius:var(--r-card) }
+.file .lab{ position:absolute; left:26px; top:26px; font-size:9.5px; color:var(--mono-c) }
+.file .state{ position:absolute; right:26px; top:18px; height:22px; padding:0 12px; border-radius:11px;
+  border:1px solid var(--accent-d); display:flex; align-items:center;
+  font-size:9.5px; color:var(--accent-d); white-space:nowrap }
+.file .state.done{ border-color:var(--ok); color:var(--ok); background:var(--okbg) }
+.file .who{ position:absolute; left:26px; top:56px; font-size:21px; line-height:25px; font-weight:600; letter-spacing:-.01em }
+.file .who.empty{ color:var(--hint); font-weight:400 }
+.file .meta{ position:absolute; left:26px; top:88px; font-size:13px; line-height:16px; color:var(--mut) }
+.file .hair{ position:absolute; left:26px; width:416px; height:1px; background:var(--hair) }
+.file .row{ position:absolute; left:26px; width:416px; height:16px }
+.file .row .k{ position:absolute; left:0; top:3px; font-size:9.5px; color:var(--faint) }
+.file .row .v{ position:absolute; right:0; top:0; max-width:300px; font-size:13px; line-height:16px;
+  font-weight:500; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.file .row .v.blank{ font-weight:400; color:var(--accent-d) }
+.file .foot{ position:absolute; left:26px; top:326px; font-size:9.5px; color:var(--mono-c) }
+.file .keep{ position:absolute; left:26px; top:346px; font-size:12px; color:var(--hint) }
+
+/* ── 右下：对话坞 ───────────────────────────────────────── */
+.dock{ position:absolute; left:924px; top:633px; width:468px; height:156px; background:var(--soft); border-radius:var(--r-card) }
+.dock .av{ position:absolute; left:26px; top:30px; width:34px; height:34px; border-radius:50% }
+.dock .msgs{ position:absolute; left:74px; top:26px; width:368px; height:60px; overflow-y:auto;
+  overscroll-behavior:contain; font-size:13.5px; line-height:20px; color:var(--mut); scrollbar-width:thin }
+.dock .msgs p{ margin:0 0 8px }
+.dock .msgs p:last-child{ margin-bottom:0 }
+.dock .msgs p.me{ color:var(--ink); font-weight:500 }
+.dock .msgs p.ok{ color:var(--accent-d) }
+.composer{ position:absolute; left:26px; top:96px; width:416px; height:44px; background:var(--white);
+  border:1px solid var(--hair); border-radius:22px; display:flex; align-items:center }
+.composer input{ flex:1; min-width:0; height:42px; border:0; background:transparent; outline:none;
+  padding:0 8px 0 22px; font-family:inherit; font-size:13.5px; color:var(--ink) }
+.composer input::placeholder{ color:var(--hint) }
+.send{ width:32px; height:32px; margin-right:6px; flex:none; border-radius:50%; border:0; background:var(--ink);
+  color:var(--accent); display:grid; place-items:center; cursor:pointer; font-size:14px; line-height:1;
+  font-family:inherit; transition:transform .14s ease, opacity .2s ease }
+.send:hover{ transform:scale(1.06) }
+.send:disabled{ opacity:.45; cursor:default; transform:none }
+.dots i{ display:inline-block; width:4px; height:4px; margin-right:3px; border-radius:50%;
+  background:var(--faint); animation:blip 1.05s infinite ease-in-out }
+.dots i:nth-child(2){ animation-delay:.14s }
+.dots i:nth-child(3){ animation-delay:.28s }
+@keyframes blip{ 0%,60%,100%{ opacity:.25 } 30%{ opacity:1 } }
+
+@keyframes flash{ 0%{ background:rgba(237,113,25,.18) } 100%{ background:transparent } }
+.justfilled{ animation:flash .9s ease-out }
+
+.next{ position:absolute; left:1112px; top:858px; width:286px; height:44px; border-radius:22px;
+  background:var(--ink); border:0; cursor:pointer; display:flex; align-items:center;
+  justify-content:space-between; padding:0 20px 0 22px; font-family:inherit;
+  transition:transform .14s ease, box-shadow .2s ease, opacity .2s ease }
+.next span{ font-size:13.5px; font-weight:600; color:#F6EFE5 }
+.next em{ font-style:normal; color:var(--accent); font-size:15px }
+.next:hover{ transform:translateY(-1px); box-shadow:0 8px 20px rgba(40,32,22,.22) }
+.next:disabled{ opacity:.4; cursor:default; transform:none; box-shadow:none }
+.next:focus-visible{ outline:2px solid var(--accent); outline-offset:3px }
+.nextnote{ position:absolute; left:1112px; top:910px; width:286px; font-size:11.5px;
+  color:var(--mut); text-align:right; opacity:0; transition:opacity .25s ease }
+.nextnote.show{ opacity:1 }
+
+@media (prefers-reduced-motion:reduce){ *{ animation-duration:.001ms !important; transition-duration:.001ms !important } }
+
+/* 签完字之后的横幅。位置在录入面板正上方，和「上下文带」同一行高度 */
+.lockbar{ position:absolute; left:121px; top:884px; width:900px;
+  font-size:9px; line-height:13px; color:#B0570F; letter-spacing:.06em;
+  text-transform:none; }
+</style>
+</head>
+
+<body>
+<div class="stagewrap" id="stagewrap">
+<div class="stage" id="stage">
+
+  <img class="logo" src="assets/logo.png" alt="MNEMOSYNE">
+  <a class="exit" href="./flow-carer-4.html" aria-label="Back to step 4">
+    <svg width="14" height="10" viewBox="0 0 14 10" fill="none" aria-hidden="true">
+      <path d="M5 1 1 5l4 4M1 5h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </a>
+  <p class="exit-label mono">SAVE&amp;EXIT</p>
+
+  <h1 class="title">Sign it, then hand it over.</h1>
+  <p class="sub">Your name goes on the record, and what each entry was based on.</p>
+
+  <div class="stepchip"><i></i><span class="mono">STEP 5 OF 5</span></div>
+
+  <nav class="steps" aria-label="Progress">
+    <div class="on" style="left:0"><b></b><a href="./flow-carer.html"><s>PROFILE</s></a></div>
+    <div class="on" style="left:162px"><b></b><a href="./flow-carer-2.html"><s>THEIR HOME</s></a></div>
+    <div class="on" style="left:324px"><b></b><a href="./flow-carer-3.html"><s>LAYOUTS</s></a></div>
+    <div class="on" style="left:486px"><b></b><a href="./flow-carer-4.html"><s>PREVIEW</s></a></div>
+    <div class="on" style="left:648px"><b></b><s>HANDOVER</s></div>
+  </nav>
+
+  <div class="visit mono">FIRST FILE</div>
+  <p class="when" id="when">&nbsp;</p>
+  <p class="saved mono" id="saved">AUTOSAVED &nbsp;·&nbsp; NOT SIGNED</p>
+
+  <!-- ══ 左：签字 ══════════════════════════════════════════ -->
+  <section class="panel" aria-label="Sign this record">
+    <p class="gtitle mono" style="left:32px;top:30px">SIGN THIS RECORD</p>
+    <p class="basis" id="basis">&nbsp;</p>
+
+    <button type="button" class="declare" id="declare" aria-pressed="false">
+      <span class="box">✓</span>
+      <span class="dt" id="dtext">I confirm these entries are what I observed or was told today.</span>
+    </button>
+
+    <div class="sig" id="sig">
+      <p class="sl mono">SIGNED BY</p>
+      <p class="sn empty" id="signame">Not signed yet</p>
+      <p class="sr" id="sigrole">&nbsp;</p>
+      <p class="st" id="sigtime"></p>
+      <p class="sx" id="signote"></p>
+      <button type="button" class="signbtn" id="signbtn" disabled>Sign now</button>
+    </div>
+
+    <div class="block" id="block">
+      <p class="bt" id="btitle">&nbsp;</p>
+      <p class="bs" id="bsub">&nbsp;</p>
+      <button type="button" class="bg" id="bsend">Send to the OT &nbsp;→</button>
+    </div>
+
+    <div class="divider" style="left:32px;top:362px;width:696px"></div>
+    <p class="gtitle mono" style="left:32px;top:378px">WHO THIS RECORD GOES TO</p>
+
+    <div class="prow" id="pr0" style="top:402px"><span class="pn"></span><span class="pr"></span><span class="pp"></span><span class="pl"></span></div>
+    <div class="prow" id="pr1" style="top:440px"><span class="pn"></span><span class="pr"></span><span class="pp"></span><span class="pl"></span></div>
+    <div class="prow" id="pr2" style="top:478px"><span class="pn"></span><span class="pr"></span><span class="pp"></span><span class="pl"></span></div>
+    <div class="prow" id="pr3" style="top:516px"><span class="pn"></span><span class="pr"></span><span class="pp"></span><span class="pl"></span></div>
+  </section>
+
+  <!-- ══ 右：即将归档的内容 ════════════════════════════════ -->
+  <aside class="file" aria-label="What gets filed" aria-live="polite">
+    <p class="lab mono">WHAT GETS FILED</p>
+    <div class="state mono" id="sigstate">READY TO SIGN</div>
+    <p class="who empty" id="fWho">No name yet</p>
+    <p class="meta" id="fMeta">Nothing recorded</p>
+    <div class="hair" style="top:122px"></div>
+
+    <div class="row" style="top:144px"><span class="k mono">RECORD</span>     <span class="v" id="vRec">—</span></div>
+    <div class="row" style="top:170px"><span class="k mono">HOME TYPE</span>  <span class="v" id="vType">—</span></div>
+    <div class="row" style="top:196px"><span class="k mono">LAYOUT</span>     <span class="v" id="vLay">—</span></div>
+    <div class="row" style="top:222px"><span class="k mono">ROOM SCORE</span> <span class="v" id="vScore">—</span></div>
+    <div class="row" style="top:248px"><span class="k mono">CHANGES</span>    <span class="v" id="vChg">—</span></div>
+    <div class="row" style="top:274px"><span class="k mono">SIGNED BY</span>  <span class="v blank" id="vSig">not yet</span></div>
+
+    <div class="hair" style="top:310px"></div>
+    <p class="foot mono">NOTHING HERE CAN BE DELETED, ONLY CORRECTED</p>
+    <p class="keep">Next visit starts from here, not from zero.</p>
+  </aside>
+
+  <!-- ══ 右下：对话 ════════════════════════════════════════ -->
+  <div class="dock">
+    <img class="av" src="assets/logo.png" alt="">
+    <div class="msgs" id="msgs">
+      <p id="lead">Want to add a note before you sign? Type it and I will attach it to today’s entry under your name.</p>
+    </div>
+    <form class="composer" id="composer">
+      <input id="say" autocomplete="off" placeholder="Add a note before signing…" aria-label="Add a note before signing">
+      <button class="send" id="send" type="submit" aria-label="Send">→</button>
+    </form>
+  </div>
+
+  <button class="next" id="next" type="button"><span>Finish — back to her file</span><em>→</em></button>
+  <p class="nextnote" id="nextnote"></p>
+
+</div>
+</div>
+
+<script src="assets/llm.js?v=20260917"></script>
+<script src="assets/nlu-rules.js"></script>
+<script src="assets/carer-core.js?v=20260917"></script>
+<script>
+(function(){
+'use strict';
+var C = window.MNEMO_CARER, $ = C.$, data = C.data;
+
+/* 和第 3、4 步同一份方案数据 */
+var OPT = { A:{ base:7.6, corridor:1200, door:850 },
+            B:{ base:7.9, corridor:1250, door:850 },
+            C:{ base:8.2, corridor:1400, door:900 } };
+function opt(){ return OPT[data.layout] || OPT.C; }
+
+/* 第 4 步那份改动清单在这里重算一遍 —— 不复制状态，只复制规则，
+   免得两屏各存一份然后对不上。 */
+function changes(){
+  var o = opt(), list = [];
+  var d = parseInt(data.doorway, 10), c = parseInt(data.corridor, 10);
+  if (d > 0 && d < o.door)     list.push({ id:'door', ot:true,  cost:0.4 });
+  if (c > 0 && c < o.corridor) list.push({ id:'corr', ot:true,  cost:0.3 });
+  if (!data.turning || /^none$/i.test(data.turning)) list.push({ id:'turn', ot:true, cost:0.5 });
+  list.push({ id:'soft', ot:false, cost:0.1 });
+  var undone = C.listGet('undone');
+  var kept = list.filter(function(x){ return undone.indexOf(x.id) < 0; });
+  var lost = list.filter(function(x){ return undone.indexOf(x.id) > -1; });
+  var score = Math.max(0, opt().base - lost.reduce(function(s,x){ return s + x.cost; }, 0));
+  var needOT = kept.filter(function(x){
+    return C.listHas('otFlags', x.id) ? !x.ot : x.ot;
+  }).length;
+  return { kept: kept, needOT: needOT, score: Math.round(score * 10) / 10 };
+}
+
+function hhmm(){
+  var d = new Date();
+  return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+}
+/* 签字条上的日期 —— 现读，不能写死 */
+function today(){
+  var W = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+  var M = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  var d = new Date();
+  return W[d.getDay()] + ' ' + d.getDate() + ' ' + M[d.getMonth()] + ' ' + d.getFullYear();
+}
+
+/* ── 声明 / 签字 ──────────────────────────────────────── */
+$('declare').addEventListener('click', function(){
+  if (data.signedAt) return;                    /* 签完就不能反悔了 */
+  data.declared = data.declared ? '' : '1';
+  C.stamp(); C.render();
+});
+
+$('signbtn').addEventListener('click', function(){
+  if (!data.declared || data.signedAt) return;
+  data.signedAt = hhmm();
+  data.signedBy = data.carerName || 'Unnamed care worker';
+  C.flash($('sig'));
+  C.stamp(); C.render();
+  C.push(('Signed — ' + data.signedBy + ' at ' + data.signedAt +
+       '. From now on this entry cannot be edited, only corrected with a new one.'), 'ok');
+});
+
+$('bsend').addEventListener('click', function(){
+  C.push('I have the items the OT needs. Actually sending them is not wired up yet.');
+});
+
+/* 谁能收到：全部由内核从真实字段推出来（本人 / 你 / 转介来源 /
+   你的团队 / 同意范围）。之前这里写死过两个编出来的人名。 */
+
+var LABEL = { en:{ note:'a note on today’s entry' } };
+
+C.boot({
+  usesExtract: false,
+  verb: { en:'Attached —' },
+
+  parse: function(text){
+    var p = {};
+    if (/^\s*(sign|sign it|sign now|签了?吧?|签字|可以签)\s*$/i.test(text)) p.act = 'sign';
+    else p.note = text;                 /* 其余一律当成备注附在今天这条上 */
+    return p;
+  },
+
+  apply: function(patch){
+    var names = LABEL.en, hit = [];
+    if (patch.act === 'sign'){
+      if (!data.declared){
+        C.push('Tick the declaration first — I cannot sign for you until you do.');
+        return [];
+      }
+      $('signbtn').click();
+      return [];
+    }
+    if (patch.note){ hit.push(names.note); C.stamp(); C.render(); }
+    return hit;
+  },
+
+  question: function(){
+    return 'Anything to add to the record before you sign?';
+  },
+
+  ctx: function(){
+    var ch = changes();
+    var b = ['Step 5 of 5: a care worker is signing off the visit record before handover'];
+    if (data.name) b.push('resident: ' + data.name);
+    if (data.carerName) b.push('care worker: ' + data.carerName);
+    b.push('layout: Option ' + (data.layout || 'C') + ', room score ' + ch.score.toFixed(1));
+    b.push('changes: ' + ch.kept.length + ', ' + ch.needOT + ' need the OT');
+    var nd = C.needs();
+    if (nd) b.push('the home must give: ' + C.needsLine(false));
+    b.push(data.signedAt ? ('signed at ' + data.signedAt) : 'not signed yet');
+    return b.join('; ');
+  },
+
+  tail: function(){
+    return 'Anything you say before signing is attached to today’s entry, under your name.';
+  },
+
+  miss: function(){
+    return 'Noted — it goes on today’s entry.';
+  },
+
+  render: function(){
+    var ch = changes(), signed = !!data.signedAt;
+
+    /* 顶部统计：只写这份流程里真实存在的东西。
+       依据来源那几个数来自第 2 步每个实测值旁边的小切换，
+       不是照 Figma 抄的固定文案。 */
+    var bcount = { measured:0, told:0, records:0 };
+    /* 三组状况的依据也要算进来 —— 它们和尺寸一样是要签字的记录 */
+    ['bDoorway','bCorridor','bBath','bTurning',
+     'bMobility','bVision','bMemory'].forEach(function(k){
+      if (data[k] && bcount[data[k]] !== undefined) bcount[data[k]]++;
+    });
+    var bbits = [];
+    /* 「量的」在这里同时包含量出来的和看出来的，所以说法要中性 */
+    if (bcount.measured) bbits.push((bcount.measured + ' first-hand'));
+    if (bcount.told)     bbits.push((bcount.told + ' reported'));
+    if (bcount.records)  bbits.push((bcount.records + ' from records'));
+
+    $('basis').textContent = ([C.filled() + ' of ' + C.COUNTED.length + ' fields recorded'].concat(bbits)
+          .concat([ch.kept.length + ' change' + (ch.kept.length===1?'':'s'),
+                   ch.needOT + ' waiting on the OT',
+                   'room score ' + ch.score.toFixed(1)]).join('  ·  '));
+
+    /* 声明 */
+    var dec = $('declare');
+    dec.setAttribute('aria-pressed', String(!!data.declared));
+    dec.disabled = signed;
+    $('dtext').textContent = 'I confirm these entries are what I observed or was told today.';
+
+    /* 签名块 */
+    var sig = $('sig');
+    sig.classList.toggle('done', signed);
+    $('signame').textContent = signed ? data.signedBy : ('Not signed yet');
+    $('signame').classList.toggle('empty', !signed);
+    $('sigrole').textContent = signed
+      ? ((data.carerRole || ('Care worker')) + '  ·  ' + (data.carerTeam || ''))
+      : ('Tick the line above before you can sign.');
+    /* 日期原来是写死的「TUE 5 AUG 2026」，签在哪天都显示那天 —— 改成现读 */
+    $('sigtime').textContent = signed ? (today() + '  ·  ' + data.signedAt) : '';
+    $('signote').textContent = signed
+      ? ('Cannot be edited after signing. Corrections are added as new entries.')
+      : '';
+    var sb = $('signbtn');
+    sb.style.display = signed ? 'none' : '';
+    sb.disabled = signed || !data.declared;
+    sb.textContent = 'Sign now';
+
+    /* 卡住的东西 */
+    var blk = $('block');
+    blk.classList.toggle('clear', ch.needOT === 0);
+    $('btitle').textContent = ch.needOT
+      ? ((ch.needOT + ' change' + (ch.needOT===1?'':'s') + ' still need the OT'))
+      : ('Nothing is waiting on the OT');
+    $('bsub').textContent = ch.needOT
+      ? ('You can sign your part now. The plan stays unreleased until they respond.')
+      : ('None of this visit’s changes need an outside sign-off.');
+
+    /* 谁能收到 */
+    C.people(ch.needOT, false, 4).forEach(function(p, i){
+      var el = $('pr' + i);
+      if (!el) return;
+      el.querySelector('.pn').textContent = p.n;
+      el.querySelector('.pr').textContent = p.r;
+      el.querySelector('.pp').textContent = p.p;
+      var pl = el.querySelector('.pl');
+      pl.textContent = p.g;
+      pl.className = 'pl' + (p.c ? ' ' + p.c : '');
+    });
+
+    /* 右卡 */
+    /* 用 sigstate 而不是 state：内核的 paintProgress() 会接管 #state，
+       在 page.render() 之后跑，会把这里写的时间戳覆盖掉。 */
+    $('sigstate').textContent = signed ? ('SIGNED ' + data.signedAt)
+                                       : (data.declared ? 'READY TO SIGN' : 'NOT SIGNED');
+    $('sigstate').classList.toggle('done', signed);
+    $('vRec').textContent   = C.filled() + ' of ' + C.COUNTED.length + ' fields';
+    $('vType').textContent  = data.homeStd || '—';
+    $('vLay').textContent   = 'Option ' + (data.layout || 'C');
+    $('vScore').textContent = ch.score.toFixed(1);
+    $('vChg').textContent   = ch.kept.length + (ch.needOT ? ', ' + ch.needOT + ' need the OT' : '');
+    $('vSig').textContent   = signed ? (data.signedBy + ' · ' + data.signedAt) : ('not yet');
+    $('vSig').classList.toggle('blank', !signed);
+
+    $('saved').classList.toggle('signed', signed);
+    $('next').disabled = !signed;
+
+    $('when').innerHTML = (data.name || 'New file') +
+      ' &nbsp;·&nbsp; ' + (ch.kept.length + ' entries recorded today');
+  },
+
+  next: { href:'./home-file-carer.html', label:'Her file' }
+});
+})();
+</script>
+</body>
+</html>

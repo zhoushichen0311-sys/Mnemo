@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MNEMOSYNE — Works</title>
+
+<style>
+/* 本地字体：和 index / research / library 共用，不依赖网络 */
+@font-face{ font-family:'InterLocal'; src:url('assets/fonts/inter-var.woff2') format('woff2-variations');
+  font-weight:100 900; font-style:normal; font-display:block }
+@font-face{ font-family:'SpaceMonoLocal'; src:url('assets/fonts/space-mono-700.woff2') format('woff2');
+  font-weight:700; font-style:normal; font-display:block }
+</style>
+
+<style>
+/* ============================================================
+   MNEMOSYNE · Project / Works
+   对应 Figma frame 537:65 —— 1440 × 1030
+   坐标、字号、色值全部取自该 frame 的实测值。
+
+   为什么这一页用「常规响应式」而不是 research 那种「固定画布 + 整体缩放」：
+   research 那一页大量图文是定位叠放的，重排会散架，只能整体缩。
+   这一页的结构就是「页头 + 三栏等宽卡片」，是一个天然能重排的网格 ——
+   窄屏时三栏变两栏、再变一栏就行，缩放反而会让字变小、读不清。
+   所以这一页跟 library-specific.html 同一套写法（--stage / --pad + 媒体查询）。
+   ============================================================ */
+:root{
+  --bg:#EFECE6;          /* 页面底色 */
+  --nav:#141414;
+  --eyebrow:#8C8780;     /* WORKS */
+  --title:#1C1A17;       /* 大标题 / 人名 */
+  --body:#6B6661;        /* 正文 */
+  --accent:#ED7119;      /* 橙色：分类标签 + 链接 */
+  --caps:#F5F3EF;
+  --nav-dim:#9E9991;
+  --meta:#8C8780;
+  --card:#F6F4EE;        /* 卡片底色（比页面底色亮一点点）*/
+  --card-bd:#D6D1C7;     /* 卡片描边 */
+  --shot-bg:#E0DDD5;     /* 图还没加载出来时那块占位底色 */
+
+  --sans:'InterLocal','Inter',system-ui,-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+  --mono:'SpaceMonoLocal','Space Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+
+  --stage:1440px;
+  --pad:152px;
+  --nav-h:76px;
+  --gap:25px;            /* 卡片间距：539 − 152 − 362 = 25 */
+}
+*{ box-sizing:border-box }
+html{ background:var(--bg); scroll-behavior:smooth; scroll-padding-top:var(--nav-h) }
+body{
+  margin:0; background:var(--bg); color:var(--body);
+  font-family:var(--sans); -webkit-font-smoothing:antialiased; overflow-x:clip;
+}
+.wrap{ width:min(100%, var(--stage)); margin-inline:auto; padding-inline:var(--pad) }
+
+/* ---------- 导航（和 library / research 同一套） ---------- */
+.nav{ position:fixed; top:0; left:0; right:0; z-index:60;
+      height:var(--nav-h); background:var(--nav) }
+.nav-in{
+  width:min(100%, var(--stage)); margin-inline:auto; height:100%;
+  padding-inline:56px; display:flex; align-items:center; justify-content:space-between;
+}
+.brand{ display:block; line-height:0 }
+.brand img{ display:block; width:92.9px; height:36px; object-fit:contain }
+.nav-r{ display:flex; align-items:center; gap:32px }
+.contact{ font-size:13px; font-weight:500; color:var(--nav-dim); text-decoration:none;
+          transition:color .22s ease }
+.contact:hover{ color:var(--caps) }
+.burger{ width:24px; height:18px; padding:0; background:none; border:0; cursor:pointer;
+         display:flex; flex-direction:column; justify-content:space-between }
+.burger i{ display:block; height:2px; border-radius:1px; background:var(--caps);
+           transition:transform .26s ease, opacity .2s ease }
+.burger[aria-expanded="true"] i:nth-child(1){ transform:translateY(8px) rotate(45deg) }
+.burger[aria-expanded="true"] i:nth-child(2){ opacity:0 }
+.burger[aria-expanded="true"] i:nth-child(3){ transform:translateY(-8px) rotate(-45deg) }
+
+.menu{
+  position:fixed; inset:0; z-index:55;
+  display:flex; align-items:center;
+  background:rgba(14,13,15,.32);
+  -webkit-backdrop-filter:blur(22px) saturate(1.25); backdrop-filter:blur(22px) saturate(1.25);
+  opacity:0; visibility:hidden;
+  transition:opacity .5s ease, visibility 0s linear .5s;
+}
+.menu[data-open="true"]{ opacity:1; visibility:visible;
+  transition:opacity .5s ease, visibility 0s linear 0s }
+.menu ul{ width:min(100%, var(--stage)); margin-inline:auto; padding:0 56px; list-style:none }
+.menu a{
+  display:flex; align-items:baseline; gap:22px; padding:7px 0; text-decoration:none;
+  font-size:clamp(30px, 4.6vw, 56px); font-weight:700; letter-spacing:-.02em; line-height:1.28;
+  color:var(--caps); width:max-content;
+  opacity:0; transform:translateY(26px);
+  transition:opacity .5s ease, transform .6s cubic-bezier(.2,.6,.2,1), color .25s ease;
+}
+.menu[data-open="true"] a{ opacity:1; transform:none }
+.menu[data-open="true"] li:nth-child(1) a{ transition-delay:.10s }
+.menu[data-open="true"] li:nth-child(2) a{ transition-delay:.16s }
+.menu[data-open="true"] li:nth-child(3) a{ transition-delay:.22s }
+.menu[data-open="true"] li:nth-child(4) a{ transition-delay:.28s }
+.menu[data-open="true"] li:nth-child(5) a{ transition-delay:.34s }
+.menu[data-open="true"] li:nth-child(6) a{ transition-delay:.40s }
+.menu[data-open="true"] li:nth-child(7) a{ transition-delay:.46s }
+.menu a:hover{ color:var(--accent) }
+.menu a[aria-disabled="true"]{ color:rgba(245,243,239,.34); pointer-events:none }
+.menu a[aria-current="page"]{ color:var(--accent) }
+.menu .no{ flex:none; width:46px; font-family:var(--mono); font-weight:700;
+           font-size:12px; letter-spacing:1.2px; color:var(--meta) }
+
+main{ padding-top:var(--nav-h); padding-bottom:100px }   /* 1030 − 930 = 100 */
+
+/* ---------- 页头 ---------- */
+.head{ padding-top:74px }                       /* 76 + 74 → WORKS 落在画板 y=150 */
+.eyebrow{ margin:0; font-size:13px; font-weight:600; line-height:16px;
+          letter-spacing:3.64px; color:var(--eyebrow) }      /* Figma 字距 28% */
+.h1{
+  margin:26px 0 0;                              /* 166 → 192 */
+  font-size:56px; font-weight:700; line-height:116%; letter-spacing:-.56px;
+  color:var(--title);
+}
+.lede{
+  margin:30px 0 0;                              /* 322 → 352 */
+  font-size:16px; font-weight:400; line-height:180%; color:var(--body);
+  /* ⚠ 这里**不能**照 Figma 写 max-width:635px。本地这套 Inter 比 Figma 里
+     渲染出来略宽几个像素，635 会把第二行挤断成两行，整页往下掉 28px，
+     后面三张卡的 y 就全错了。断行本来就由 <br> 定死，宽度放开即可。
+     （index.html 的 hero lede 当初栽的是同一个跟头，那边也是这么解的。）*/
+}
+
+/* ---------- 三张卡 ---------- */
+.cards{
+  margin-top:60px;                              /* 410 → 470 */
+  display:grid; grid-template-columns:repeat(3, 1fr); gap:var(--gap);
+  align-items:start;
+}
+.card{
+  background:var(--card);
+  border-radius:10px;
+  overflow:hidden;                              /* Figma 这三个 frame 都是 clipsContent */
+  display:flex; flex-direction:column;
+  /* 描边用 inset 阴影而不是 border。
+     Figma 这条描边是 **INSIDE 对齐**：它画在卡片内部、盖在填充和图片上面，
+     不占版面。CSS 的 border 会把内容框整整挤小 2px —— 图窗变成 360×217、
+     里面的文字整体右移 1px，和 Figma 逐项对时全差 1。
+     inset box-shadow 正好是「画上去但不占位」，语义和 Figma 完全对上。 */
+  box-shadow:inset 0 0 0 1px var(--card-bd);
+}
+
+/* 图窗。
+   Figma 里每张图的**矩形比卡片的图窗高**，而且是往上溢出的：
+     Ying  图 362×251，比图窗高 33，整块上移 33
+     Li    图 362×253，上移 24
+     Chen  图 362×241，上移 6
+   也就是说每张图各自被切掉的是**顶上那一条**，切多少三张都不一样。
+   所以不能用 object-fit:cover（那是居中裁，上下各切一半）——
+   得把图绝对定位、按各自的比例往上顶。
+
+   为什么 top 用百分比而不是 -33px：百分比的参照是**包含块的高度**，
+   而图窗的高度是 aspect-ratio 按卡片宽度算出来的。
+   这样窄屏卡片缩小时，裁掉的比例不变，构图和 Figma 里一模一样。 */
+.shot{
+  position:relative; width:100%; aspect-ratio:362 / 218;
+  overflow:hidden; background:var(--shot-bg);
+}
+.shot img{ position:absolute; left:0; width:100%; height:auto; display:block }
+#p-ying .shot img{ top:-15.14% }                /* −33 / 218 */
+#p-li   .shot img{ top:-11.01% }                /* −24 / 218 */
+#p-chen .shot img{ top:-2.75%  }                /* −6  / 218 */
+
+.pc{ padding:26px 26px 32px }                   /* 图底 218 → 眼眉 244；卡底留 32 */
+.pc-tag{
+  margin:0; font-size:11px; font-weight:600; line-height:13px;
+  letter-spacing:2.2px; color:var(--accent);    /* Figma 字距 20% */
+}
+.pc-nm{ margin:11px 0 0; font-size:26px; font-weight:700; line-height:31px; color:var(--title) }
+.pc-bd{ margin:13px 0 0; font-size:13px; font-weight:400; line-height:172%; color:var(--body) }
+
+/* 链接。箭头单独做成 svg，好在 hover 时往前推一下 ——
+   和 library.html 的 “View all →” 是同一个写法，整站一致。 */
+.pc-go{
+  display:inline-flex; align-items:center; gap:8px; margin-top:34px;
+  font-size:13px; font-weight:600; line-height:16px;
+  color:var(--accent); text-decoration:none;
+}
+.pc-go svg{ transition:transform .22s ease }
+.pc-go:hover svg{ transform:translateX(4px) }
+/* 三个 persona 详情页都做好了（Figma 537:97 / 539:68 / 540:91
+   → project-01/02/03.html），三张卡现在都是真链接。
+   is-off 这条留着：以后再加第四位、详情页还没做时照样能先挂上去。 */
+.pc-go.is-off{ opacity:.45; cursor:default }
+
+/* 滚动淡入。和 library-specific 一样，只是三张卡依次错开一点。 */
+.rv{ opacity:0; transform:translateY(14px);
+     transition:opacity .6s ease, transform .6s cubic-bezier(.2,.6,.2,1) }
+.rv.in{ opacity:1; transform:none }
+.cards .rv:nth-child(2){ transition-delay:.08s }
+.cards .rv:nth-child(3){ transition-delay:.16s }
+@media (prefers-reduced-motion:reduce){ .rv{ opacity:1; transform:none; transition:none } }
+
+/* ---------- 窄屏 ---------- */
+@media (max-width:1300px){ :root{ --pad:56px } }
+@media (max-width:1040px){
+  .cards{ grid-template-columns:repeat(2, 1fr) }
+  .h1{ font-size:44px }
+}
+@media (max-width:720px){
+  :root{ --pad:24px }
+  .cards{ grid-template-columns:1fr; gap:20px }
+  .h1{ font-size:32px }
+  .lede{ font-size:15px }
+  /* 窄屏放开 Figma 里那几处硬换行，否则会断在很奇怪的地方。
+     ⚠ 唯独 .h1 的 br 要留着：那是**两句话**，
+     去掉之后会连成 “Three People.Three Rooms, Rebuilt.”，中间连个空格都没有。 */
+  .lede br, .pc-bd br{ display:none }
+}
+</style>
+</head>
+
+<body>
+
+<header class="nav">
+  <div class="nav-in">
+    <a class="brand" href="./index.html" aria-label="MNEMOSYNE">
+      <img src="assets/logo-dark.png" alt="MNEMOSYNE">
+    </a>
+    <div class="nav-r">
+      <a class="contact" href="mailto:zhoushichen0311@gmail.com">Contact</a>
+      <button class="burger" id="burger" aria-expanded="false" aria-controls="menu" aria-label="Menu">
+        <i></i><i></i><i></i>
+      </button>
+    </div>
+  </div>
+  <nav class="menu" id="menu" data-open="false" aria-label="Sections">
+    <ul>
+      <li><a href="./index.html#about"><span class="no">01</span>About</a></li>
+      <li><a href="./research.html"><span class="no">02</span>Research</a></li>
+      <li><a href="./project.html" aria-current="page"><span class="no">03</span>Project</a></li>
+      <li><a href="./library.html"><span class="no">04</span>Library</a></li>
+      <li><a href="./cube-system.html"><span class="no">05</span>Cube System</a></li>
+      <li><a href="./core-system.html"><span class="no">06</span>Core System</a></li>
+      <li><a href="./home-file-empty.html"><span class="no">07</span>Home File</a></li>
+    </ul>
+  </nav>
+</header>
+
+<main>
+  <div class="wrap">
+
+    <div class="head">
+      <p class="eyebrow">WORKS</p>
+      <h1 class="h1">Three People.<br>Three Rooms, Rebuilt.</h1>
+      <p class="lede">The three aging types from our research, given faces. Each card opens the full story<br>
+        of one home: what made it hard to live in, and how the cube system rebuilt it.</p>
+    </div>
+
+    <div class="cards">
+
+      <!-- ── 01 MRS. YING · 行动不便 ── -->
+      <article class="card rv" id="p-ying">
+        <div class="shot">
+          <img src="assets/project/ying.webp" width="362" height="251"
+               alt="Mrs. Ying's rebuilt room" decoding="async">
+        </div>
+        <div class="pc">
+          <p class="pc-tag">01 — MOBILITY DECLINE</p>
+          <h2 class="pc-nm">MRS. YING</h2>
+          <p class="pc-bd">Knee arthritis and balance loss.<br>
+            A cane indoors, fear of falling,<br>
+            furniture that gets in the way.</p>
+          <a class="pc-go" href="./project-01.html">View the transformation
+            <svg width="16" height="11" viewBox="0 0 16 11" fill="none" aria-hidden="true">
+              <path d="M0 5.5h13.5M10.5 1l4 4.5-4 4.5" stroke="currentColor" stroke-width="1.8"
+                    stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </a>
+        </div>
+      </article>
+
+      <!-- ── 02 MRS. LI · 视力衰退 ── -->
+      <article class="card rv" id="p-li">
+        <div class="shot">
+          <img src="assets/project/li.webp" width="362" height="253"
+               alt="Mrs. Li's rebuilt room" loading="lazy" decoding="async">
+        </div>
+        <div class="pc">
+          <p class="pc-tag">02 — VISION DECLINE</p>
+          <h2 class="pc-nm">MRS. LI</h2>
+          <p class="pc-bd">Low contrast and poor night vision.<br>
+            Boundaries blur, night trips to the<br>
+            bathroom become risky.</p>
+          <a class="pc-go" href="./project-02.html">View the transformation
+            <svg width="16" height="11" viewBox="0 0 16 11" fill="none" aria-hidden="true">
+              <path d="M0 5.5h13.5M10.5 1l4 4.5-4 4.5" stroke="currentColor" stroke-width="1.8"
+                    stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </a>
+        </div>
+      </article>
+
+      <!-- ── 03 MR. CHEN · 记忆衰退 ── -->
+      <article class="card rv" id="p-chen">
+        <div class="shot">
+          <img src="assets/project/chen.webp" width="362" height="241"
+               alt="Mr. Chen's rebuilt room" loading="lazy" decoding="async">
+        </div>
+        <div class="pc">
+          <p class="pc-tag">03 — MEMORY DECLINE</p>
+          <h2 class="pc-nm">MR. CHEN</h2>
+          <p class="pc-bd">Short-term memory loss.<br>
+            Rooms stop making sense,<br>
+            routes and routines slip away.</p>
+          <a class="pc-go" href="./project-03.html">View the transformation
+            <svg width="16" height="11" viewBox="0 0 16 11" fill="none" aria-hidden="true">
+              <path d="M0 5.5h13.5M10.5 1l4 4.5-4 4.5" stroke="currentColor" stroke-width="1.8"
+                    stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </a>
+        </div>
+      </article>
+
+    </div>
+  </div>
+</main>
+
+<script>
+/* 汉堡菜单（和 library / research 逐字相同） */
+(function(){
+  var b = document.getElementById('burger'), m = document.getElementById('menu'), open = false;
+  function set(v){
+    open = v;
+    b.setAttribute('aria-expanded', open ? 'true' : 'false');
+    m.dataset.open = open ? 'true' : 'false';
+    document.body.style.overflow = open ? 'hidden' : '';
+  }
+  b.addEventListener('click', function(e){ e.stopPropagation(); set(!open); });
+  m.addEventListener('click', function(){ set(false); });
+  document.addEventListener('click', function(e){ if (!e.target.closest('.nav')) set(false); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') set(false); });
+})();
+
+/* 滚动淡入 */
+(function(){
+  var items = document.querySelectorAll('.rv');
+  if (!('IntersectionObserver' in window)){
+    items.forEach(function(el){ el.classList.add('in'); });
+    return;
+  }
+  var io = new IntersectionObserver(function(en){
+    en.forEach(function(e){
+      if (!e.isIntersecting) return;
+      e.target.classList.add('in'); io.unobserve(e.target);
+    });
+  }, { rootMargin:'0px 0px -10% 0px', threshold:.1 });
+  items.forEach(function(el){ io.observe(el); });
+})();
+</script>
+
+</body>
+</html>

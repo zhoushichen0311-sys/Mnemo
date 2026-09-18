@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MNEMOSYNE — Cabinet, 13 Modules</title>
+
+<style>
+@font-face{
+  font-family:'InterLocal';
+  src:url('assets/fonts/inter-var.woff2') format('woff2-variations');
+  font-weight:100 900; font-style:normal; font-display:block;
+}
+@font-face{
+  font-family:'SpaceMonoLocal';
+  src:url('assets/fonts/space-mono-700.woff2') format('woff2');
+  font-weight:700; font-style:normal; font-display:block;
+}
+</style>
+
+<style>
+/* ============================================================
+   MNEMOSYNE · Library / Cabinet 类别展开
+   对应 Figma 731:71 —— 1440 × 1520
+   四列网格，卡片 269×268（图版 269×178 + 文字区）
+   ============================================================ */
+:root{
+  --bg:#EFECE6;
+  --nav:#141414;
+  --crumb:#8C8780;
+  --title:#1C1A17;
+  --body:#6B6661;
+  --accent:#ED7119;
+  --card:#F6F4EE;        /* 卡片底 */
+  --card-line:#D6D1C7;   /* 卡片描边 */
+  --plate:#E2DED6;       /* 卡片内图版 */
+  --caps:#F5F3EF;
+  --nav-dim:#9E9991;
+  --meta:#8C8780;
+
+  --sans:'InterLocal','Inter',system-ui,-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+  --mono:'SpaceMonoLocal','Space Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+
+  --stage:1440px;
+  --pad:152px;
+  --nav-h:76px;
+  --card-w:269px;
+  --plate-h:178px;
+}
+*{ box-sizing:border-box }
+html{ background:var(--bg); scroll-behavior:smooth; scroll-padding-top:var(--nav-h) }
+body{
+  margin:0; background:var(--bg); color:var(--body);
+  font-family:var(--sans); -webkit-font-smoothing:antialiased; overflow-x:clip;
+}
+.wrap{ width:min(100%, var(--stage)); margin-inline:auto; padding-inline:var(--pad) }
+
+/* ---------- 导航 ---------- */
+.nav{ position:fixed; top:0; left:0; right:0; z-index:60;
+      height:var(--nav-h); background:var(--nav) }
+.nav-in{
+  width:min(100%, var(--stage)); margin-inline:auto; height:100%;
+  padding-inline:56px; display:flex; align-items:center; justify-content:space-between;
+}
+.brand{ display:block; line-height:0 }
+.brand img{ display:block; width:92.9px; height:36px; object-fit:contain }
+.nav-r{ display:flex; align-items:center; gap:32px }
+.contact{ font-size:13px; font-weight:500; color:var(--nav-dim); text-decoration:none;
+          transition:color .22s ease }
+.contact:hover{ color:var(--caps) }
+.burger{ width:24px; height:18px; padding:0; background:none; border:0; cursor:pointer;
+         display:flex; flex-direction:column; justify-content:space-between }
+.burger i{ display:block; height:2px; border-radius:1px; background:var(--caps);
+           transition:transform .26s ease, opacity .2s ease }
+.burger[aria-expanded="true"] i:nth-child(1){ transform:translateY(8px) rotate(45deg) }
+.burger[aria-expanded="true"] i:nth-child(2){ opacity:0 }
+.burger[aria-expanded="true"] i:nth-child(3){ transform:translateY(-8px) rotate(-45deg) }
+/* ============================================================
+   全屏毛玻璃菜单（沿用 v1 hero4 的 Foster 风格面板）
+   盖满视口、透出背后的视频/页面并做高斯模糊；
+   z-index 55 压在导航条（60）之下，所以 logo 和汉堡始终可点。
+   ============================================================ */
+.menu{
+  position:fixed; inset:0; z-index:55;
+  display:flex; align-items:center;
+  background:rgba(14,13,15,.32);
+  -webkit-backdrop-filter:blur(22px) saturate(1.25);
+          backdrop-filter:blur(22px) saturate(1.25);
+  opacity:0; visibility:hidden;
+  transition:opacity .5s ease, visibility 0s linear .5s;
+}
+.menu[data-open="true"]{
+  opacity:1; visibility:visible;
+  transition:opacity .5s ease, visibility 0s linear 0s;
+}
+.menu ul{
+  width:min(100%, var(--stage));
+  margin-inline:auto;
+  padding:0 56px;            /* 与导航条同一条左线 */
+  list-style:none;
+}
+.menu a{
+  display:flex; align-items:baseline; gap:22px;
+  padding:7px 0; text-decoration:none;
+  font-size:clamp(30px, 4.6vw, 56px);
+  font-weight:700; letter-spacing:-.02em; line-height:1.28;
+  color:var(--caps);
+  width:max-content;
+  opacity:0; transform:translateY(26px);
+  transition:opacity .5s ease,
+             transform .6s cubic-bezier(.2,.6,.2,1),
+             color .25s ease;
+}
+.menu[data-open="true"] a{ opacity:1; transform:none }
+.menu[data-open="true"] li:nth-child(1) a{ transition-delay:.10s }
+.menu[data-open="true"] li:nth-child(2) a{ transition-delay:.16s }
+.menu[data-open="true"] li:nth-child(3) a{ transition-delay:.22s }
+.menu[data-open="true"] li:nth-child(4) a{ transition-delay:.28s }
+.menu[data-open="true"] li:nth-child(5) a{ transition-delay:.34s }
+.menu[data-open="true"] li:nth-child(6) a{ transition-delay:.40s }
+.menu[data-open="true"] li:nth-child(7) a{ transition-delay:.46s }
+.menu a:hover{ color:var(--accent) }
+.menu a[aria-disabled="true"]{ color:rgba(245,243,239,.34); pointer-events:none }
+.menu a[aria-current="page"]{ color:var(--accent) }
+.menu .no{
+  flex:none; width:46px;
+  font-family:var(--mono); font-weight:700;
+  font-size:12px; letter-spacing:1.2px; color:var(--meta);
+}
+
+main{ padding-top:var(--nav-h) }
+
+/* ---------- 页头 ---------- */
+.head{ padding-top:46px }                  /* 76 + 46 → 面包屑落在画板 y=122 */
+.crumb{
+  display:inline-flex; align-items:center; gap:9px;
+  margin:0; font-size:12px; font-weight:600; line-height:15px;
+  letter-spacing:1.68px; color:var(--crumb); text-decoration:none;
+  transition:color .2s ease;
+}
+.crumb:hover{ color:var(--title) }
+.crumb .arw{ transition:transform .22s ease }
+.crumb:hover .arw{ transform:translateX(-3px) }
+.head h1{
+  margin:27px 0 0; font-size:44px; font-weight:700; line-height:53px;
+  letter-spacing:0; color:var(--title);
+}
+.lede{
+  margin:15px 0 0; font-size:14.5px; line-height:18px; color:var(--body);
+}
+
+/* ---------- 网格 ---------- */
+/* Figma: 卡 269 宽，列距 20（152→441），行距 24（292→584）；4×269 + 3×20 = 1136 */
+.grid{
+  margin-top:42px;                          /* 250 → 292 */
+  display:grid; grid-template-columns:repeat(4, var(--card-w));
+  gap:24px 20px; justify-content:space-between;
+}
+.card{
+  width:var(--card-w);
+  background:var(--card);
+  border:1px solid var(--card-line);
+  border-radius:8px;
+  overflow:hidden;                          /* 图版顶角跟着卡片圆角 */
+  text-decoration:none; color:inherit; display:block;
+  /* 用 button 承载点击：重置浏览器默认样式 */
+  font:inherit; text-align:left; padding:0; cursor:pointer;
+  transition:border-color .22s ease, transform .28s ease,
+             box-shadow .22s ease, opacity .28s ease;
+}
+.card:hover:not(.dimmed){
+  border-color:#C0BAAE;
+  transform:translateY(-2px);
+  box-shadow:0 10px 22px rgba(62,52,42,.07);
+}
+.card:focus-visible{ outline:2px solid var(--accent); outline-offset:3px }
+/* 展开时其余卡片退到背景（沿用旧版的 .22 / .97） */
+.card.dimmed{ opacity:.22; transform:scale(.97); pointer-events:none }
+/* 图版：整幅铺满卡宽，去背图落在其上，共用一条地平线 */
+.plate{
+  height:var(--plate-h);
+  background:var(--plate);
+  /* 一张卡里只有一个物件，没有可共享的地平线，
+     底对齐只会让矮的物件（如 Cabinet M 只有 78 高）看着往下沉。改垂直居中。 */
+  display:flex; align-items:center; justify-content:center;
+  padding:0 20px;
+}
+.plate img{
+  display:block; max-width:100%;
+  object-fit:contain; object-position:center;
+  filter:drop-shadow(0 10px 13px rgba(62,52,42,.15));
+}
+.card .nm{
+  margin:16px 0 0 18px; font-size:16px; font-weight:700; line-height:19px;
+  color:var(--title);
+}
+.card .dim{
+  margin:9px 0 31px 18px; font-size:12px; font-weight:500; line-height:15px;
+  letter-spacing:.48px; color:var(--body);
+}
+.card .dim b{ font-weight:500; color:var(--meta); margin-right:10px }
+
+/* ============================================================
+   点卡片展开 —— 沿用旧版 furniture-library 的交互时序，
+   换成浅色体系（旧版是深色玻璃拟态，这套页面不用玻璃）
+   ============================================================ */
+.backdrop{
+  position:fixed; inset:0; z-index:150; cursor:pointer;
+  background:rgba(28,26,23,.42);
+  -webkit-backdrop-filter:blur(2px); backdrop-filter:blur(2px);
+  visibility:hidden; opacity:0;
+  transition:opacity .3s ease, visibility 0s linear .3s;
+}
+.backdrop.active{
+  visibility:visible; opacity:1;
+  transition:opacity .3s ease, visibility 0s linear 0s;
+}
+
+.exp{
+  position:fixed; z-index:200;
+  left:50%; top:50%;
+  width:min(780px, calc(100vw - 64px));
+  background:var(--card);
+  border:1px solid var(--card-line);
+  border-radius:20px;
+  box-shadow:0 32px 80px rgba(40,33,26,.26), 0 8px 24px rgba(40,33,26,.10);
+  overflow:hidden;
+  visibility:hidden; opacity:0;
+  /* 居中与入场缩放共用一个 transform，顺序不能反 */
+  transform:translate(-50%,-50%) scale(.88) translateY(16px);
+  transition:opacity .38s ease,
+             transform .38s cubic-bezier(.34,1.4,.64,1),
+             visibility 0s linear .38s;
+}
+.exp.active{
+  visibility:visible; opacity:1;
+  transform:translate(-50%,-50%) scale(1) translateY(0);
+  transition:opacity .38s ease,
+             transform .38s cubic-bezier(.34,1.4,.64,1),
+             visibility 0s linear 0s;
+}
+
+.exp-plate{
+  position:relative;
+  height:360px; background:var(--plate);
+  display:flex; align-items:center; justify-content:center;
+  padding:30px 56px;
+}
+.exp-plate img{
+  display:block; max-width:100%; max-height:100%;
+  object-fit:contain; object-position:center;
+  filter:drop-shadow(0 18px 26px rgba(62,52,42,.20));
+}
+.exp-close{
+  position:absolute; top:16px; right:16px;
+  width:34px; height:34px; padding:0;
+  background:rgba(255,255,255,.55);
+  border:1px solid rgba(62,52,42,.14);
+  border-radius:50%; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  color:var(--body);
+  transition:background .18s ease, color .18s ease, border-color .18s ease;
+}
+.exp-close:hover{ background:#fff; color:var(--title); border-color:rgba(62,52,42,.28) }
+
+.exp-body{
+  padding:22px 32px 26px;
+  display:flex; align-items:flex-end; justify-content:space-between; gap:24px;
+}
+.exp-nm{
+  margin:0; font-size:26px; font-weight:700; line-height:32px;
+  letter-spacing:-.2px; color:var(--title);
+}
+.exp-dim{
+  margin:8px 0 0; font-size:13px; font-weight:500; line-height:16px;
+  letter-spacing:.48px; color:var(--body);
+}
+.exp-dim b{ font-weight:500; color:var(--meta); margin-right:10px }
+
+.exp-nav{ display:flex; align-items:center; gap:10px; flex:none }
+.exp-count{
+  font-family:var(--mono); font-weight:700; font-size:10.5px;
+  letter-spacing:1.2px; color:var(--meta); margin-right:4px;
+}
+.exp-arrow{
+  width:36px; height:36px; padding:0;
+  background:transparent; border:1px solid var(--card-line);
+  border-radius:50%; cursor:pointer; color:var(--body);
+  display:flex; align-items:center; justify-content:center;
+  transition:border-color .18s ease, color .18s ease, background .18s ease;
+}
+.exp-arrow:hover{ border-color:var(--accent); color:var(--accent); background:rgba(237,113,25,.06) }
+.exp-close:focus-visible, .exp-arrow:focus-visible{ outline:2px solid var(--accent); outline-offset:2px }
+
+@media (prefers-reduced-motion:reduce){
+  .exp, .backdrop, .card{ transition:none !important }
+}
+
+footer.foot{
+  margin-top:84px; padding-bottom:56px;
+  display:flex; justify-content:space-between;
+  font-family:var(--mono); font-weight:700; font-size:9.8px;
+  letter-spacing:1.32px; color:var(--meta);
+}
+
+.rv{ opacity:0; transition:opacity .55s ease }
+.rv.in{ opacity:1 }
+@media (prefers-reduced-motion:reduce){ .rv{ opacity:1; transition:none } }
+
+@media (max-width:1300px){
+  :root{ --pad:56px }
+  .grid{ grid-template-columns:repeat(4, 1fr) }
+  .card{ width:auto }
+}
+@media (max-width:1000px){ .grid{ grid-template-columns:repeat(3, 1fr) } }
+@media (max-width:760px){
+  :root{ --pad:24px }
+  .grid{ grid-template-columns:repeat(2, 1fr) }
+  .head h1{ font-size:32px; line-height:40px }
+}
+</style>
+</head>
+
+<body>
+
+<header class="nav">
+  <div class="nav-in">
+    <a class="brand" href="./index.html" aria-label="MNEMOSYNE">
+      <img src="assets/logo-dark.png" alt="MNEMOSYNE">
+    </a>
+    <div class="nav-r">
+      <a class="contact" href="mailto:zhoushichen0311@gmail.com">Contact</a>
+      <button class="burger" id="burger" aria-expanded="false" aria-controls="menu" aria-label="Menu">
+        <i></i><i></i><i></i>
+      </button>
+    </div>
+  </div>
+  <nav class="menu" id="menu" data-open="false" aria-label="Sections">
+    <ul>
+      <li><a href="./index.html#about"><span class="no">01</span>About</a></li>
+      <li><a href="./research.html"><span class="no">02</span>Research</a></li>
+      <li><a href="./project.html"><span class="no">03</span>Project</a></li>
+      <li><a href="./library.html" aria-current="page"><span class="no">04</span>Library</a></li>
+      <li><a href="./cube-system.html"><span class="no">05</span>Cube System</a></li>
+      <li><a href="./core-system.html"><span class="no">06</span>Core System</a></li>
+      <li><a href="./home-file-empty.html"><span class="no">07</span>Home File</a></li>
+    </ul>
+  </nav>
+</header>
+
+<main>
+  <div class="wrap">
+
+    <div class="head">
+      <a class="crumb" href="./library.html">
+        <svg class="arw" width="11" height="9" viewBox="0 0 11 9" fill="none" aria-hidden="true">
+          <path d="M11 4.5H1M4 1 .5 4.5 4 8" stroke="currentColor" stroke-width="1.6"
+                stroke-linecap="round" stroke-linejoin="round"/></svg>
+        LIBRARY&nbsp;&nbsp;/&nbsp;&nbsp;CABINET
+      </a>
+      <h1>Cabinet — 13 Modules</h1>
+      <p class="lede">All seats hold the 450 mm transfer height. Length and depth scale by cube count.</p>
+    </div>
+
+    <div class="grid" id="grid"></div>
+
+    <footer class="foot">
+      <span>ADAPTIVE BY DESIGN</span>
+      <span>300MM CUBE SYSTEM</span>
+    </footer>
+
+  </div>
+</main>
+
+<!-- 展开视图 -->
+<div class="backdrop" id="backdrop"></div>
+<div class="exp" id="exp" role="dialog" aria-modal="true" aria-labelledby="exp-nm">
+  <div class="exp-plate">
+    <button class="exp-close" id="exp-close" aria-label="Close">
+      <svg width="13" height="13" viewBox="0 0 13 13" aria-hidden="true">
+        <path d="M1 1l11 11M12 1L1 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+      </svg>
+    </button>
+    <img id="exp-img" src="" alt="">
+  </div>
+  <div class="exp-body">
+    <div>
+      <h2 class="exp-nm" id="exp-nm"></h2>
+      <p class="exp-dim"><b>L × W × H</b><span id="exp-dim"></span></p>
+    </div>
+    <div class="exp-nav">
+      <span class="exp-count" id="exp-count"></span>
+      <button class="exp-arrow" id="exp-prev" aria-label="Previous">
+        <svg width="13" height="11" viewBox="0 0 13 11" fill="none" aria-hidden="true">
+          <path d="M13 5.5H1M5 1 .5 5.5 5 10" stroke="currentColor" stroke-width="1.6"
+                stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button class="exp-arrow" id="exp-next" aria-label="Next">
+        <svg width="13" height="11" viewBox="0 0 13 11" fill="none" aria-hidden="true">
+          <path d="M0 5.5h12M8 1l4.5 4.5L8 10" stroke="currentColor" stroke-width="1.6"
+                stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* 尺寸逐字取自 Figma 731:71；aspect 为去背图物件实框的真实纵横比。
+   Figma 里图是 CROP 模式（显示的是裁切子区域），所以 Figma 矩形的
+   长宽比不等于源图长宽比 —— 这里用源图完整轮廓，contain 落在图版里。 */
+var CABINETS = [
+  { id:'a', nm:'Cabinet A', dim:'2.1 × 1.5 × 0.45 m', a:0.768 },
+  { id:'b', nm:'Cabinet B', dim:'1.5 × 0.45 × 2.1 m', a:0.810 },
+  { id:'c', nm:'Cabinet C', dim:'3.3 × 0.45 × 2.7 m', a:0.804 },
+  { id:'d', nm:'Cabinet D', dim:'1.8 × 0.45 × 2.4 m', a:0.634 },
+  { id:'e', nm:'Cabinet E', dim:'1.2 × 0.45 × 2.1 m', a:0.578 },
+  { id:'f', nm:'Cabinet F', dim:'1.2 × 0.45 × 1.2 m', a:0.773 },
+  { id:'g', nm:'Cabinet G', dim:'1.2 × 0.45 × 2.4 m', a:0.689 },
+  { id:'h', nm:'Cabinet H', dim:'3.3 × 0.45 × 2.7 m', a:0.853 },
+  { id:'i', nm:'Cabinet I', dim:'2.7 × 0.45 × 2.7 m', a:0.753 },
+  { id:'j', nm:'Cabinet J', dim:'1.5 × 0.45 × 2.4 m', a:0.724 },
+  { id:'k', nm:'Cabinet K', dim:'1.5 × 0.45 × 2.1 m', a:0.574 },
+  { id:'l', nm:'Cabinet L', dim:'1.5 × 0.6 × 0.9 m', a:1.269 },
+  { id:'m', nm:'Cabinet M', dim:'2.4 × 1.2 × 0.6 m', a:2.123 }
+];
+
+/* 等面积归一：13 件柜体纵横比从 0.57 到 2.12，若按满高或满宽统一，
+   一端会出血、另一端缩成细条。上限由最竖的一件在图框内定死。 */
+var BOX_W = 229, BOX_H = 150;
+var MIN_A = Math.min.apply(null, CABINETS.map(function(s){ return s.a; }));
+/* 目标面积由「最竖的一件在图框内刚好满高」定死，各图框各算各的 */
+function areaFor(boxH){ return boxH * boxH * MIN_A; }
+var AREA = areaFor(BOX_H);
+
+/* 给定图框，按等面积算出该件的显示尺寸。
+   area 必须随图框一起变 —— 若沿用卡片的 AREA，展开后的图会和卡片里一样大。 */
+function fit(a, boxW, boxH, area){
+  var h = Math.min(boxH, Math.sqrt((area || AREA) / a)), w = h * a;
+  if (w > boxW){ w = boxW; h = w / a; }
+  return { w:w, h:h };
+}
+
+document.getElementById('grid').innerHTML = CABINETS.map(function(s, i){
+  var d = fit(s.a, BOX_W, BOX_H);
+  return '<button type="button" class="card rv" data-i="' + i + '">'
+       +   '<div class="plate">'
+       +     '<img src="assets/library/cabinet/' + s.id + '.webp" alt="' + s.nm + '"'
+       +     ' style="width:' + d.w.toFixed(1) + 'px;height:' + d.h.toFixed(1) + 'px"'
+       +     ' loading="lazy" decoding="async">'
+       +   '</div>'
+       +   '<p class="nm">' + s.nm + '</p>'
+       +   '<p class="dim"><b>L × W × H</b>' + s.dim + '</p>'
+       + '</button>';
+}).join('');
+
+/* ---------------- 点卡片展开 ---------------- */
+(function(){
+  var cards = [].slice.call(document.querySelectorAll('.card'));
+  var back  = document.getElementById('backdrop');
+  var exp   = document.getElementById('exp');
+  var img   = document.getElementById('exp-img');
+  var nm    = document.getElementById('exp-nm');
+  var dim   = document.getElementById('exp-dim');
+  var cnt   = document.getElementById('exp-count');
+  var cur   = -1, lastFocus = null;
+
+  /* 展开面板的图框：360 高的图版，留出上下内边距。
+     面积按 EXP_H 重算，线性放大约 2×。 */
+  var EXP_W = 640, EXP_H = 300, EXP_AREA = areaFor(EXP_H);
+
+  function paint(i){
+    var s = CABINETS[i], d = fit(s.a, EXP_W, EXP_H, EXP_AREA);
+    img.src = 'assets/library/cabinet/' + s.id + '.webp';
+    img.alt = s.nm;
+    img.style.width  = d.w.toFixed(1) + 'px';
+    img.style.height = d.h.toFixed(1) + 'px';
+    nm.textContent   = s.nm;
+    dim.textContent  = s.dim;
+    cnt.textContent  = String(i + 1).padStart(2, '0') + ' / ' + CABINETS.length;
+    cur = i;
+  }
+
+  function open(i){
+    lastFocus = document.activeElement;
+    paint(i);
+    cards.forEach(function(c){ c.classList.add('dimmed'); });
+    back.classList.add('active');
+    exp.classList.add('active');
+    document.body.style.overflow = 'hidden';
+    document.getElementById('exp-close').focus();
+  }
+
+  function close(){
+    exp.classList.remove('active');
+    back.classList.remove('active');
+    cards.forEach(function(c){ c.classList.remove('dimmed'); });
+    document.body.style.overflow = '';
+    /* 焦点还给刚才点的那张卡，键盘用户不会被丢回页首 */
+    if (cur > -1 && cards[cur]) cards[cur].focus();
+    else if (lastFocus) lastFocus.focus();
+  }
+
+  function step(d){ paint((cur + d + CABINETS.length) % CABINETS.length); }
+
+  cards.forEach(function(c){
+    c.addEventListener('click', function(){ open(+c.dataset.i); });
+  });
+  back.addEventListener('click', close);
+  document.getElementById('exp-close').addEventListener('click', close);
+  document.getElementById('exp-prev').addEventListener('click', function(){ step(-1); });
+  document.getElementById('exp-next').addEventListener('click', function(){ step(1); });
+
+  document.addEventListener('keydown', function(e){
+    if (!exp.classList.contains('active')) return;
+    if (e.key === 'Escape')     { close(); }
+    if (e.key === 'ArrowLeft')  { step(-1); }
+    if (e.key === 'ArrowRight') { step(1); }
+  });
+})();
+
+/* 汉堡菜单 */
+(function(){
+  var b = document.getElementById('burger'), m = document.getElementById('menu'), open = false;
+  function set(v){
+    open = v;
+    b.setAttribute('aria-expanded', open ? 'true' : 'false');
+    m.dataset.open = open ? 'true' : 'false';
+    document.body.style.overflow = open ? 'hidden' : '';   /* 全屏面板期间锁滚动 */
+  }
+  b.addEventListener('click', function(e){ e.stopPropagation(); set(!open); });
+  /* 面板铺满视口后，点空白处关闭是最自然的关法；点条目也一并关掉 */
+  m.addEventListener('click', function(){ set(false); });
+  document.addEventListener('click', function(e){ if (!e.target.closest('.nav')) set(false); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') set(false); });
+})();
+
+/* 滚动淡入，逐张错开 */
+(function(){
+  var items = document.querySelectorAll('.rv');
+  if (!('IntersectionObserver' in window)){
+    items.forEach(function(el){ el.classList.add('in'); });
+    return;
+  }
+  var io = new IntersectionObserver(function(en){
+    en.forEach(function(e){
+      if (!e.isIntersecting) return;
+      var i = [].indexOf.call(items, e.target);
+      e.target.style.transitionDelay = (i % 4) * 70 + 'ms';
+      e.target.classList.add('in');
+      io.unobserve(e.target);
+    });
+  }, { rootMargin:'0px 0px -8% 0px', threshold:.1 });
+  items.forEach(function(el){ io.observe(el); });
+})();
+</script>
+
+</body>
+</html>

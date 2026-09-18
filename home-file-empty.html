@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MNEMOSYNE — Home File</title>
+
+<style>
+/* 本地字体：不依赖网络，不阻塞渲染，不会加载后二次替换 */
+@font-face{
+  font-family:'InterLocal';
+  src:url('assets/fonts/inter-var.woff2') format('woff2-variations');
+  font-weight:100 900; font-style:normal; font-display:block;
+}
+@font-face{
+  font-family:'SpaceMonoLocal';
+  src:url('assets/fonts/space-mono-700.woff2') format('woff2');
+  font-weight:700; font-style:normal; font-display:block;
+}
+</style>
+
+<style>
+/* ============================================================
+   MNEMOSYNE · Home File — 空状态（尚未创建档案）
+   对应 Figma frame 644:65
+   ============================================================ */
+
+:root{
+  /* 色板 —— 与 Figma 一一对应 */
+  --cream-a:#F8ECDC;          /* 背景渐变起 */
+  --cream-b:#F1ECE5;          /* 背景渐变止 */
+  --ink:#0E0D0F;              /* 唯一的黑：MNEMO / 系统 */
+  --ink-soft:#1A1917;
+  --muted:#736E66;
+  --soft:#9E9891;
+  --hair:#DEDACD;             /* 发丝描边 */
+  --hair-strong:#C2BDB4;
+  --ghost:#9E9890;            /* 幽灵态 */
+  --accent:#ED7119;           /* 品牌橙，全站唯一强调色 */
+  --amber:#F2B82F;
+  --white:#fff;
+
+  --radius-card:14px;
+  --radius-pill:999px;
+
+  /* 老人模式：选择「I am the resident」后放大 */
+  --type-scale:1;
+
+  --rail-w:136px;             /* 侧栏占位宽（34 + 68 + 34） */
+  --gutter:48px;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+
+html{ -webkit-text-size-adjust:100%; }
+
+body{
+  margin:0;
+  min-height:100dvh;
+  font-family:'InterLocal','Inter',system-ui,-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+  color:var(--ink);
+  background:
+    url('assets/bg/bg-family-carer.webp') center center / cover no-repeat fixed,
+    linear-gradient(160deg,var(--cream-a) 0%,var(--cream-b) 100%);
+  background-attachment:fixed;
+  -webkit-font-smoothing:antialiased;
+  font-synthesis-weight:none;
+}
+
+.mono{
+  font-family:'SpaceMonoLocal','Space Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:.09em;
+}
+
+/* ── 页面骨架 ───────────────────────────────────────────── */
+.shell{
+  display:grid;
+  grid-template-columns:var(--rail-w) minmax(0,1fr);
+  max-width:1440px;
+  margin-inline:auto;
+  min-height:100dvh;
+  padding:34px var(--gutter) 48px 0;
+}
+
+/* ── 左侧栏 ─────────────────────────────────────────────── */
+.rail{
+  position:sticky; top:34px;
+  align-self:start;
+  height:calc(100dvh - 82px);
+  display:flex; flex-direction:column; align-items:center;
+  padding-left:34px;
+}
+
+.logo{ width:68px; height:68px; display:block; flex:none; object-fit:contain; }
+
+.rail-nav{ margin-top:34px; display:flex; flex-direction:column; gap:18px; align-items:center; }
+
+.pill{
+  background:var(--white);
+  border:1px solid var(--hair);
+  border-radius:var(--radius-pill);
+  padding:10px;
+  display:flex; flex-direction:column; gap:8px; align-items:center;
+}
+.pill.is-locked{ opacity:.55; }
+
+.nav-btn{
+  width:48px; height:48px;
+  border:0; border-radius:50%;
+  background:transparent;
+  display:grid; place-items:center;
+  cursor:pointer;
+  color:var(--muted);
+  transition:background .18s ease, color .18s ease, transform .12s ease;
+}
+.nav-btn:hover:not(:disabled){ background:#F3EFE8; }
+.nav-btn:active:not(:disabled){ transform:scale(.94); }
+.nav-btn[aria-current="page"]{ background:var(--ink); color:var(--white); }
+.nav-btn:disabled{ opacity:.28; cursor:not-allowed; }
+
+.locked-note{ margin-top:10px; font-size:7.5px; color:var(--muted); opacity:.6; }
+
+.rail-spacer{ flex:1 1 auto; min-height:24px; }
+
+.avatar-empty{
+  width:56px; height:56px; border-radius:50%;
+  border:1.5px dashed var(--hair-strong);
+  display:grid; place-items:center;
+  color:var(--hair-strong);
+}
+
+/* ── 主区 ───────────────────────────────────────────────── */
+.main{ min-width:0; padding-left:38px; position:relative; }
+
+.topbar{
+  display:flex; align-items:flex-start; justify-content:space-between;
+  gap:24px; margin-bottom:36px;
+}
+.greeting h1{
+  margin:0;
+  font-size:calc(34px * var(--type-scale));
+  line-height:1.1; letter-spacing:-.022em; font-weight:700;
+}
+.greeting p{
+  margin:14px 0 0;
+  font-size:calc(14.5px * var(--type-scale));
+  color:var(--muted); max-width:62ch;
+}
+
+.step-tag{
+  flex:none;
+  display:inline-flex; align-items:center; gap:11px;
+  padding:10px 20px;
+  border:1px dashed var(--hair-strong);
+  border-radius:var(--radius-pill);
+  font-size:9.5px; color:#59544D;
+  white-space:nowrap;
+}
+.step-tag .dot{ width:8px; height:8px; border-radius:50%; background:var(--accent); flex:none; }
+
+/* ── 幽灵卡片栅格 ───────────────────────────────────────── */
+.ghost-grid{ display:flex; flex-direction:column; gap:24px; }
+.row{ display:grid; gap:24px; }
+.row--top{ grid-template-columns:760fr 468fr; }
+.row--bottom{ grid-template-columns:368fr 860fr; }
+.stack{ display:grid; grid-template-rows:176px 176px; gap:24px; }
+
+.ghost{
+  position:relative;
+  border:1px dashed var(--hair-strong);
+  border-radius:var(--radius-card);
+  background:rgba(255,255,255,.34);
+  padding:22px 24px;
+  overflow:hidden;
+  opacity:0;
+  transform:translateY(10px);
+  animation:ghost-in .7s cubic-bezier(.22,.7,.3,1) forwards;
+}
+.ghost:nth-child(1){ animation-delay:.05s }
+.ghost:nth-child(2){ animation-delay:.11s }
+.stack .ghost:nth-child(1){ animation-delay:.17s }
+.stack .ghost:nth-child(2){ animation-delay:.23s }
+.row--bottom > .ghost{ animation-delay:.29s }
+
+@keyframes ghost-in{ to{ opacity:1; transform:none; } }
+
+.ghost--tall{ height:360px; }
+.ghost--wide{ height:376px; }
+
+.ghost-label{ font-size:9px; color:var(--ghost); opacity:.85; }
+
+.ghost-note{
+  position:absolute; left:24px; right:24px; bottom:18px;
+  font-size:11.5px; line-height:1.45; color:var(--ghost); opacity:.72;
+  max-width:46ch;
+}
+
+/* 幽灵内容：占位条 */
+.bar{ background:var(--ghost); border-radius:4px; opacity:.16; }
+
+/* A · 状态色斑占位 */
+.blobs{ position:absolute; inset:0; pointer-events:none; }
+.blobs i{
+  position:absolute; border-radius:50%;
+  border:1.2px dashed var(--ghost); opacity:.4;
+}
+.blobs i:nth-child(1){ left:398px; top:84px; width:236px; height:236px; }
+.blobs i:nth-child(2){ left:300px; top:150px; width:166px; height:166px; }
+.blobs i:nth-child(3){ left:470px; top:206px; width:120px; height:120px; }
+.blobs i:nth-child(4){ left:236px; top:148px; width:104px; height:104px; opacity:.55; }
+.blob-q{
+  position:absolute; left:280px; top:176px;
+  font-size:26px; font-weight:700; color:var(--ghost); opacity:.45;
+}
+.legend-rows{ position:absolute; left:24px; top:224px; display:grid; gap:24px; }
+.legend-rows > div{ display:flex; align-items:center; gap:10px; }
+.legend-rows .sw{ width:26px; height:8px; border-radius:4px; background:var(--ghost); opacity:.3; }
+.legend-rows .ln{ width:148px; height:7px; border-radius:3.5px; background:var(--ghost); opacity:.18; }
+
+/* B · 观察点阵占位 */
+.dotgrid{ position:absolute; left:24px; top:78px; display:grid;
+  grid-template-columns:repeat(7,36px); gap:10px; }
+.dotgrid span{ width:36px; height:36px; border-radius:50%; background:var(--ghost); opacity:.11; }
+
+/* C · 房间占位 */
+.miniplan{
+  width:120px; height:72px; margin-top:22px;
+  border:1.2px dashed var(--ghost); border-radius:8px; opacity:.5;
+}
+.room-lines{ position:absolute; left:166px; top:66px; display:grid; gap:9px; }
+
+/* D · 改造占位 */
+.rebuild-lines{ display:grid; gap:14px; margin-top:22px; }
+.chip-row{ display:flex; gap:8px; }
+
+/* E · Circle 占位 */
+.rows{ display:grid; gap:16px; margin-top:26px; }
+.grow{
+  display:grid; grid-template-columns:44px 1fr 104px 130px; align-items:center; gap:16px;
+  background:var(--ghost); border-radius:12px; padding:14px 16px;
+  opacity:.07;
+}
+.grow .av{ width:44px; height:44px; border-radius:50%; border:1.2px dashed var(--ink); opacity:.5; }
+
+/* ── 中央浮层 ───────────────────────────────────────────── */
+.overlay-wrap{
+  position:absolute; inset:0;
+  display:grid; place-items:center;
+  padding:24px;
+  pointer-events:none;
+}
+.card{
+  pointer-events:auto;
+  position:relative;
+  width:min(660px,100%);
+  background:var(--white);
+  border:1px solid #E6E2DC;
+  border-radius:18px;
+  padding:34px 36px 32px;
+  overflow:hidden;
+  box-shadow:0 18px 44px rgba(77,64,46,.14), 0 2px 6px rgba(77,64,46,.07);
+  opacity:0; transform:translateY(14px) scale(.985);
+  animation:card-in .8s cubic-bezier(.22,.7,.3,1) .35s forwards;
+}
+@keyframes card-in{ to{ opacity:1; transform:none; } }
+
+/* 右上暖光 */
+.card::before{
+  content:''; position:absolute; right:-120px; top:-190px;
+  width:420px; height:300px; border-radius:50%;
+  background:radial-gradient(closest-side,rgba(242,184,47,.42),rgba(242,184,47,0));
+  pointer-events:none;
+}
+.card > *{ position:relative; }
+
+.card-head{ display:flex; align-items:center; gap:14px; margin-bottom:30px; }
+.card-head .logo{ width:44px; height:44px; }
+
+.state-tag{
+  display:inline-flex; align-items:center; gap:9px;
+  padding:6px 14px;
+  background:#F8F2EA; border:1px solid #E6E1DA;
+  border-radius:var(--radius-pill);
+  font-size:9px; color:#59544D;
+}
+.state-tag .dot{ width:7px; height:7px; border-radius:50%; background:var(--accent); }
+
+.card h2{
+  margin:0;
+  font-size:calc(27px * var(--type-scale));
+  line-height:1.18; letter-spacing:-.02em; font-weight:700;
+}
+.card h2 span{ display:block; }
+
+.lede{
+  margin:16px 0 0;
+  font-size:calc(13.5px * var(--type-scale));
+  line-height:1.55; color:var(--muted); max-width:56ch;
+}
+
+.rule{ height:1px; background:#E8E5E0; margin:24px 0 20px; border:0; }
+
+.q{
+  margin:0 0 14px;
+  font-size:calc(14px * var(--type-scale));
+  font-weight:600;
+}
+
+/* 身份选项 —— 真正的 radio，可键盘操作 */
+.identity{ border:0; padding:0; margin:0; }
+.identity legend{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+.opts{ display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+
+/* display:grid 让 label 撑满栅格单元 —— 三张卡等高，不受文案行数影响 */
+.opt{ position:relative; display:grid; }
+
+/* radio 本体只做无障碍锚点，不参与点击命中；整张卡片由 label 承担 */
+.opt input{
+  position:absolute; left:12px; top:12px;
+  width:1px; height:1px; opacity:0; margin:0;
+  pointer-events:none;
+}
+
+.opt label{
+  display:block; position:relative;
+  border:1.6px solid #E0DDD6;      /* 常态也用 1.6，选中时只换颜色，不会跳动 */
+  border-radius:12px;
+  padding:14px 16px 16px;
+  background:var(--white);
+  cursor:pointer;
+  transition:border-color .18s ease, background .18s ease, transform .12s ease;
+  min-height:84px;
+  -webkit-tap-highlight-color:transparent;
+}
+.opt label:hover{ border-color:var(--hair-strong); }
+.opt label:active{ transform:scale(.99); }
+
+.opt input:checked + label{
+  border-color:var(--accent);
+  background:#FEF2E7;
+}
+.opt input:focus-visible + label{
+  outline:2px solid var(--accent); outline-offset:2px;
+}
+
+.opt .icon{ color:var(--muted); display:block; margin-bottom:10px; line-height:0; }
+.opt input:checked + label .icon{ color:var(--accent); }
+
+.opt .t{
+  display:block;
+  font-size:calc(13px * var(--type-scale));
+  font-weight:600; line-height:1.3;
+}
+.opt .d{
+  display:block;
+  font-size:calc(10.5px * var(--type-scale));
+  color:var(--muted); margin-top:5px; line-height:1.4;
+}
+
+.opt .tick{
+  position:absolute; right:13px; top:13px;
+  width:18px; height:18px; border-radius:50%;
+  background:var(--accent); color:var(--white);
+  display:none; place-items:center;
+}
+.opt input:checked + label .tick{ display:grid; }
+
+/* 老人模式提示 */
+.resident-note{
+  margin:22px 0 0;              /* 显式清掉 <p> 的默认下外边距 */
+  display:none;
+  align-items:center;           /* 图标与文字垂直居中，文字仍左对齐 */
+  gap:9px;
+  font-size:calc(11.5px * var(--type-scale));
+  color:#7A5A32;
+  background:#FEF6EC; border:1px solid #F3E2CC;
+  border-radius:10px; padding:12px 16px;
+}
+body[data-mode="resident"] .resident-note{ display:flex; }
+
+/* 医护模式提示 —— 和上面那条共用同一套样式，只是触发的 data-mode 不同。
+   加这一条是因为上面 .lede 写的是「MNEMO asks, you answer」，
+   而医护版是表单主导、对话降级到右下角，不先说清楚会走进去发现对不上。 */
+.carer-note{
+  margin:22px 0 0;
+  display:none;
+  align-items:center;
+  gap:9px;
+  font-size:calc(11.5px * var(--type-scale));
+  color:#7A5A32;
+  background:#FEF6EC; border:1px solid #F3E2CC;
+  border-radius:10px; padding:12px 16px;
+}
+body[data-mode="carer"] .carer-note{ display:flex; }
+
+/* ── 行动区 ─────────────────────────────────────────────── */
+.actions{ display:flex; align-items:center; gap:22px; margin-top:22px; flex-wrap:wrap; }
+
+.btn{
+  display:inline-flex; align-items:center; gap:12px;
+  padding:15px 24px;
+  background:var(--ink); color:var(--white);
+  border:0; border-radius:var(--radius-pill);
+  font-family:inherit;
+  font-size:calc(14px * var(--type-scale)); font-weight:600;
+  cursor:pointer;
+  transition:transform .14s cubic-bezier(.3,.8,.4,1), box-shadow .2s ease, background .2s ease;
+  box-shadow:0 1px 2px rgba(0,0,0,.16);
+}
+.btn:hover{ background:#221F23; box-shadow:0 6px 18px rgba(20,16,12,.22); }
+.btn:active{ transform:translateY(1px) scale(.99); }
+.btn:focus-visible{ outline:2px solid var(--accent); outline-offset:3px; }
+.btn .arrow{ color:var(--accent); transition:transform .22s cubic-bezier(.3,.8,.4,1); }
+.btn:hover .arrow{ transform:translateX(4px); }
+
+.aside{ margin:0; font-size:calc(12px * var(--type-scale)); color:var(--muted); line-height:1.5; }
+.aside a{
+  display:inline-block; margin-top:3px;
+  color:var(--ink); font-weight:600; text-decoration:none;
+  border-bottom:1px solid var(--hair-strong); padding-bottom:1px;
+}
+.aside a:hover{ border-bottom-color:var(--accent); }
+.aside a:focus-visible{ outline:2px solid var(--accent); outline-offset:3px; border-radius:2px; }
+
+/* ── 响应式 ─────────────────────────────────────────────── */
+@media (max-width:1180px){
+  :root{ --gutter:32px; }
+  .row--top, .row--bottom{ grid-template-columns:1fr; }
+  .stack{ grid-template-rows:176px 176px; }
+  .ghost--tall, .ghost--wide{ height:300px; }
+  .blobs, .dotgrid{ display:none; }
+}
+
+@media (max-width:900px){
+  :root{ --rail-w:0px; --gutter:22px; }
+  .shell{ grid-template-columns:1fr; padding:22px var(--gutter) 40px; }
+  .rail{
+    position:static; height:auto; width:100%;
+    flex-direction:row; align-items:center; gap:16px;
+    padding-left:0; margin-bottom:26px;
+  }
+  .rail-nav{ margin-top:0; flex-direction:row; }
+  .pill{ flex-direction:row; }
+  .rail-spacer{ flex:1 1 auto; }
+  .locked-note{ display:none; }
+  .main{ padding-left:0; }
+  .topbar{ flex-direction:column; }
+  .overlay-wrap{ position:static; padding:0; margin-top:28px; }
+  .ghost-grid{ order:2; margin-top:28px; }
+  .main{ display:flex; flex-direction:column; }
+  .card{ width:100%; }
+}
+
+@media (max-width:620px){
+  .opts{ grid-template-columns:1fr; }
+  .card{ padding:26px 22px 24px; }
+  .greeting h1{ font-size:calc(27px * var(--type-scale)); }
+  .actions{ flex-direction:column; align-items:stretch; }
+  .btn{ justify-content:center; }
+
+  /* ── 顶部这条：桌面是竖侧栏，横过来之后放不下 ──
+     logo 68 + 两个胶囊各 124 + 头像 56 = 404，加上左右内边距 448，
+     在 393 的屏幕上溢出 55px（实测 71）。整条按比例收一档：
+     按钮 48→38 仍在 38px 以上，还够点。 */
+  .rail{ gap:10px; }
+  .logo{ width:44px; height:44px; }
+  .rail-nav{ gap:10px; }
+  .pill{ padding:6px; gap:4px; }
+  .nav-btn{ width:38px; height:38px; }
+  .avatar-empty{ width:40px; height:40px; }
+
+  /* ── 占位卡 ──
+     .ghost-note 是 absolute 钉在卡片底部的，卡片高度又写死 360/376。
+     窄屏上这行说明会折成两三行，正好压在上面那几条骨架条上。
+     手机上让卡片按内容长，说明回到文档流排在最后一行。 */
+  .ghost, .ghost--tall, .ghost--wide{ height:auto; }
+  .ghost-note{ position:static; margin:18px 0 0; max-width:none; }
+  /* 卡片一旦按内容长，这几块按 1440 坐标钉住的骨架就落到卡片外被裁掉，
+     只剩一行标题加一句话，看着像没渲染出来。一起放回文档流。 */
+  .legend-rows{ position:static; gap:12px; margin-top:16px; }
+  .legend-rows .ln{ width:100%; max-width:180px; }
+  .room-lines{ position:static; margin-top:16px; }
+  .blob-q{ display:none; }
+}
+
+/* ── 尊重系统减弱动效设置 ───────────────────────────────── */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    animation-duration:.01ms !important;
+    animation-iteration-count:1 !important;
+    transition-duration:.01ms !important;
+  }
+  .ghost,.card{ opacity:1; transform:none; }
+}
+</style>
+</head>
+
+<body>
+
+<div class="shell">
+
+  <!-- ── 侧栏 ─────────────────────────────────────────── -->
+  <aside class="rail">
+    <a href="./index.html" aria-label="MNEMOSYNE home">
+      <img class="logo" src="assets/logo.png" alt="MNEMOSYNE">
+    </a>
+
+    <nav class="rail-nav" aria-label="Main">
+      <div class="pill">
+        <button class="nav-btn" aria-current="page" aria-label="Home file">
+          <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true">
+            <rect x="1" y="1" width="9" height="9" rx="2.5" fill="#F2B82F"/>
+            <rect x="12" y="1" width="9" height="9" rx="2.5" fill="currentColor"/>
+            <rect x="1" y="12" width="9" height="9" rx="2.5" fill="currentColor"/>
+            <rect x="12" y="12" width="9" height="9" rx="2.5" fill="currentColor"/>
+          </svg>
+        </button>
+        <button class="nav-btn" disabled aria-label="New rebuild (needs a home file first)">
+          <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true">
+            <path d="M13 4v18M4 13h18" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="pill is-locked">
+        <button class="nav-btn" disabled aria-label="Notifications (locked)">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
+            <path d="M5.5 9a5.5 5.5 0 0 1 11 0v4.2l1.3 2.3H4.2L5.5 13.2V9Z"
+                  stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+            <path d="M8.8 18.2a2.4 2.4 0 0 0 4.4 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+          </svg>
+        </button>
+        <button class="nav-btn" disabled aria-label="Settings (locked)">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M3 9h18M3 16h18" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+            <circle cx="9" cy="9" r="3.1" fill="#fff" stroke="currentColor" stroke-width="1.9"/>
+            <circle cx="16" cy="16" r="3.1" fill="#fff" stroke="currentColor" stroke-width="1.9"/>
+          </svg>
+        </button>
+      </div>
+      <p class="locked-note mono">Locked</p>
+    </nav>
+
+    <div class="rail-spacer"></div>
+
+    <div class="avatar-empty" aria-hidden="true" title="No one is signed in yet">
+      <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+        <circle cx="13" cy="9.5" r="4.2" stroke="currentColor" stroke-width="1.6"/>
+        <path d="M4.6 23c0-4.3 3.8-6.6 8.4-6.6s8.4 2.3 8.4 6.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+      </svg>
+    </div>
+  </aside>
+
+  <!-- ── 主区 ─────────────────────────────────────────── -->
+  <main class="main">
+
+    <header class="topbar">
+      <div class="greeting">
+        <h1>Welcome.</h1>
+        <p>There is no home file here yet — everything below fills in once you start one.</p>
+      </div>
+      <p class="step-tag mono"><span class="dot"></span>Step 0 of 5</p>
+    </header>
+
+    <!-- 幽灵卡片：结构与满状态完全一致，等着被填满 -->
+    <div class="ghost-grid" aria-hidden="true">
+
+      <div class="row row--top">
+        <section class="ghost ghost--tall">
+          <p class="ghost-label mono">Her condition</p>
+          <div class="blobs"><i></i><i></i><i></i><i></i></div>
+          <span class="blob-q">?</span>
+          <div class="legend-rows">
+            <div><span class="sw"></span><span class="ln"></span></div>
+            <div><span class="sw"></span><span class="ln"></span></div>
+            <div><span class="sw"></span><span class="ln"></span></div>
+          </div>
+          <p class="ghost-note">Mobility, vision and memory — measured once, watched from then on.</p>
+        </section>
+
+        <section class="ghost ghost--tall">
+          <p class="ghost-label mono">MNEMO watch</p>
+          <div class="dotgrid">
+            <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+          </div>
+          <p class="ghost-note">MNEMO starts watching the day the room is finished.</p>
+        </section>
+      </div>
+
+      <div class="row row--bottom">
+        <div class="stack">
+          <section class="ghost">
+            <p class="ghost-label mono">The room</p>
+            <div class="miniplan"></div>
+            <div class="room-lines">
+              <div class="bar" style="width:150px;height:9px"></div>
+              <div class="bar" style="width:110px;height:9px;opacity:.14"></div>
+              <div class="bar" style="width:124px;height:26px;border-radius:13px;opacity:.12"></div>
+            </div>
+            <p class="ghost-note">Her floor plan lands here.</p>
+          </section>
+
+          <section class="ghost">
+            <p class="ghost-label mono">Rebuild</p>
+            <div class="rebuild-lines">
+              <div class="bar" style="width:150px;height:12px;opacity:.2"></div>
+              <div class="bar" style="width:100%;height:8px;opacity:.14"></div>
+              <div class="chip-row">
+                <span class="bar" style="width:76px;height:7px;opacity:.12"></span>
+                <span class="bar" style="width:76px;height:7px;opacity:.12"></span>
+                <span class="bar" style="width:76px;height:7px;opacity:.12"></span>
+              </div>
+            </div>
+            <p class="ghost-note">No rebuild yet — this is Rebuild 01.</p>
+          </section>
+        </div>
+
+        <section class="ghost ghost--wide">
+          <p class="ghost-label mono">Her circle</p>
+          <div class="rows">
+            <div class="grow"><span class="av"></span><span></span><span></span><span></span></div>
+            <div class="grow"><span class="av"></span><span></span><span></span><span></span></div>
+            <div class="grow"><span class="av"></span><span></span><span></span><span></span></div>
+          </div>
+          <p class="ghost-note">Invite her daughter, her care worker, her GP — they review before anything is built.</p>
+        </section>
+      </div>
+    </div>
+
+    <!-- ── 中央邀请浮层 ──────────────────────────────── -->
+    <div class="overlay-wrap">
+      <section class="card" role="region" aria-labelledby="inv-title">
+
+        <div class="card-head">
+          <img class="logo" src="assets/logo.png" alt="" aria-hidden="true">
+          <p class="state-tag mono"><span class="dot"></span>No file yet</p>
+        </div>
+
+        <h2 id="inv-title"><span>Nothing here yet.</span><span>Let us build the file together.</span></h2>
+
+        <p class="lede">MNEMO asks, you answer. About five minutes — how the resident moves,
+          sees and remembers. Then MNEMO finds the homes that fit.</p>
+
+        <hr class="rule">
+
+        <fieldset class="identity">
+          <legend>Who is filling this in?</legend>
+          <p class="q" id="q-label">First — who is filling this in?</p>
+
+          <div class="opts">
+            <div class="opt">
+              <input type="radio" name="who" id="who-family" value="family" checked
+                     aria-describedby="d-family">
+              <label for="who-family">
+                <span class="icon" aria-hidden="true">
+                  <svg width="30" height="20" viewBox="0 0 30 20" fill="none">
+                    <circle cx="9" cy="5.6" r="3.9" fill="currentColor"/>
+                    <path d="M2 19c0-3.7 3.1-5.7 7-5.7s7 2 7 5.7" fill="currentColor"/>
+                    <circle cx="21" cy="6.2" r="3.4" stroke="currentColor" stroke-width="1.6"/>
+                    <path d="M15.5 19c0-3.4 2.5-5.2 5.5-5.2s5.5 1.8 5.5 5.2"
+                          stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                  </svg>
+                </span>
+                <span class="t">A family member</span>
+                <span class="d" id="d-family">Her daughter, son or partner</span>
+                <span class="tick" aria-hidden="true">
+                  <svg width="11" height="9" viewBox="0 0 11 9" fill="none">
+                    <path d="M1 4.4 L4.2 7.6 L10 1.4" stroke="currentColor" stroke-width="2"
+                          stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </span>
+              </label>
+            </div>
+
+            <div class="opt">
+              <input type="radio" name="who" id="who-carer" value="carer" aria-describedby="d-carer">
+              <label for="who-carer">
+                <span class="icon" aria-hidden="true">
+                  <svg width="30" height="20" viewBox="0 0 30 20" fill="none">
+                    <circle cx="9" cy="6.2" r="3.6" stroke="currentColor" stroke-width="1.6"/>
+                    <path d="M2.6 19c0-3.5 2.7-5.4 6.4-5.4 1.2 0 2.3.2 3.2.6"
+                          stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                    <circle cx="21.5" cy="13" r="6" stroke="currentColor" stroke-width="1.5"/>
+                    <path d="M21.5 9.6v6.8M18.1 13h6.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                  </svg>
+                </span>
+                <span class="t">A care worker</span>
+                <span class="d" id="d-carer">Visiting or live-in carer</span>
+                <span class="tick" aria-hidden="true">
+                  <svg width="11" height="9" viewBox="0 0 11 9" fill="none">
+                    <path d="M1 4.4 L4.2 7.6 L10 1.4" stroke="currentColor" stroke-width="2"
+                          stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </span>
+              </label>
+            </div>
+
+            <div class="opt">
+              <input type="radio" name="who" id="who-resident" value="resident" aria-describedby="d-resident">
+              <label for="who-resident">
+                <span class="icon" aria-hidden="true">
+                  <svg width="30" height="20" viewBox="0 0 30 20" fill="none">
+                    <circle cx="11" cy="5.8" r="4.4" stroke="currentColor" stroke-width="1.7"/>
+                    <path d="M3 19c0-4 3.6-6.2 8-6.2s8 2.2 8 6.2"
+                          stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                  </svg>
+                </span>
+                <span class="t">I am the resident</span>
+                <span class="d" id="d-resident">Bigger text</span>
+                <span class="tick" aria-hidden="true">
+                  <svg width="11" height="9" viewBox="0 0 11 9" fill="none">
+                    <path d="M1 4.4 L4.2 7.6 L10 1.4" stroke="currentColor" stroke-width="2"
+                          stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <!-- 选「我自己」后即时生效，不是空承诺 -->
+          <p class="resident-note">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="flex:none">
+              <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.3"/>
+              <path d="M8 7.2v4M8 4.9v.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            </svg>
+            <span>Text is larger from here on, and MNEMO will read every question aloud.</span>
+          </p>
+
+          <!-- 选「医护人员」后即时生效，说清楚这一版长什么样 -->
+          <p class="carer-note">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="flex:none">
+              <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.3"/>
+              <path d="M8 7.2v4M8 4.9v.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            </svg>
+            <span>You fill it in yourself, in any order — five steps, no questions
+              waiting on you. Every entry keeps your name and what it was based on.</span>
+          </p>
+        </fieldset>
+
+        <div class="actions">
+          <button class="btn" type="button" id="start">
+            Create the home file
+            <svg class="arrow" width="16" height="11" viewBox="0 0 16 11" fill="none" aria-hidden="true">
+              <path d="M0 5.5h14M9.5 1 14 5.5 9.5 10" stroke="currentColor" stroke-width="1.9"
+                    stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+
+          <p class="aside">
+            Already have a plan code from the care team?<br>
+            <a href="#" id="code-link">Enter it here</a>
+          </p>
+        </div>
+
+      </section>
+    </div>
+
+  </main>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  var body  = document.body;
+  var radios = Array.prototype.slice.call(document.querySelectorAll('input[name="who"]'));
+
+  /* 选择「I am the resident」时，立刻把字号放大 —— 让那句承诺当场兑现，
+     而不是一行说明文字。--type-scale 驱动全部排版尺寸。 */
+  /* 三条分支各自换 data-mode；只有本人版放大字号。
+     .lede 也跟着换 —— 原来那句「MNEMO asks, you answer」只对家属版成立。 */
+  var LEDE = {
+    family:   'MNEMO asks, you answer. About five minutes \u2014 how the resident moves, '
+            + 'sees and remembers. Then MNEMO finds the homes that fit.',
+    carer:    'A working record of one visit \u2014 who she is, what you measured, '
+            + 'which layout, what changed. It ends with your signature.',
+    resident: 'MNEMO asks, you answer. About five minutes \u2014 how you move, '
+            + 'see and remember. Then MNEMO finds the homes that fit.'
+  };
+  var lede = document.querySelector('.lede');
+  var startBtn = document.getElementById('start');
+
+  function applyMode(){
+    var picked = radios.filter(function(r){ return r.checked; })[0];
+    var who = (picked && picked.value) || 'family';
+    var isResident = who === 'resident';
+    body.dataset.mode = isResident ? 'resident' : (who === 'carer' ? 'carer' : 'standard');
+    document.documentElement.style.setProperty('--type-scale', isResident ? '1.16' : '1');
+    if (lede && LEDE[who]) lede.textContent = LEDE[who];
+
+    /* 按钮文案：只改按钮里的第一个文本节点，不动后面那个箭头 <svg> */
+    if (startBtn && startBtn.firstChild && startBtn.firstChild.nodeType === 3){
+      startBtn.firstChild.nodeValue = (who === 'carer')
+        ? '\n            Open a new client file\n            '
+        : '\n            Create the home file\n            ';
+    }
+  }
+
+  radios.forEach(function(r){ r.addEventListener('change', applyMode); });
+  applyMode();
+
+  /* 下一步：直接进 Profile 问答（v3 取消了上传平面这一步）。 */
+  var NEXT = './flow.html';
+
+  /* ── 「新建」就要真的是新的（2026-09-17）────────────────────────
+     发现的问题：从这一页选「医护」进去，第 1 步那 11 格已经填着上一份的
+     资料了（Bea Nolan / Wei Chen / 67 …）。三版里只有医护版会这样 ——
+     家属版和本人版是对话式的，答案活在 JS 里，每次加载都从空的开始；
+     医护版是表单式的，carer-core.js 一加载就把 sessionStorage 回填进表单。
+     那个回填在**同一次访视里前后翻页**是对的，不能去掉；
+     错的是「新建一份」这条路没有把上一份清掉。
+
+     为什么不在 flow-carer.html 里判断：这一页跳的是 flow.html?who=carer，
+     而 flow.html 那个总路口用的是 location.replace('./flow-carer.html')，
+     ?who= 在那一步就丢了 —— 医护版根本不知道自己是被「新建」进来的。
+     所以在这里、按钮按下的那一刻清，是最靠得住的位置。
+
+     只清这一版自己的档案，不碰别的两版，也不碰 localStorage 里的
+     mnemo:file:last（那是「上一次走完流程」的长期底稿，是另一个功能），
+     以及 mnemo:base / mnemo:*:rail 这类纯界面偏好。 */
+  var WIPE = {
+    family:   ['mnemo:file'],
+    resident: ['mnemo:file'],
+    /* thought / forked 存的是流程走到哪了，不清的话新档案会跳过
+       第 3 步那段「正在分析」，第 2 步的岔路口也直接算选过了 */
+    carer:    ['mnemo:carer', 'mnemo:carer:thought', 'mnemo:carer:forked']
+  };
+  function startFresh(who){
+    var keys = WIPE[who] || WIPE.family;
+    try{ keys.forEach(function(k){ sessionStorage.removeItem(k); }); }catch(e){}
+  }
+
+  document.getElementById('start').addEventListener('click', function(){
+    var who = (radios.filter(function(r){ return r.checked; })[0] || {}).value || 'family';
+    if (NEXT) {
+      startFresh(who);
+      location.href = NEXT + '?who=' + encodeURIComponent(who);
+    } else {
+      flash(this, 'Next: a few questions about the resident');
+    }
+  });
+
+  document.getElementById('code-link').addEventListener('click', function(e){
+    e.preventDefault();
+    flash(document.getElementById('start'), 'Plan-code entry not built yet');
+  });
+
+  /* 轻量提示，不用 alert 打断 */
+  var timer;
+  function flash(anchor, msg){
+    var el = document.getElementById('flash');
+    if (!el){
+      el = document.createElement('div');
+      el.id = 'flash';
+      el.setAttribute('role','status');
+      el.style.cssText = 'position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(8px);'
+        + 'background:#0E0D0F;color:#fff;padding:11px 18px;border-radius:999px;font-size:13px;'
+        + 'font-family:inherit;box-shadow:0 8px 24px rgba(0,0,0,.24);opacity:0;'
+        + 'transition:opacity .22s ease, transform .22s ease;z-index:50;pointer-events:none';
+      document.body.appendChild(el);
+    }
+    el.textContent = msg;
+    requestAnimationFrame(function(){
+      el.style.opacity = '1';
+      el.style.transform = 'translateX(-50%) translateY(0)';
+    });
+    clearTimeout(timer);
+    timer = setTimeout(function(){
+      el.style.opacity = '0';
+      el.style.transform = 'translateX(-50%) translateY(8px)';
+    }, 2200);
+  }
+})();
+</script>
+
+</body>
+</html>

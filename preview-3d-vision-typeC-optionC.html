@@ -1,0 +1,3529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MNEMO — Room preview</title>
+
+<!-- ============================================================
+     MNEMO v3 · 家属版 3D 预览（产品页，不是调试台）
+     ------------------------------------------------------------
+     · 方案「chushi」写死在 AUTO_SCHEME 里，打开即定型。
+     · 相机：透视。近墙：全显示（不自动让开）。这两条按要求写死。
+     · 调试面板整段隐藏（不是删除）—— 现有代码有不少地方要读面板控件的值，
+       直接删会连带改一堆。等换材质的交互定了，再出一版真正精简的产品代码。
+     · 用户换材质的 UI 还没做，这一版只是"看效果"。
+     ------------------------------------------------------------
+     · 模型原封不动读入：房间3D/mobility typeC OptionA.glb
+       —— 这一页是 **typeC OptionA** 的（mobility 的第九个、最后一个房间），
+          从 preview-3d-typeC-optionB.html 复制，**分类规则一字不差**。
+          不同的有：模型 / 家具分组多一组架子 / 可换的是**两件** /
+          WHOLE / ZONES / AUTO_SCHEME。
+
+       **可换的只有沙发和床** —— 这个房间没有岛台，也没有衣柜、储物柜、茶几。
+       九个房间里唯一一个只放两件的。翻页卡本来就是照数组长度算的，
+       两件和四件一样能跑（`pvGo` 里那个 `% PV_KEYS.length`）。
+
+       这一版有个和别处不一样的地方：`沙发（15MM 软包边-皮质）` 名字里带「沙发」，
+       所以它**进了沙发这一组**（typeB OptionA 里那个裸的「15MM 软包边-皮质」
+       两头不沾，只能留在「墙 / 地 / 其它」）。进了组更好：点中它会被正确地
+       告诉是 Sofa。换材质仍然换不到它 —— `EDIT_ONLY.sofa` 里
+       `!/软包边/` 那一半就是干这个的，包边和软包本来就该是两种材质。
+       6.83 MB · 131,143 三角面 · 227 mesh
+     · Rhino 导出的 9 个材质全是随机色 + 全都带 transmission 扩展，
+       不能用。这里按 **节点名（= Rhino 图层名）** 重新分派材质。
+     · cube 网格是着色器按世界坐标画的，不改几何、不加面。
+       wall / floor 不画网格。
+     · 圆角照模型来 —— 一个顶点都没动。
+     ============================================================ -->
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "./assets/three/build/three.module.js",
+    "three/addons/": "./assets/three/jsm/"
+  }
+}
+</script>
+
+<style>
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{
+  background:transparent;color:#3A352F;overflow:hidden;
+  font-family:'Inter',system-ui,-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+}
+#view{position:fixed;inset:0}
+#panel,#hud{display:none !important}          /* 产品页不出现调试台 */
+#err{inset:0}
+/* width/height 这两条不能省。resize() 里用的是 renderer.setSize(w, h, false)，
+   第三个参数 false = **不让 three 去写 canvas 的 CSS 尺寸**（这样做本身是对的，
+   避免它和布局打架），但那样一来 canvas 的 CSS 尺寸就等于它的 width/height 属性，
+   而那两个属性 = 逻辑尺寸 × pixelRatio。在 DPR≥2 的屏幕上就是**两倍大**，
+   于是画布撑出容器，用户只看得见左上角那一块，房间跑到画面外去了。
+   （DPR=1 的显示器上看不出来，所以很容易漏。） */
+#view canvas{display:block;width:100%;height:100%}
+#panel{
+  position:fixed;top:0;right:0;bottom:0;width:336px;
+  background:#171718;border-left:1px solid #2C2C2E;overflow-y:auto;padding:18px 18px 40px;
+}
+h1{margin:0 0 4px;font-size:15px}
+.note{margin:0 0 14px;font-size:11px;line-height:1.65;color:#8E8E92}
+.note code{font-family:ui-monospace,Menlo,Consolas,monospace;color:#D8B98F}
+fieldset{border:1px solid #2E2E30;border-radius:9px;margin:0 0 14px;padding:12px 12px 8px}
+legend{font-size:11.5px;padding:0 6px;color:#E2A96A;letter-spacing:.04em}
+.why{font-size:10.5px;line-height:1.6;color:#83838A;margin:0 0 10px}
+.row{display:grid;grid-template-columns:92px 1fr 46px;align-items:center;gap:8px;margin-bottom:8px}
+.row label{font-size:10.5px;color:#B4B4BA}
+.row input[type=range]{width:100%;accent-color:#ED7119}
+.row .v{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10px;color:#83838A;text-align:right}
+.row input[type=color]{width:100%;height:22px;padding:0;border:1px solid #37373A;border-radius:4px;background:none}
+.grp{display:grid;grid-template-columns:1fr 44px 34px 20px;align-items:center;gap:6px;margin-bottom:6px}
+.grp .nm{font-size:11px;color:#C6C6CC;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.grp .ct{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:9.5px;color:#75757C;text-align:right}
+.grp input[type=color]{width:34px;height:20px;padding:0;border:1px solid #37373A;border-radius:4px;background:none}
+/* 「染」开关：亮起来表示这个图层是"换色相"，灭着表示"颜色乘在贴图上" */
+.grp .dye{width:20px;height:20px;padding:0;font:inherit;font-size:10px;line-height:1;cursor:pointer;
+  color:#8A8A8E;background:#232326;border:1px solid #37373A;border-radius:4px}
+.grp .dye[aria-pressed="true"]{color:#111;background:#E8B33A;border-color:#E8B33A}
+.fcard{border:1px solid #2E2E30;border-radius:8px;padding:9px;margin-bottom:9px;background:#141416}
+.fcard .top{display:flex;gap:9px;align-items:flex-start}
+.fcard canvas{width:88px;height:88px;flex:none;border-radius:6px;background:#0F0F11;border:1px solid #2A2A2C}
+.fcard .meta{flex:1;min-width:0}
+.fcard .fn{font-size:12px;color:#EDE9E2;margin-bottom:3px}
+.fcard .fl{font-size:9.5px;line-height:1.55;color:#75757C;word-break:break-all}
+.fcard .opts{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.fcard .op{
+  width:30px;height:30px;border-radius:5px;border:2px solid #303034;cursor:pointer;
+  background-repeat:no-repeat;background-image:url('./assets/tex/lib/thumbs.jpg');
+}
+.fcard .op:hover{border-color:#4A4A50}
+.fcard .op[aria-selected="true"]{border-color:#ED7119}
+.mtl{margin:-2px 0 9px}
+.mtl-cur{
+  width:100%;display:flex;align-items:center;gap:6px;padding:5px 6px;
+  font-size:10.5px;font-family:inherit;text-align:left;cursor:pointer;
+  background:#202024;color:#C6C6CC;border:1px solid #37373A;border-radius:5px;
+}
+.mtl-cur:hover{border-color:#4A4A50}
+.mtl-cur .tw{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mtl-cur .ar{color:#75757C;font-size:9px}
+.mtl-pop{margin-top:4px;border:1px solid #2E2E30;border-radius:6px;overflow:hidden;background:#141416}
+.mtl-cat{
+  display:flex;align-items:center;gap:5px;padding:6px 8px;font-size:10.5px;color:#C6C6CC;
+  cursor:pointer;border-top:1px solid #232326;
+}
+.mtl-cat:first-child{border-top:none}
+.mtl-cat:hover{background:#1C1C1F}
+.mtl-cat .ar{display:inline-block;width:9px;color:#ED7119;transition:transform .12s}
+.mtl-cat[aria-expanded="true"] .ar{transform:rotate(90deg)}
+.mtl-cat .n{flex:1}
+.mtl-cat .c{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:9px;color:#68686E}
+.mtl-list{max-height:230px;overflow-y:auto;background:#0F0F11}
+.mtl-it{
+  display:flex;align-items:center;gap:7px;padding:3px 8px 3px 18px;font-size:10.5px;
+  color:#A8A8AF;cursor:pointer;
+}
+.mtl-it:hover{background:#202024;color:#EDE9E2}
+.mtl-it[aria-selected="true"]{color:#F5C79C;background:#241C15}
+.mtl-it .th{
+  width:22px;height:22px;flex:none;border-radius:3px;border:1px solid #303034;
+  background-image:url('./assets/tex/lib/thumbs.jpg');background-repeat:no-repeat;
+}
+.mtl-it .nm2{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mtl-it .tl{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:9px;color:#68686E}
+.foot{display:flex;gap:8px;margin-top:6px}
+button.act{
+  flex:1;padding:9px 0;font-size:11.5px;font-family:inherit;cursor:pointer;
+  background:#26262A;color:#EDE9E2;border:1px solid #3C3C40;border-radius:8px;
+}
+button.act:hover{background:#303035}
+button.act[aria-pressed="true"]{border-color:#ED7119;color:#F5C79C}
+#hud{
+  position:fixed;left:16px;bottom:14px;font-size:10.5px;color:#83838A;
+  font-family:ui-monospace,Menlo,Consolas,monospace;line-height:1.7;
+  background:rgba(10,10,11,.66);padding:8px 11px;border-radius:7px;border:1px solid #2A2A2C;
+}
+#hud b{color:#EDE9E2;font-weight:600}
+/* 这个加载条在**产品页里也看得见**（#load 不在 #hud 里），
+   而产品页的底是浅色的 —— 原来那套深色值（#C6C6CC 的字、#2A2A2C 的槽）
+   是给调试页的深底配的，放到浅底上就成了一条脏灰道子。改成浅色系。
+   文字交给外层 flow.html 那一层说（两层都写就会看见重影），这里只留进度条。 */
+#load{
+  position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
+  font-size:13px;color:#8C8479;text-align:center;line-height:1.8;
+}
+#load .bar{width:220px;height:3px;border-radius:2px;background:#E7E3DB;margin:12px auto 0;overflow:hidden}
+#load .bar i{display:block;height:100%;width:0;background:#ED7119;transition:width .2s}
+#err{
+  position:fixed;inset:0 336px 0 0;display:none;padding:48px 56px;background:#0B0B0C;
+  font-size:13px;line-height:1.9;color:#D9C3A2;overflow:auto;
+}
+#err h2{margin:0 0 14px;font-size:16px;color:#ED9A55}
+#err code{font-family:ui-monospace,Menlo,Consolas,monospace;color:#E2A96A}
+#err pre{background:#141312;border:1px solid #33302C;border-radius:8px;padding:12px;
+  font-size:11px;color:#9E968B;white-space:pre-wrap}
+</style>
+</head>
+<body>
+
+<div id="view"></div>
+
+<div id="load">
+
+  <div class="bar"><i id="lbar"></i></div>
+</div>
+
+<div id="hud">
+  拖动旋转 · 滚轮缩放<br>
+  <span id="fps">— fps</span> · 三角面 <b id="tri">—</b> · 物件 <b id="cnt">—</b><br>
+  <span id="note2">正等测 · 正交相机</span> · 烘贴图 <b id="bake">—</b>
+</div>
+
+<div id="panel">
+  <h1>房间 3D</h1>
+  <p class="note">
+    <code>mobility typeA optionC.glb</code> 原封不动读入，一个顶点没动，圆角照模型来。
+    材质按 <strong>Rhino 图层名</strong> 重新分派 —— 文件里那 9 个材质是随机色，不能用。
+  </p>
+
+  <fieldset>
+    <legend>cube 模数网格</legend>
+    <p class="why">着色器按世界坐标画，不改几何、不加面、不需要 UV。
+      <strong>wall 和 floor 不画</strong>（那两样是建筑面，不是家具模块）。模数已按你的 <strong>300 mm</strong> 设好；三个「相位」是把格线整体挪半格以内，用来和 cube 的实际面对齐。</p>
+    <div class="row"><label>模数 (m)</label><input type="range" id="g_pitch" min="0.05" max="1" step="0.005" value="0.3"><span class="v"></span></div>
+    <div class="row"><label>相位 X</label><input type="range" id="g_ox" min="-0.5" max="0.5" step="0.01" value="0"><span class="v"></span></div>
+    <div class="row"><label>相位 Y</label><input type="range" id="g_oy" min="-0.5" max="0.5" step="0.01" value="0"><span class="v"></span></div>
+    <div class="row"><label>相位 Z</label><input type="range" id="g_oz" min="-0.5" max="0.5" step="0.01" value="0"><span class="v"></span></div>
+    <div class="row"><label>线宽</label><input type="range" id="g_lw" min="0" max="0.1" step="0.002" value="0.012"><span class="v"></span></div>
+    <div class="row"><label>线色</label><input type="color" id="g_col" value="#3A342C"><span class="v"></span></div>
+    <div class="row"><label>线浓度</label><input type="range" id="g_amt" min="0" max="1" step="0.01" value="0.7"><span class="v"></span></div>
+    <div class="foot"><button class="act" type="button" id="t_grid" aria-pressed="true">网格：开</button></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>家具（家属版预览原型）</legend>
+    <p class="why">按图层名把家具拆出来，每件一张卡片。缩略图是<strong>实时渲染</strong>的
+      —— 不是预先烘好的图片，所以换材质时它和右边的 3D 预览会一起变。<br>
+      下面那排色块是我从材质库自动挑的示意选项，<strong>不是最终方案</strong>；
+      等你定好每件家具给几个选项、分别是什么，我再换成真的。</p>
+    <div id="furn"></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>材质分组（按图层名）</legend>
+    <p class="why">左边是分到的组，右边是件数，分组完全按 Rhino 图层名。
+      每组都有自己的 <strong>颜色 / 粗糙度 / 法线</strong> 三张贴图，
+      全部是打开页面时现场算的，不下载任何图片文件 ——
+      户型会换，贴图文件的尺寸一旦对不上就会被拉伸，程序化的图按
+      「世界坐标 ÷ 实际米数」贴，1 米永远是 1 米。<br>
+      右边的色块是在贴图上<em>叠加染色</em>，不是替换颜色，调过头会脏。
+      分错的告诉我图层名，我改映射表，模型不用动。</p>
+    <div class="foot" style="margin-bottom:10px">
+      <button class="act" type="button" id="t_floor">地面：白瓷砖</button>
+      <button class="act" type="button" id="t_wood">木色：中性橡木</button>
+    </div>
+    <div class="row"><label>贴图缩放</label><input type="range" id="x_texs" min="0.25" max="3" step="0.05" value="1"><span class="v"></span></div>
+    <div class="foot" style="margin-bottom:8px">
+      <button class="act" type="button" id="t_pbr" aria-pressed="true">贴图：真实优先</button>
+    </div>
+    <p class="why" style="margin:2px 0 10px">已读到的真实贴图：<b id="texinfo">（无）</b>　
+      把图放到 <code>assets/tex/&lt;组名&gt;/</code> 下，命名
+      <code>color.jpg / normal.jpg / rough.jpg / ao.jpg</code>，刷新即生效；
+      没放的组继续用程序化贴图。</p>
+    <div id="groups"></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>方案（配色版本）</legend>
+    <p class="why">调好一版就点「导出」，把框里那段 JSON 发给我，我记进方案表。
+      别用手抄 —— 24 个图层的材质 id 加上全局参数，抄一遍必错。<br>
+      「载入」是把之前导出的 JSON 贴回来，用来在几版之间来回对比。</p>
+    <div class="row" style="grid-template-columns:1fr"><input type="text" id="sch_name" placeholder="方案名，比如「暖木 · 家属版 A」"
+      style="width:100%;padding:5px 6px;font-size:10.5px;font-family:inherit;background:#202024;color:#C6C6CC;border:1px solid #37373A;border-radius:5px"></div>
+    <textarea id="sch_txt" spellcheck="false"
+      style="width:100%;height:88px;margin:6px 0;padding:6px;font-size:9.5px;line-height:1.5;
+             font-family:ui-monospace,Menlo,Consolas,monospace;background:#0F0F11;color:#9E9EA6;
+             border:1px solid #2E2E30;border-radius:6px;resize:vertical"></textarea>
+    <div class="foot">
+      <button class="act" type="button" id="t_export">导出这一版</button>
+      <button class="act" type="button" id="t_import">载入</button>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>轮廓线</legend>
+    <p class="why">用 <code>EdgesGeometry</code> 现算，不占文件。
+      13 万面全算一遍要几秒，所以默认关着 —— 需要再开。</p>
+    <div class="row"><label>阈值角</label><input type="range" id="e_ang" min="10" max="80" step="1" value="40"><span class="v"></span></div>
+    <div class="row"><label>线色</label><input type="color" id="e_col" value="#2B2B2E"><span class="v"></span></div>
+    <div class="foot"><button class="act" type="button" id="t_edge" aria-pressed="false">轮廓：关</button></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>光 · 阴影 · 遮蔽</legend>
+    <p class="why">这一段比任何一张贴图都重要。所谓"廉价感"的根源
+      不是材质不够花哨，是<strong>缝隙里不够暗</strong> —— 现实里两块板
+      贴在一起，环境光进不去，交界处会自然形成一圈暗影；没有这圈暗影，
+      再好的木纹也像贴纸糊上去的。<br>
+      <strong>遮蔽</strong>＝屏幕空间 AO（现算，不烘焙）；
+      <strong>阴影软度</strong>＝ VSM 阴影的模糊半径，就是参考图里那种边缘会
+      随距离变宽的软阴影。</p>
+    <div class="row"><label>纹理强度</label><input type="range" id="x_det" min="0" max="2.5" step="0.05" value="1"><span class="v"></span></div>
+    <div class="row"><label>遮蔽强度</label><input type="range" id="a_int" min="0" max="2" step="0.02" value="1"><span class="v"></span></div>
+    <div class="row"><label>遮蔽半径 (m)</label><input type="range" id="a_rad" min="0.02" max="0.3" step="0.005" value="0.075"><span class="v"></span></div>
+    <div class="row"><label>阴影软度</label><input type="range" id="s_soft" min="0" max="20" step="0.5" value="8"><span class="v"></span></div>
+    <div class="foot"><button class="act" type="button" id="t_ao" aria-pressed="true">遮蔽：开</button></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>整体</legend>
+    <div class="row"><label>曝光</label><input type="range" id="x_exp" min="0.4" max="2" step="0.01" value="0.82"><span class="v"></span></div>
+    <div class="row"><label>环境强度</label><input type="range" id="x_env" min="0" max="2" step="0.02" value="0.75"><span class="v"></span></div>
+    <div class="row"><label>太阳方位</label><input type="range" id="s_az" min="-180" max="180" step="1" value="-50"><span class="v"></span></div>
+    <div class="row"><label>太阳高度</label><input type="range" id="s_el" min="5" max="85" step="1" value="42"><span class="v"></span></div>
+    <p class="why">环境贴图是材质好不好看的<strong>第一位</strong>因素。PBR 材质的
+      高光和反射全部来自它 —— 环境里只有一片均匀的灰，金属和釉面反射到的
+      也只有一片均匀的灰，所有材质就被拉平成一个样子。<br>
+      <strong>摄影棚</strong>＝ three.js 官方例子 <code>webgl_loader_gltf</code>
+      用的那个 RoomEnvironment，六片亮度差五倍的发光板 + 六个反弹箱子；
+      <strong>住宅窗光</strong>＝我按"一侧有窗的居室"手调的，偏暖、方向性更强。</p>
+    <div class="foot">
+      <button class="act" type="button" id="t_env" aria-pressed="true">环境：摄影棚</button>
+      <button class="act" type="button" id="t_bg" aria-pressed="false">底色：浅</button>
+    </div>
+    <div class="foot">
+      <button class="act" type="button" id="t_cam">切透视</button>
+    </div>
+    <div class="foot">
+      <button class="act" type="button" id="t_wall" aria-pressed="true">近墙：自动让开</button>
+      <button class="act" type="button" id="t_wallon" aria-pressed="true">墙体：显示</button>
+      <button class="act" type="button" id="t_fit">重置视角</button>
+    </div>
+  </fieldset>
+</div>
+
+<div id="err"></div>
+
+<script>
+(function(){
+  function show(h){ var e=document.getElementById('err'); e.style.display='block'; e.innerHTML=h;
+                    var l=document.getElementById('load'); if(l) l.style.display='none'; }
+  if (location.protocol === 'file:'){
+    /* 提示里带上**当前这个文件的文件名** —— 以前写死成 _room-3d.html，
+       结果打开方案副本时照着提示开，开的还是主文件，白折腾一轮。 */
+    var fn = decodeURIComponent((location.pathname.split('/').pop() || '_room-3d.html'));
+    show('<h2>要用本地服务打开</h2><p>这一页用 ES 模块，<code>file://</code> 下浏览器不执行（你现在就是双击打开的）。</p>' +
+         '<p><b>1.</b> 双击 <code>网页final\\v3\\start-server.bat</code><br>' +
+         '<b>2.</b> 浏览器开 <code>http://localhost:8080/v3/' + fn + '</code></p>' +
+         '<p style="color:#9E968B">注意路径里有 <code>/v3/</code>，文件名要和上面这个一致。</p>');
+  } else if (!(window.HTMLScriptElement && HTMLScriptElement.supports &&
+               HTMLScriptElement.supports('importmap'))){
+    show('<h2>浏览器不支持 import maps</h2><p>需要 Chrome/Edge 89+、Firefox 108+、Safari 16.4+。</p>');
+  }
+  window.__showErr = show;
+})();
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader }    from 'three/addons/loaders/GLTFLoader.js';
+
+/* GLTFLoader 默认会"清洗"节点名：空格换成下划线，[ ] . : / 直接删掉。
+   那样面板上显示的就不是你 Rhino 里的图层名了（比如 me1.1 会变成 me11）。
+   这里把清洗函数改成原样返回 —— 我们不用动画，节点名不需要当绑定路径用。 */
+THREE.PropertyBinding.sanitizeNodeName = n => n;
+
+const $ = id => document.getElementById(id);
+const view = $('view');
+
+/* ═══ 渲染器 ═══════════════════════════════════════════ */
+/* alpha:true —— 产品页里 3D 是嵌在卡片里的，背景要透出卡片本身的颜色，
+   自带一块灰底会像贴上去的一张图。 */
+/* stencil:true —— 下面「切面填充」那一节要用模板缓冲。three 从 r163 起
+   WebGLRenderer 默认 stencil:false，不显式打开的话模板测试整个失效，
+   填充会变成一整片铺满房间的色块。 */
+const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true, stencil:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = .82;
+renderer.shadowMap.enabled = true;
+/* 墙体高度滑块要用逐材质的裁剪面。全局裁剪（renderer.clippingPlanes）会
+   把家具一起切掉，所以走 localClippingEnabled + material.clippingPlanes。 */
+renderer.localClippingEnabled = true;
+/* VSM 是 three 里唯一能做出"真软边"的阴影 —— PCF 只能靠多采样把
+   硬边磨毛，边缘宽度是固定的；VSM 存的是深度的方差，可以整张图高斯
+   模糊，边缘会随遮挡距离自然变宽，这才是参考图里那种阴影。 */
+renderer.shadowMap.type = THREE.VSMShadowMap;
+view.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = null;
+scene.environmentIntensity = .75;
+
+const ORTHO = new THREE.OrthographicCamera(-1,1,1,-1,.01,500);
+const PERSP = new THREE.PerspectiveCamera(30, 1, .01, 500);
+let camera = ORTHO;
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = .07;
+
+/* ═══ 光 ═══════════════════════════════════════════════ */
+/* ═══ 环境光贴图 ═════════════════════════════════════════
+   这是决定材质好不好看的**第一位**因素，比贴图重要得多。
+   道理：PBR 材质的高光和反射全部来自环境贴图。环境里如果只有
+   一片均匀的灰，那金属、清漆、釉面反射到的也只有一片均匀的灰 ——
+   于是所有材质都被拉平成一个样子，就是"廉价感"。
+   环境里如果有几块形状明确、亮度不同的光源，材质才会各自反射出
+   不同的高光形状，金属像金属、釉面像釉面。
+
+   下面第一套 roomEnv 就是 three.js 官方例子 webgl_loader_gltf
+   用的那个 RoomEnvironment（MIT，源自 Google model-viewer 的
+   EnvironmentScene）—— 你说那个例子的材质效果满意，靠的就是它。
+   它是一个虚拟的摄影棚：一个大房间、几个漫反射的箱子（提供反弹光）、
+   六片亮度不同的发光板（提供高光形状）、一盏点光。               */
+function roomEnvScene(){
+  const s = new THREE.Scene();
+  s.position.y = -3.5;
+  const g = new THREE.BoxGeometry();
+  g.deleteAttribute('uv');
+
+  const roomMat = new THREE.MeshStandardMaterial({ side:THREE.BackSide });
+  const boxMat  = new THREE.MeshStandardMaterial();
+  /* 发光板：只发光、不反光，用来在材质表面留下明确的高光形状 */
+  const area = i => new THREE.MeshLambertMaterial({
+    color:0x000000, emissive:0xffffff, emissiveIntensity:i });
+
+  const main = new THREE.PointLight(0xffffff, 900, 28, 2);
+  main.position.set(.418, 16.199, .300); s.add(main);
+
+  const room = new THREE.Mesh(g, roomMat);
+  room.position.set(-.757, 13.219, .717);
+  room.scale.set(31.713, 28.305, 28.591); s.add(room);
+
+  /* 六个漫反射箱子 —— 它们本身不发光，作用是把光反弹得不均匀，
+     让环境里出现明暗层次。少了它们，反射就是一片死板的亮斑。 */
+  const BOXES = [
+    [-10.906,  2.009,  1.846, -0.195, 2.328, 7.905, 4.651],
+    [ -5.607, -0.754, -0.758,  0.994, 1.970, 1.534, 3.955],
+    [  6.167,  0.857,  7.803,  0.561, 3.927, 6.285, 3.687],
+    [ -2.017,  0.018,  6.124,  0.333, 2.002, 4.566, 2.064],
+    [  2.291, -0.756, -2.621, -0.286, 1.546, 1.552, 1.496],
+    [ -2.193, -0.369, -5.547,  0.516, 3.875, 3.487, 2.986]
+  ];
+  const boxes = new THREE.InstancedMesh(g, boxMat, BOXES.length);
+  const tr = new THREE.Object3D();
+  BOXES.forEach((b, i) => {
+    tr.position.set(b[0], b[1], b[2]);
+    tr.rotation.set(0, b[3], 0);
+    tr.scale.set(b[4], b[5], b[6]);
+    tr.updateMatrix(); boxes.setMatrixAt(i, tr.matrix);
+  });
+  s.add(boxes);
+
+  /* 六片发光板：位置、大小、亮度都不一样 —— 这正是关键。
+     亮度 50 / 50 / 17 / 43 / 20 / 100，差了五倍，
+     所以物体的左右两侧、上下两面收到的光完全不同。 */
+  const LIGHTS = [
+    [ -16.116, 14.370,   8.208, 0.10, 2.428, 2.739,  50],
+    [ -16.109, 18.021,  -8.207, 0.10, 2.425, 2.751,  50],
+    [  14.904, 12.198,  -1.832, 0.15, 4.265, 6.331,  17],
+    [  -0.462,  8.890,  14.520, 4.38, 5.441, 0.088,  43],
+    [   3.235, 11.486, -12.541, 2.50, 2.000, 0.100,  20],
+    [   0.000, 20.000,   0.000, 1.00, 0.100, 1.000, 100]
+  ];
+  LIGHTS.forEach(L => {
+    const m = new THREE.Mesh(g, area(L[6]));
+    m.position.set(L[0], L[1], L[2]);
+    m.scale.set(L[3], L[4], L[5]);
+    s.add(m);
+  });
+  return s;
+}
+
+/* 第二套：我按"一侧有窗的住宅"手调的，偏暖、方向性更强。
+   做适老化方案的效果图时更像真实居室；做材质对比时用上面那套。 */
+function windowEnvScene(){
+  const s = new THREE.Scene(), box = new THREE.BoxGeometry();
+  const panel = (r,g,b,x,y,z,sx,sy,sz) => {
+    const m = new THREE.MeshBasicMaterial(); m.color.setRGB(r,g,b);
+    const n = new THREE.Mesh(box, m); n.position.set(x,y,z); n.scale.set(sx,sy,sz); s.add(n);
+  };
+  const shell = new THREE.Mesh(box, new THREE.MeshBasicMaterial({ side:THREE.BackSide }));
+  shell.material.color.setRGB(.16,.155,.148); shell.scale.set(60,40,60); s.add(shell);
+  panel(9.0,9.5,10.4, -17,  7,   4, .1, 13, 15);   /* 窗：偏冷天光，最亮 */
+  panel(2.0,2.05,2.2, -17,  7, -14, .1, 13, 10);
+  panel(1.5,1.45,1.35,  0, 17,   0, 30, .1, 30);   /* 顶 */
+  panel(1.1,0.95,0.72,  0, -9,   0, 30, .1, 30);   /* 地面暖反弹 */
+  panel(0.45,0.44,0.42, 17,  6,  -4, .1, 13, 20);
+  return s;
+}
+
+let envTex = null;
+function buildEnv(kind){
+  const pm = new THREE.PMREMGenerator(renderer);
+  const s = kind === 'window' ? windowEnvScene() : roomEnvScene();
+  if (envTex) envTex.dispose();
+  envTex = pm.fromScene(s, .04).texture;
+  pm.dispose();
+  s.traverse(o => { if (o.isMesh){ o.geometry.dispose(); o.material.dispose(); } });
+  scene.environment = envTex;
+}
+
+buildEnv('room');
+
+const sun = new THREE.DirectionalLight(0xFFF2E2, 2.6);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+/* VSM 下 bias 要给正的小值，radius 才是"软"的那个旋钮；
+   blurSamples 是高斯模糊的取样数，给足了边缘才不会有台阶。 */
+sun.shadow.bias = 0; sun.shadow.normalBias = .03;
+sun.shadow.radius = 8; sun.shadow.blurSamples = 20;
+scene.add(sun, sun.target);
+
+/* ═══ SSAO：屏幕空间环境光遮蔽 ═══════════════════════════
+   这一块是这一版最重要的东西，比任何一张贴图都重要。
+   为什么？因为"廉价感"的根源不是材质不够花哨，是**缝隙里不够暗**。
+   现实里两块板贴在一起，交界处的环境光进不去，会自然形成一圈暗影；
+   没有这圈暗影，再好的木纹也像贴纸糊上去的。
+   pmnd.rs 那个房间的高级感，一半来自软阴影，一半来自这个。
+
+   做法（不依赖任何 postprocessing 插件，纯核心 three 手写）：
+   1. 先把整个场景用 MeshDepthMaterial 画一遍，得到一张深度图；
+   2. 用深度图反算每个像素的相机空间位置和法线，
+      在法线朝向的半球里撒 16 个采样点，
+      数一数有几个被别的几何体挡住 → 挡得越多越暗；
+   3. 模糊一次去噪；
+   4. 用「正片叠底」把这张 AO 图压到正常渲染结果上。       */
+const AO = { on:true, radius:.075, intensity:1.0, bias:.010 };
+
+const aoKernel = [];
+for (let i = 0; i < 16; i++){
+  /* 半球内的采样点，越靠近中心越密 —— 近处的遮挡比远处重要 */
+  const a = i * 2.399963;                       /* 黄金角，避免采样点扎堆 */
+  const r = Math.sqrt((i + .5) / 16);
+  const z = Math.sqrt(1 - r*r*.92);
+  const s = .35 + .65 * ((i + 1) / 16) * ((i + 1) / 16);
+  aoKernel.push(new THREE.Vector3(Math.cos(a)*r*s, Math.sin(a)*r*s, z*s));
+}
+
+const depthMat = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
+depthMat.side = THREE.DoubleSide;
+
+const rtOpt = { minFilter:THREE.NearestFilter, magFilter:THREE.NearestFilter,
+                format:THREE.RGBAFormat, type:THREE.UnsignedByteType, depthBuffer:true };
+let depthRT = new THREE.WebGLRenderTarget(2, 2, rtOpt);
+let aoRT    = new THREE.WebGLRenderTarget(2, 2, { minFilter:THREE.LinearFilter, magFilter:THREE.LinearFilter, depthBuffer:false });
+let aoRT2   = new THREE.WebGLRenderTarget(2, 2, { minFilter:THREE.LinearFilter, magFilter:THREE.LinearFilter, depthBuffer:false });
+
+const quadCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+const quadGeo = new THREE.PlaneGeometry(2, 2);
+function quad(mat){ const s = new THREE.Scene(); s.add(new THREE.Mesh(quadGeo, mat)); return s; }
+
+const aoMat = new THREE.ShaderMaterial({
+  uniforms:{
+    tDepth:{ value:null }, texel:{ value:new THREE.Vector2() },
+    proj:{ value:new THREE.Matrix4() }, projInv:{ value:new THREE.Matrix4() },
+    radius:{ value:AO.radius }, intensity:{ value:AO.intensity }, bias:{ value:AO.bias },
+    kernel:{ value:aoKernel }
+  },
+  vertexShader:`varying vec2 vUv;
+    void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+  fragmentShader:`
+    #include <packing>
+    varying vec2 vUv;
+    uniform sampler2D tDepth;
+    uniform vec2 texel;
+    uniform mat4 proj, projInv;
+    uniform float radius, intensity, bias;
+    uniform vec3 kernel[16];
+
+    /* 从打包的深度图还原相机空间坐标。用逆投影矩阵做，
+       正交和透视两种相机都能用同一套代码，不用分支。 */
+    vec3 viewPos(vec2 uv){
+      float d = unpackRGBAToDepth(texture2D(tDepth, uv));
+      vec4 c = projInv * vec4(uv*2.0 - 1.0, d*2.0 - 1.0, 1.0);
+      return c.xyz / c.w;
+    }
+    float rand(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+
+    void main(){
+      float raw = unpackRGBAToDepth(texture2D(tDepth, vUv));
+      if (raw >= 0.9999){ gl_FragColor = vec4(1.0); return; }   /* 背景不算 */
+      vec3 p = viewPos(vUv);
+      /* 法线用深度的屏幕空间导数现推 —— 省掉一张法线图 */
+      vec3 n = normalize(cross(dFdx(p), dFdy(p)));
+
+      float ang = rand(vUv) * 6.2831853;
+      vec3 rv = vec3(cos(ang), sin(ang), 0.0);
+      vec3 t = normalize(rv - n * dot(rv, n));
+      mat3 tbn = mat3(t, cross(n, t), n);
+
+      float occ = 0.0;
+      for (int i = 0; i < 16; i++){
+        vec3 sp = p + tbn * kernel[i] * radius;
+        vec4 o = proj * vec4(sp, 1.0);
+        vec2 suv = (o.xy / o.w) * 0.5 + 0.5;
+        if (suv.x < 0.0 || suv.x > 1.0 || suv.y < 0.0 || suv.y > 1.0) continue;
+        float sz = viewPos(suv).z;
+        /* 距离衰减：远处的几何体不该在这里投 AO，否则会出现"漏光带" */
+        float rc = smoothstep(0.0, 1.0, radius / max(1e-4, abs(p.z - sz)));
+        occ += (sz >= sp.z + bias ? 1.0 : 0.0) * rc;
+      }
+      float ao = clamp(1.0 - occ / 16.0 * intensity, 0.0, 1.0);
+      gl_FragColor = vec4(vec3(ao), 1.0);
+    }`
+});
+const aoScene = quad(aoMat);
+
+const blurMat = new THREE.ShaderMaterial({
+  uniforms:{ tAO:{ value:null }, texel:{ value:new THREE.Vector2() } },
+  vertexShader:`varying vec2 vUv;
+    void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+  fragmentShader:`
+    varying vec2 vUv; uniform sampler2D tAO; uniform vec2 texel;
+    void main(){
+      float s = 0.0;
+      for (int y = -2; y <= 2; y++) for (int x = -2; x <= 2; x++)
+        s += texture2D(tAO, vUv + vec2(float(x), float(y)) * texel).r;
+      gl_FragColor = vec4(vec3(s / 25.0), 1.0);
+    }`
+});
+const blurScene = quad(blurMat);
+
+/* 正片叠底：把 AO 压到已经渲染好的画面上。
+   用 MultiplyBlending 而不是在每个材质里乘，是因为这样
+   不用碰任何材质的着色器，AO 开关可以随时切。 */
+const compMat = new THREE.ShaderMaterial({
+  uniforms:{ tAO:{ value:null } },
+  vertexShader:`varying vec2 vUv;
+    void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+  fragmentShader:`varying vec2 vUv; uniform sampler2D tAO;
+    void main(){ gl_FragColor = vec4(vec3(texture2D(tAO, vUv).r), 1.0); }`,
+  blending:THREE.MultiplyBlending, premultipliedAlpha:true,
+  depthTest:false, depthWrite:false, transparent:true
+});
+const compScene = quad(compMat);
+
+/* ═══ 辉光（bloom）════════════════════════════════════════
+   不是「整屏取亮部」——白瓷砖地面和白洁具会被一起判成亮部跟着糊掉。
+   改成**单独画一遍会发光的东西**（相机图层 1），关掉太阳和环境光、
+   背景涂黑，渲出来正好是纯发光量。白天 accent 的 emissive 是 0，
+   这一遍全黑，辉光自动就没有，不用特判。
+   模糊用可分离高斯，横竖为一轮做两轮；分辨率 1/4。 */
+const BLOOM = { amt:0.9, rad:1.6 };
+let bloomA = new THREE.WebGLRenderTarget(2, 2, { minFilter:THREE.LinearFilter, magFilter:THREE.LinearFilter, depthBuffer:true });
+let bloomB = new THREE.WebGLRenderTarget(2, 2, { minFilter:THREE.LinearFilter, magFilter:THREE.LinearFilter, depthBuffer:false });
+const gaussMat = new THREE.ShaderMaterial({
+  uniforms:{ tSrc:{ value:null }, texel:{ value:new THREE.Vector2() }, dir:{ value:new THREE.Vector2(1,0) } },
+  vertexShader:`varying vec2 vUv;
+    void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+  fragmentShader:`
+    varying vec2 vUv; uniform sampler2D tSrc; uniform vec2 texel; uniform vec2 dir;
+    void main(){
+      vec2 o = texel * dir;
+      vec3 c  = texture2D(tSrc, vUv).rgb * 0.2270270270;
+      c += (texture2D(tSrc, vUv + o * 1.3846153846).rgb +
+            texture2D(tSrc, vUv - o * 1.3846153846).rgb) * 0.3162162162;
+      c += (texture2D(tSrc, vUv + o * 3.2307692308).rgb +
+            texture2D(tSrc, vUv - o * 3.2307692308).rgb) * 0.0702702703;
+      gl_FragColor = vec4(c, 1.0);
+    }`
+});
+const gaussScene = quad(gaussMat);
+const bloomCompMat = new THREE.ShaderMaterial({
+  uniforms:{ tBloom:{ value:null }, amount:{ value:0.9 } },
+  vertexShader:`varying vec2 vUv;
+    void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+  fragmentShader:`varying vec2 vUv; uniform sampler2D tBloom; uniform float amount;
+    void main(){ gl_FragColor = vec4(texture2D(tBloom, vUv).rgb * amount, 1.0); }`,
+  blending:THREE.AdditiveBlending, depthTest:false, depthWrite:false, transparent:true
+});
+const bloomCompScene = quad(bloomCompMat);
+function sizeBloom(w, h){
+  const bw = Math.max(2, Math.floor(w/4)), bh = Math.max(2, Math.floor(h/4));
+  bloomA.setSize(bw, bh); bloomB.setSize(bw, bh);
+  gaussMat.uniforms.texel.value.set(1/bw, 1/bh);
+}
+
+function sizeAO(w, h){
+  depthRT.setSize(w, h);
+  aoRT.setSize(w, h); aoRT2.setSize(w, h);
+  aoMat.uniforms.texel.value.set(1/w, 1/h);
+  blurMat.uniforms.texel.value.set(1/w, 1/h);
+}
+
+/* ═══ cube 网格着色器 ══════════════════════════════════ */
+const GRID = {
+  pitch:{ value:.3 },                    /* 300 mm —— 你的 cube 模数 */
+  lw:{ value:.012 },
+  gcol:{ value:new THREE.Color('#3A342C') }, amt:{ value:.7 }, gon:{ value:1 },
+  /* 格线总强度。amt 只管"涂多深的颜色"，可方案里 amt=0，格线全靠
+     粗糙度 + 金属度 + V 形法线在撑，所以调 amt 是关不掉线的。
+     gstr 乘在 _g 上，四个效果一起淡 —— 缩略图那么小，一格才几像素，
+     线和物体的比例被放大了好几倍，所以只在缩略图里调低它。 */
+  gstr:{ value:1 },
+  /* 网格原点。模型不在世界原点上，不给偏移的话格线会和 cube 的面错开半格。 */
+  goff:{ value:new THREE.Vector3() }
+};
+const GOFF_BASE = new THREE.Vector3();   /* 模型包围盒的角点，作为对齐基准 */
+function withCubeGrid(mat){
+  mat.onBeforeCompile = function(shader){
+    Object.assign(shader.uniforms, GRID);
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;\nvarying vec3 vWNrm;')
+      .replace('#include <begin_vertex>',
+        '#include <begin_vertex>\n' +
+        '  vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;\n' +
+        '  vWNrm = mat3(modelMatrix) * objectNormal;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>
+        varying vec3 vWPos; varying vec3 vWNrm;
+        uniform float pitch; uniform float lw; uniform vec3 gcol;
+        uniform float amt; uniform float gon; uniform vec3 goff; uniform float gstr;
+        float axisLine(float x, float w){
+          float f = abs(fract(x - 0.5) - 0.5);
+          float d = fwidth(x);
+          return 1.0 - smoothstep(0.0, max(d, 1e-5) * 1.3 + w, f);
+        }`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        float _g = 0.0; vec3 _gv = vec3(0.0);
+        if (gon > 0.5){
+          vec3 p = (vWPos - goff) / pitch;
+          vec3 an = abs(normalize(vWNrm));
+          float gx = axisLine(p.x, lw) * (1.0 - an.x);
+          float gy = axisLine(p.y, lw) * (1.0 - an.y);
+          float gz = axisLine(p.z, lw) * (1.0 - an.z);
+          _g = clamp(max(gx, max(gy, gz)), 0.0, 1.0) * gstr;
+          /* 有符号的"往缝心倒"的方向 —— 用来把法线掰出一道 V 形浅槽 */
+          vec3 sg = sign(fract(p - 0.5) - 0.5);
+          _gv = vec3(gx * sg.x, gy * sg.y, gz * sg.z) * gstr;
+          diffuseColor.rgb = mix(diffuseColor.rgb, gcol, _g * amt);
+        }`)
+      /* 缝里要变粗糙、要掉金属度。
+         真实的模块缝是一道 3~5 mm 的"影子槽"，槽底进不去环境光，
+         所以既不反光也不发亮。只把颜色涂灰、不动粗糙度的话，
+         槽底会和旁边的面一样亮，眼睛立刻判定成"印上去的线"。      */
+      .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
+        roughnessFactor = mix(roughnessFactor, 1.0, _g * 0.75);`)
+      .replace('#include <metalnessmap_fragment>', `#include <metalnessmap_fragment>
+        metalnessFactor = mix(metalnessFactor, 0.0, _g * 0.85);`)
+      /* 再把法线掰出一道 V 形浅槽：缝的两侧各自接到不同的光，
+         转动模型时高光会沿着缝走 —— 那才像是拼出来的。
+         必须插在 normal_fragment_maps 之后，否则会被法线贴图覆盖掉。 */
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+        if (gon > 0.5 && _g > 0.001){
+          normal = normalize(normal + mat3(viewMatrix) * _gv * 0.75);
+        }`);
+  };
+  mat.customProgramCacheKey = () => 'cubegrid';
+  return mat;
+}
+
+/* ═══ 选中时其余家具变淡 ═══════════════════════════════
+   点开一张信息卡的时候，被点的那件保持原样，其余的往背景色里退。
+
+   为什么是"退向背景色"而不是真的调 opacity：
+   真透明会露出家具的**内壁和背面**，一个实心的柜子会变成 X 光片，
+   而且透明物体要单独排序渲染，前后关系一乱就更像 bug 不像设计。
+   退向背景色是不透明的，形还是那个形，只是"退到后面去了"——
+   这正是这个交互要说的话：这件不是重点，但它还在。
+
+   实现上是在片元着色器最后一行把颜色混向 uFadeCol。插在
+   dithering_fragment 之后 = 色调映射和 sRGB 转换都做完了，
+   所以 uFadeCol 直接写网页上那个背景色的十六进制就行，不用换空间。
+
+   uFade 是**每个材质一份**（每件家具要能单独淡），
+   uFadeCol 是**全局共用一份**（背景色只有一个）。          */
+const DIM = {
+  amt:{ value:.5 },                      /* 淡到什么程度。0 = 不淡，1 = 整个变成背景色 */
+  col:{ value:new THREE.Color('#F3EFE8') },  /* 放大后那个盒子的底色，见 flow.html .pv-box.is-zoom */
+  arch:false                             /* 墙和地要不要一起淡。false = 房子还是房子，只有家具退下去 */
+};
+/* FURN 最后一条的 test 能匹配任何字符串（兜底），所以图层名里没写清楚归谁的，全落进 'arch'。
+   这两条其实是家具身上的零件，不是房子：
+     15MM 软包边-皮质 —— 在床的位置（x −9.7…−8.8），是床的包边
+     金属           —— 在淋浴区（x ≈ −9.6），是卫浴五金
+   不单独认一下的话，选中床的时候床的包边会跟着淡，一件家具亮一半，看着像坏了。
+   （改 FURN 的 test 也能解决，但那会连带改到信息卡的分组和缩略图，动静太大。） */
+const DIM_WITH = { '15MM 软包边-皮质':'bed', '金属':'bath' };
+function withFade(m){
+  if (m.userData._fade) return m.userData._fade;
+  const u = { uFade:{ value:0 } };
+  m.userData._fade = u;
+  const prev = m.onBeforeCompile;
+  const prevKey = m.customProgramCacheKey;
+  m.customProgramCacheKey = function(){ return (prevKey ? prevKey.call(this) : '') + '|fade'; };
+  m.onBeforeCompile = function(shader, renderer){
+    if (prev) prev.call(this, shader, renderer);
+    shader.uniforms.uFade = u.uFade;
+    shader.uniforms.uFadeCol = DIM.col;
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform float uFade;\nuniform vec3 uFadeCol;')
+      .replace('#include <dithering_fragment>', `#include <dithering_fragment>
+        gl_FragColor.rgb = mix( gl_FragColor.rgb, uFadeCol, uFade );`);
+  };
+  return u;
+}
+/* 当前淡化的基准：只有这一件保持原样。'' = 谁都不淡。 */
+/* 收的是一**组** key，不是一个 —— 点一件家具时组里只有一个，
+   分区高亮时组里是这个区的全部家具。两种用法共用同一套机制。 */
+let _dimKeys = [];
+function applyDim(keys){
+  const on = keys && keys.length;
+  LAYERS.forEach(L => {
+    const m = MAT[L]; if (!m || !m.userData._fade) return;
+    const g = DIM_WITH[L] || furnOf(L);
+    /* 房子的壳只认真正的墙和地（看模板），不认 'arch' 这个兜底组 */
+    const shell = TMPL_OF[L] === 'wall' || TMPL_OF[L] === 'floor';
+    /* 不淡的三种：没开淡化 / 在这一组里 / 是墙地且设了墙地不淡 */
+    const off = !on || keys.indexOf(g) >= 0 || (!DIM.arch && shell);
+    m.userData._fade.uFade.value = off ? 0 : DIM.amt.value;
+  });
+}
+function setDim(k){
+  _dimKeys = !k ? [] : (Array.isArray(k) ? k.slice() : [k]);
+  applyDim(_dimKeys);
+}
+/* 分区。按组划，不按位置划 —— 变淡本身就是逐材质（= 逐图层 = 逐组）的，
+   位置划得再细也落实不到渲染上。已知的不准之处：厨房那一组里混着
+   浴室的一个柜子，点 Kitchen 时它也会亮着。 */
+const ZONES = {
+  /* typeC OptionC：有岛台、有架子、有茶几；没有洗碗机、衣柜、椅子、换鞋凳。 */
+  kitchen: ['kitchen', 'board2', 'island'],
+  living:  ['sofa', 'bed', 'shelf', 'coffee'],
+  bath:    ['bath', 'rail']
+};
+
+/* ═══ 材质分组 ═══════════════════════════════════════════
+   分派完全靠 Rhino 图层名。glb 里自带的那 9 个材质是随机色，不能用。
+   规则表按「先命中先算」的顺序排，越具体的越靠前 ——
+   比如「水池（金属）」必须排在「金属」前面，否则会被吃掉。
+   分错了改这张表就行，模型一个字都不用动。                       */
+const RULES = [
+  /* OptionB 的墙图层叫「墙面」，optionC 叫 wall —— 同一样东西两个名字。
+     不认的话墙会掉进 other：不切 cube、不投影、近墙让开、墙体高度裁剪，四样全失效。 */
+  /* vision：墙和地按**房间**拆开了（厕所墙 / 客厅地板 …共八层），
+     旧规则 /^wall|墙面|墙体/ 和 /^floor/ 一个都不认，会全部掉进 other ——
+     不切 cube、不投影、近墙让开、墙高裁剪四样一起失效。
+     改成认「墙」「地板/地面」这两个字本身。 */
+  { key:'wall',    test:/^wall|墙/i },
+  { key:'floor',   test:/^floor|地板|地面/i },
+  /* vision 独有的三层。放前面：它们和墙、地一样属于建筑面，不是家具。
+     触摸板带个「板」字，但 wood 认的是「刨花板」和「木」，不会抢走。 */
+  { key:'accent',  test:/^path$|盲道|导盲|触摸板/i },
+  { key:'light',   test:/^light$|灯/i },
+  { key:'prop',    test:/^me\d/i },              /* FBX 导入的小摆件 */
+  { key:'mirror',  test:/镜/ },
+  { key:'glass',   test:/玻璃|glass/ },
+  { key:'sink',    test:/水池|台盆|洗手/ },        /* 必须在 metal 之前 */
+  { key:'plastic', test:/案板|塑料/ },
+  { key:'ceramic', test:/陶瓷|马桶/ },
+  /* 收紧成「浴室 + 软的」。只写 /浴室/ 的话，「浴室架子（木板）」会被当成软包。 */
+  { key:'bathsoft',test:/浴室.*(?:软包|软垫|皮纹)/ },  /* 浴室里的软包：材质同软包，但不切 cube */
+  { key:'piping',  test:/软包边|皮质/ },           /* 必须在 leather 之前 */
+  /* 2026-09-01 放宽（typeA OptionC）：原来是 /软包|软垫|皮纹/。
+     这一版的家具用「（硬）/（软）」两个后缀标骨架和软包 ——
+     「茶几（软）」「椅子（软）」「换鞋凳（软）」一个都不命中，全掉进 other。
+     不会误伤：带「软」的另外几层是「软包边-皮质」（piping 在前面先接走）、
+     「浴室(软包…」（bathsoft 在前面）、「扶手（软材质）」（是"软材"不是"软)"）。 */
+  { key:'leather', test:/软包|软垫|皮纹|软[)）]/ },
+  { key:'rail',    test:/扶手|软材质/ },
+  { key:'metal',   test:/金属|花洒|窗框/ },
+  /* 「不切 cube 的木头」放在 wood 前面：柜门 / 衣柜柜门是整块门板，
+     浴室架子按件做 —— 切成 300 模块读起来是错的。
+     必须排在 wood 之前，这几个名字里都带「木」，wood 会先把它们吃掉。 */
+  { key:'door',    test:/柜门|浴室架子/ },
+  { key:'wood',    test:/橱柜|岛台|木制|木色|刨花板|木/ },
+  /* 沙发 / 床的硬边必须排在 board 之前 —— 否则 board 里的「硬边」
+     和「沙发」「床」三个关键词会把它们一起吃进柜门组。 */
+  /* 同上：原来只认「硬边」，这一版是「茶几（硬）」「椅子（硬）」。
+     硬边和「（硬）」讲的是同一件事 —— 这件家具**不软的那部分骨架**。 */
+  { key:'frame',   test:/硬边|硬[)）]/ },
+  { key:'board',   test:/抽屉|沙发|床|柜/ },
+  { key:'other',   test:/.*/ }
+];
+
+/* ═══ 程序化贴图 ═════════════════════════════════════════
+   全部用 canvas 现画，一张图片文件都不下载。
+   这么做不是为了炫技，是被项目本身逼的：户型是会换的，
+   贴图文件的尺寸一旦和房间对不上就会被拉伸；而程序化的图按
+   「世界坐标 ÷ 实际米数」贴，1 米永远是 1 米，换房型不用重做。
+   每种材质吐三张图：颜色 / 粗糙度 / 法线。粗糙度那张是关键 ——
+   现实里同一块材料表面的粗糙度是不匀的，全都一个值就是塑料感。 */
+function hash2(a, b){
+  const ia = Math.floor(a), ib = Math.floor(b);
+  let n = Math.imul(ia, 374761393) + Math.imul(ib, 668265263);
+  n = Math.imul(n ^ (n >>> 13), 1274126177);
+  return ((n ^ (n >>> 16)) >>> 0) / 4294967296;
+}
+function noise2(x, y){
+  const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
+  const u = xf*xf*(3-2*xf), v = yf*yf*(3-2*yf);
+  return (hash2(xi,yi)*(1-u) + hash2(xi+1,yi)*u)*(1-v)
+       + (hash2(xi,yi+1)*(1-u) + hash2(xi+1,yi+1)*u)*v;
+}
+function fbm(x, y, oct){
+  let a = 0, amp = .5, f = 1;
+  for (let i = 0; i < (oct||4); i++){ a += noise2(x*f, y*f) * amp; amp *= .5; f *= 2; }
+  return a;
+}
+/* 周期性细胞噪声：皮革的粒面靠它。格点坐标先对 N 取模，
+   所以在 N 的边界上首尾相接，平铺看不出缝。 */
+function cellP(x, y, N){
+  const xi = Math.floor(x), yi = Math.floor(y);
+  let b1 = 9, b2 = 9;
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++){
+    const gx = xi + dx, gy = yi + dy;
+    const wx = ((gx % N) + N) % N, wy = ((gy % N) + N) % N;
+    const fx = gx + .15 + .7 * hash2(wx*3 + 1, wy*7 + 2);
+    const fy = gy + .15 + .7 * hash2(wy*5 + 3, wx*11 + 4);
+    const d = (fx-x)*(fx-x) + (fy-y)*(fy-y);
+    if (d < b1){ b2 = b1; b1 = d; } else if (d < b2) b2 = d;
+  }
+  return { d1: Math.sqrt(b1), d2: Math.sqrt(b2) };
+}
+const cl01 = x => x < 0 ? 0 : (x > 1 ? 1 : x);
+
+/* fn(u,v) → { r,g,b,rough,h }，全 0~1。
+   法线由 h（高度）的相邻差分算出来，所以凹凸是真跟着图案走的。 */
+function bakeMaps(N, fn){
+  const mkC = () => { const c = document.createElement('canvas'); c.width = c.height = N; return c; };
+  const cA = mkC(), cR = mkC(), cN = mkC();
+  const gA = cA.getContext('2d'), gR = cR.getContext('2d'), gN = cN.getContext('2d');
+  const iA = gA.createImageData(N,N), iR = gR.createImageData(N,N), iN = gN.createImageData(N,N);
+  const H = new Float32Array(N*N);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++){
+    const o = fn(x/N, y/N), i = (y*N + x) * 4;
+    iA.data[i] = o.r*255; iA.data[i+1] = o.g*255; iA.data[i+2] = o.b*255; iA.data[i+3] = 255;
+    const rr = cl01(o.rough)*255;
+    iR.data[i] = iR.data[i+1] = iR.data[i+2] = rr; iR.data[i+3] = 255;
+    H[y*N + x] = o.h;
+  }
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++){
+    const gx = H[y*N + ((x+1)%N)] - H[y*N + ((x-1+N)%N)];
+    const gy = H[((y+1)%N)*N + x] - H[((y-1+N)%N)*N + x];
+    const i = (y*N + x) * 4;
+    iN.data[i]   = Math.max(0, Math.min(255, 128 - gx*400));
+    iN.data[i+1] = Math.max(0, Math.min(255, 128 - gy*400));
+    iN.data[i+2] = 255; iN.data[i+3] = 255;
+  }
+  gA.putImageData(iA,0,0); gR.putImageData(iR,0,0); gN.putImageData(iN,0,0);
+  const mk = (cv, srgb) => {
+    const t = new THREE.CanvasTexture(cv);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  };
+  return { map:mk(cA,true), rough:mk(cR,false), normal:mk(cN,false) };
+}
+/* THREE.Color 读 '#RRGGBB' 会当成 sRGB、内部存成线性值；
+   而我们是逐字节往一张 sRGB 贴图里写，所以必须先转回 sRGB，
+   否则烘出来整体明显偏暗。这个坑踩过一次了。                */
+const sRGB = hex => new THREE.Color(hex).convertLinearToSRGB();
+const mixc = (a, b, t, s) => ({ r:(a.r+(b.r-a.r)*t)*s, g:(a.g+(b.g-a.g)*t)*s, b:(a.b+(b.b-a.b)*t)*s });
+
+/* ── 墙：乳胶漆 ─────────────────────────────────────
+   室内最常见的做法。视觉特征其实只有两件事：滚筒留下的大尺度
+   深浅不匀（近看没有、退远了才看得出），加上极细的"橘皮"颗粒，
+   让高光不是一块死板的亮斑。幅度必须压得很小，大了就变水泥。
+   颜色定暖白 #EDE9E1 —— 老人房不该用冷白，低照度下冷白显脏。 */
+const wallBase = sRGB('#EDE9E1');
+function plasterPixel(u, v){
+  const a = u*Math.PI*2, b = v*Math.PI*2;
+  const ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(b);
+  const roll  = fbm(ca*2.1 + 9, sa*2.1 + cb*2.1 + 9, 4);
+  const peel  = noise2(ca*90 + 3, sa*90 + cb*90 + 3);
+  const grain = noise2(u*310 + 7, v*310 + 7);
+  const t = (roll - .5)*.030 + (peel - .5)*.012;
+  return { r:cl01(wallBase.r*(1+t)), g:cl01(wallBase.g*(1+t)), b:cl01(wallBase.b*(1+t)),
+           rough:.90 + (peel-.5)*.04, h: peel*.55 + grain*.45 };
+}
+
+/* ── 木纹：换一套算法 ───────────────────────────────
+   前两版都错在"用一条正弦波来当年轮"。正弦波是连续摆动的，
+   画出来永远是一条来回扭的大波浪 —— 那是胶合板旋切纹的样子，
+   高级住宅里用的锯切实木 / 直纹薄木贴面根本不长这样。
+
+   真实的直纹木饰面是什么？是**一堆几乎平行的细线**：
+   间距 5~15 mm 不等、深浅不一、宽窄不一，沿板长方向只有极缓的偏移，
+   绝不会整条扭起来。所以这版改成"线场"：把跨纹方向的坐标切成一根根，
+   每根线的深度、宽度、位置抖动都各自随机。
+   三层不同疏密的线场叠在一起，才有真木头那种疏密不匀的呼吸感。   */
+function grainLines(t, N, seed){
+  const i = Math.floor(t), f = t - i;
+  const w = ((i % N) + N) % N;                       /* 对 N 取模 → 平铺无缝 */
+  const amp = .35 + .65 * hash2(w*3 + seed*29, seed*7 + 1);   /* 这根线有多深 */
+  const wid = .12 + .50 * hash2(w*5 + seed*31, seed*11 + 3);  /* 有多宽 */
+  const off = (hash2(w*7 + seed*37, seed*13 + 5) - .5) * .55; /* 位置抖一点，别太齐 */
+  const d = Math.abs((f - .5 - off) * 2) / Math.max(.08, wid);
+  return d >= 1 ? 0 : Math.pow(1 - d, 1.7) * amp;
+}
+/* 三层线场 + 沿长度方向的缓慢强弱变化 */
+function woodGrain(x, u, seed, ca, sa){
+  /* 四层，从宽到窄。最宽的那层（12 条）很重要 —— 它是退远了还看得见的
+     那种"大色带"，只有细线的话，一缩小就被 mipmap 抹平成一块纯色，
+     木头就变成了塑料板。中间两层是主纹，最细的一层是毛边。         */
+  let g = grainLines(x*12  + seed, 12,  seed + 5) * .16
+        + grainLines(x*43  + seed, 43,  seed + 2) * .26
+        + grainLines(x*112 + seed, 112, seed + 1) * .44
+        + grainLines(x*271 + seed, 271, seed + 3) * .22;
+  /* 沿长度的强弱起伏也要收：起伏大了就成了一块块的花斑，
+     真实贴面是"整体很匀，细看才有纹"。 */
+  const breathe = .86 + .26 * fbm(ca*1.7 + seed*3.1 + 31, sa*1.7 + seed*3.1 + 31, 3);
+  return Math.min(1, g * breathe);
+}
+
+/* 木色预设。高级住宅里木饰面的选择基本就这四档，
+   越往下越沉、对比越大。地板比柜体浅半档是常规做法 ——
+   反过来会显得屋子被"压住"，老人房尤其忌讳压抑。         */
+const WOODS = [
+  { name:'浅橡木',   fl:['#C7B59D','#A08A6C',.30], vn:['#BFAC92','#9C866A',.24] },
+  { name:'中性橡木', fl:['#B69C7C','#8B7050',.34], vn:['#AC9273','#846A4C',.26] },
+  { name:'烟熏橡木', fl:['#8D7862','#5F4C38',.38], vn:['#7E6A54',.0,.30] },
+  { name:'胡桃木',   fl:['#89694E','#583E28',.42], vn:['#795C41','#4E361F',.34] }
+];
+WOODS[2].vn = ['#7E6A54','#544028',.30];
+let WOOD_I = 1;
+let flL, flD, flC, vnL, vnD, vnC;
+function setWoodColors(i){
+  const w = WOODS[i];
+  flL = sRGB(w.fl[0]); flD = sRGB(w.fl[1]); flC = w.fl[2];
+  vnL = sRGB(w.vn[0]); vnD = sRGB(w.vn[1]); vnC = w.vn[2];
+}
+setWoodColors(WOOD_I);
+
+/* ── 地面：宽板橡木地板 ─────────────────────────────
+   板宽 150 mm、板长 1.2 m。150 mm 正好是 300 mm 模数的一半，
+   地板缝会自然踩在 cube 格线上，两套尺寸系统对得上。       */
+function floorPixel(u, v){
+  const NP = 8;                                  /* 一张图 8 块板 × 150 mm = 1.2 m */
+  const row = Math.floor(v*NP), inRow = v*NP - row;
+  const jit = hash2(row*7.3 + 2.1, 4.7);         /* 每块板的整体色差 —— 卖真实感的就是这个 */
+  const off = hash2(row*11.9 + 5.3, 8.1);        /* 端头缝逐排错开 */
+  const seamV = (inRow < .016 || inRow > .984) ? 1 : 0;
+  const seg = (u + off) % 1;
+  const seamU = (seg < .003 || seg > .997) ? 1 : 0;
+  const seam = Math.max(seamV, seamU);
+
+  const a = u*Math.PI*2, ca = Math.cos(a), sa = Math.sin(a);
+  /* 沿板长只允许极缓的偏移（真实锯材的纹路会慢慢偏，但不会扭） */
+  const drift = (fbm(ca*1.2 + row*4.7, sa*1.2 + row*4.7, 3) - .5) * .030;
+  const g = woodGrain(inRow + drift, u, row, ca, sa);
+
+  const t = cl01(1 - g*flC + (jit - .5)*.11);
+  const c = mixc(flD, flL, t, seam ? .78 : 1);
+  c.rough = seam ? .90 : (.42 + g*.08);
+  c.h = seam ? 0 : (.5 - g*.30);
+  return c;
+}
+
+/* ── 地面备选：微水泥 ───────────────────────────────
+   当代高端住宅里用得最多的整体地面。它的视觉特征是"几乎纯色，
+   但不是死板的一块" —— 靠三样东西：抹刀留下的大尺度云斑、
+   中频的批刮痕、细砂粒。三样的幅度都必须压得很小，
+   加起来色差不超过 6%，多一点就变成水泥毛坯了。
+   它比木地板"安静"，不跟家具抢，是想要整体高级感时更稳的选择。 */
+const CEM_TILE = 3.0;                       /* 一张图铺 3 米，退远了看不出重复 */
+const cemBase = sRGB('#B9B1A5');
+function cementPixel(u, v){
+  const a = u*Math.PI*2, b = v*Math.PI*2;
+  const ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(b);
+  const cloud  = fbm(ca*2.0 + 7,  sa*2.0 + cb*2.0 + 7,  4);   /* 抹出来的深浅 */
+  const trowel = fbm(ca*6.0 + 19, sa*6.0 + cb*1.6 + 19, 3);   /* 批刮痕，有方向 */
+  const sand   = noise2(ca*260 + 5, sa*260 + cb*260 + 5);      /* 细砂粒 */
+  const t = (cloud - .5)*.055 + (trowel - .5)*.025 + (sand - .5)*.010;
+  return { r:cl01(cemBase.r*(1+t)), g:cl01(cemBase.g*(1+t)), b:cl01(cemBase.b*(1+t)),
+           rough:.62 + (cloud - .5)*.10 + (trowel - .5)*.06,
+           h: sand*.55 + trowel*.45 };
+}
+
+/* ── 地面备选：白色大板瓷砖 ─────────────────────────
+   高端住宅最常用的那种"通体大理石瓷砖 / 岩板"：接近白，
+   带极淡的暖灰细脉，柔光面。
+
+   规格 600 × 600 mm —— 正好两个 300 mm 模数，砖缝会自然落在
+   cube 格线上。缝宽 2 mm 并且用同色勾缝：白砖一旦用深缝，
+   整个地面会变成"格子"，那是公共卫生间的样子，不是住宅。
+
+   白砖看着贵不贵，八成靠两件事，都不是花色：
+   1) 柔光面 —— 粗糙度压到 0.3 左右，地面会把房间和家具淡淡地映出来。
+      这是白色石材地面"高级感"的真正来源。（代价：太亮会显滑，
+      适老化项目不建议再往下压，0.3 已经是我认为的安全下限。）
+   2) 脉络要少而淡 —— 一张贴图只铺 1.2 m，脉络一浓，每 1.2 m 就重复
+      一次同样的花纹，一眼假。所以这里把脉络压到几乎只是"影子"。   */
+const TILE_TILE = 1.2;                       /* 一张图 2 × 2 块 600 mm 砖 */
+const tilLight = sRGB('#F1EEE9'), tilDark = sRGB('#DCD8D1');
+const veinCol  = sRGB('#C6C2BB');
+const groutCol = sRGB('#E2DED7');            /* 同色勾缝，只比砖面深一点点 */
+function tilePixel(u, v){
+  const NT = 2;                              /* 每边 2 块砖 */
+  const cx = Math.floor(u*NT), cy = Math.floor(v*NT);
+  const fx = u*NT - cx, fy = v*NT - cy;
+  const GW = 0.0033;                         /* 2 mm / 600 mm */
+  const gx = Math.min(fx, 1 - fx), gy = Math.min(fy, 1 - fy);
+  const gd = Math.min(gx, gy);
+  const grout = gd < GW ? 1 : 0;
+  const edge = 1 - Math.min(1, gd / (GW * 4));   /* 缝边倒角，让光有得抓 */
+
+  /* 每块砖自己的色号 + 自己的花纹相位（真砖出厂就是这么随机的） */
+  const h1 = hash2(cx*31 + cy*7 + 3, cy*17 + 5);
+  const h2 = hash2(cy*23 + cx*11 + 9, cx*29 + 13);
+  const su = fx + h1*4.7, sv = fy + h2*3.9;
+
+  const cloud = fbm(su*2.0 + 41, sv*2.0 + 41, 4);
+  const grain = noise2(su*180 + 3, sv*180 + 3);
+  /* 细脉：把 fbm 折一下取脊线，得到细而长的脉络，再压到很淡 */
+  const ridge = 1 - Math.abs(fbm(su*1.3 + h1*9 + 61, sv*3.4 + h2*9 + 61, 4)*2 - 1);
+  const vein  = Math.pow(ridge, 7);
+
+  if (grout){
+    return { r:groutCol.r, g:groutCol.g, b:groutCol.b, rough:.62, h:0 };
+  }
+  let t = cl01(.72 + (cloud - .5)*.42 + (h1 - .5)*.16);
+  const c = mixc(tilDark, tilLight, t, 1);
+  /* 脉络单独往灰里压，不走明暗通道 —— 大理石的脉是"另一种颜色"，
+     不是同一种颜色的深浅。 */
+  const k = vein * .55;
+  c.r += (veinCol.r - c.r) * k;
+  c.g += (veinCol.g - c.g) * k;
+  c.b += (veinCol.b - c.b) * k;
+  c.rough = .30 + (cloud - .5)*.06 + (grain - .5)*.03 + vein*.06;
+  c.h = .55 - edge*.55 + (grain - .5)*.02;
+  return c;
+}
+
+/* ── 木饰面：橱柜 / 岛台 ────────────────────────────
+   同一套线场，但没有板缝、纹路更密、颜色沉半档。
+   立面上的木饰面通常比地板深一点，不然整屋会糊成一片。    */
+function veneerPixel(u, v){
+  const a = u*Math.PI*2, ca = Math.cos(a), sa = Math.sin(a);
+  /* 按 400 mm 分一次"板"，每块板的纹路错开 —— 真实贴面是一张张拼的，
+     整面柜子共用一张连续纹理会露馅。 */
+  const NB = 2, bd = Math.floor(v*NB);
+  const drift = (fbm(ca*1.1 + bd*6.3 + 13, sa*1.1 + bd*6.3 + 13, 3) - .5) * .026;
+  const g = woodGrain(v + drift, u, bd + 11, ca, sa);
+  const bj = hash2(bd*17 + 3, 9.1);
+
+  const t = cl01(1 - g*vnC + (bj - .5)*.06);
+  const c = mixc(vnD, vnL, t, 1);
+  c.rough = .42 + g*.08;
+  c.h = .5 - g*.26;
+  return c;
+}
+
+/* ── 板材：柜门 / 抽屉内部 / 硬边 ───────────────────
+   哑光烤漆板。它几乎是"没有纹理"的，但完全没有就会假。
+   这里只给两样：大尺度的喷涂不匀，加上极细的漆面颗粒。 */
+const lqBase = sRGB('#E6DFD4');
+function lacquerPixel(u, v){
+  const a = u*Math.PI*2, b = v*Math.PI*2;
+  const mott = fbm(Math.cos(a)*3 + 31, Math.sin(a)*3 + Math.cos(b)*3 + 31, 3);
+  const micro = noise2(Math.cos(a)*130 + 7, Math.sin(a)*130 + Math.cos(b)*130 + 7);
+  /* 擦拭痕：低频、拉长的粗糙度斑。哑光漆面在掠射光下最明显的就是这个，
+     没有它，整块板的高光会是一整片死亮，一眼就是塑料。 */
+  const wipe = fbm(Math.cos(a)*1.6 + 61, Math.sin(a)*1.6 + Math.cos(b)*7.5 + 61, 3);
+  const t = (mott-.5)*.030 + (micro-.5)*.014;
+  return { r:cl01(lqBase.r*(1+t)), g:cl01(lqBase.g*(1+t)), b:cl01(lqBase.b*(1+t)),
+           rough:.34 + (wipe-.5)*.26 + (micro-.5)*.05, h: micro*.6 + mott*.4 };
+}
+
+/* ── 皮革：软包 / 软垫 ──────────────────────────────
+   图层名写的是"皮纹细腻"，所以按细粒面皮做。
+   皮纹的本体是细胞状的粒 + 粒之间的皱褶沟，用周期性细胞噪声
+   （Worley）算：到最近特征点的距离＝鼓包，最近和次近之差＝沟。
+   贴图只铺 150 mm 见方 —— 粒径要到 2 mm 才像皮，铺大了就成了石头。 */
+const ltD = sRGB('#8E7A62'), ltL = sRGB('#CFBEA4');
+function leatherPixel(u, v){
+  const NC = 64;                                   /* 150 mm / 64 ≈ 2.3 mm 一粒 */
+  const c = cellP(u*NC, v*NC, NC);
+  const crease = 1 - Math.min(1, (c.d2 - c.d1)*2.2);
+  const bump = cl01(1 - c.d1*1.6);
+  const pore = noise2(u*700 + 5, v*700 + 5);
+  const t = cl01(.62 + bump*.18 - crease*.28 + (pore-.5)*.06);
+  const o = mixc(ltD, ltL, t, 1);
+  o.rough = .76 + crease*.14;
+  o.h = cl01(.5 + bump*.35 - crease*.40 + (pore-.5)*.05);
+  return o;
+}
+
+/* ── 拉丝金属：抽屉拉手 / 花洒 / 窗框 / 水池 ────────
+   拉丝的关键不是颜色，是"粗糙度沿一个方向被拉长"。
+   所以噪声在 v 方向高频、u 方向低频，再让粗糙度跟着抖 ——
+   高光就会顺着丝纹拉成一条，而不是一个圆亮点。            */
+const mtBase = sRGB('#BFBCB6');
+function brushedPixel(u, v){
+  const a = u*Math.PI*2, ca = Math.cos(a), sa = Math.sin(a);
+  const s1 = noise2(ca*3 + 2, sa*3 + v*80 + 2);
+  const s2 = noise2(ca*9 + 8, sa*9 + v*32 + 8);
+  const t = (s1-.5)*.10 + (s2-.5)*.05;
+  return { r:cl01(mtBase.r*(1+t)), g:cl01(mtBase.g*(1+t)), b:cl01(mtBase.b*(1+t)),
+           rough:.30 + (s1-.5)*.18 + (s2-.5)*.08, h: s1*.6 + s2*.4 };
+}
+
+/* ── 陶瓷釉面：马桶 / 洗手盆 ────────────────────────
+   釉面几乎是镜子，但不是完美的镜子：釉层流坠会有极缓的厚薄不匀，
+   偶尔还有针孔。加上这两样，白瓷才不像白塑料。                */
+const cerBase = sRGB('#F4F2EE');
+function glazePixel(u, v){
+  const a = u*Math.PI*2, b = v*Math.PI*2;
+  const w = fbm(Math.cos(a)*2.2 + 41, Math.sin(a)*2.2 + Math.cos(b)*2.2 + 41, 3);
+  const sp = noise2(Math.cos(a)*150 + 9, Math.sin(a)*150 + Math.cos(b)*150 + 9);
+  const t = (w-.5)*.018;
+  return { r:cl01(cerBase.r*(1+t)), g:cl01(cerBase.g*(1+t)), b:cl01(cerBase.b*(1+t)),
+           rough:.09 + (w-.5)*.05 + (sp > .94 ? .30 : 0), h: w*.85 + sp*.15 };
+}
+
+/* ── 塑料案板 ───────────────────────────────────────
+   厨房案板是哑光的工程塑料，表面有细密的磨砂颗粒和刀痕级别的
+   微起伏。做得太干净就会和陶瓷分不开。                      */
+const hpBase = sRGB('#D9D4CA');
+function hplPixel(u, v){
+  const a = u*Math.PI*2, b = v*Math.PI*2;
+  const g1 = noise2(Math.cos(a)*180 + 3, Math.sin(a)*180 + Math.cos(b)*180 + 3);
+  const g2 = fbm(Math.cos(a)*6 + 17, Math.sin(a)*6 + Math.cos(b)*6 + 17, 3);
+  const t = (g1-.5)*.05 + (g2-.5)*.03;
+  return { r:cl01(hpBase.r*(1+t)), g:cl01(hpBase.g*(1+t)), b:cl01(hpBase.b*(1+t)),
+           rough:.62 + (g1-.5)*.10, h: g1*.7 + g2*.3 };
+}
+
+/* ── 软材质扶手 ─────────────────────────────────────
+   适老扶手常用软触包覆（PU / 硅胶），要的是"哑光 + 微磨砂"，
+   手感提示要靠视觉先给出来 —— 一看就知道握上去不冰、不滑。 */
+const rbBase = sRGB('#CFCAC2');
+function rubberPixel(u, v){
+  const a = u*Math.PI*2, b = v*Math.PI*2;
+  const g1 = noise2(Math.cos(a)*80 + 11, Math.sin(a)*80 + Math.cos(b)*80 + 11);
+  const g2 = noise2(Math.cos(a)*230 + 21, Math.sin(a)*230 + Math.cos(b)*230 + 21);
+  const t = (g1-.5)*.06 + (g2-.5)*.04;
+  return { r:cl01(rbBase.r*(1+t)), g:cl01(rbBase.g*(1+t)), b:cl01(rbBase.b*(1+t)),
+           rough:.86 + (g2-.5)*.08, h: g2*.6 + g1*.4 };
+}
+
+/* ═══ 烘图 ═══════════════════════════════════════════
+   分辨率不是越高越好：贴图的像素密度要压得住图案的最细一档，
+   否则细纹会走样（摩尔纹）。所以纹路密的给 384~768，
+   本来就没什么图案的（漆面、釉面、塑料）给 192 就够。
+   九张材质加起来的纯计算时间约 0.3 秒（HUD 里那个「烘贴图」）。  */
+const _bake0 = performance.now();
+/* 地面纹理浓淡：vision 的地面是有颜色的（一房一色），白瓷砖那张图的
+   云斑 / 脉络 / 砖缝铺在 #4A4A7E 上，对比会被底色放大，看着「花」。
+   0 = 纯色平面，1 = 贴图原样。只作用于 floor 模板。 */
+let FLOOR_FLAT = 0.5;
+function floorFn(fn){
+  let r=0,g=0,b=0,ro=0,n=0;
+  for (let y=0;y<24;y++) for (let x=0;x<24;x++){
+    const c = fn((x+.5)/24,(y+.5)/24);
+    r+=c.r; g+=c.g; b+=c.b; ro+=(c.rough!=null?c.rough:.5); n++;
+  }
+  const B = { r:r/n, g:g/n, b:b/n, rough:ro/n };
+  return (u,v) => { const c = fn(u,v), k = FLOOR_FLAT;
+    return { r:B.r+(c.r-B.r)*k, g:B.g+(c.g-B.g)*k, b:B.b+(c.b-B.b)*k,
+             rough:B.rough+((c.rough!=null?c.rough:B.rough)-B.rough)*k, h:(c.h||0)*k }; };
+}
+
+const TEX = {
+  wall:    bakeMaps(384, plasterPixel),
+  floor:   bakeMaps(1024, floorFn(tilePixel)),
+  wood:    bakeMaps(768, veneerPixel),
+  board:   bakeMaps(192, lacquerPixel),
+  leather: bakeMaps(384, leatherPixel),
+  metal:   bakeMaps(384, brushedPixel),
+  ceramic: bakeMaps(192, glazePixel),
+  plastic: bakeMaps(192, hplPixel),
+  rail:    bakeMaps(192, rubberPixel)
+};
+/* 地面有两套：微水泥（默认）和木地板。两张图的"实际米数"不一样，
+   而 UV 是按 TILE=1.2 算好的，所以用 repeat 换算，不用重算 UV。 */
+const FLOORS = [
+  { name:'白瓷砖', fn:tilePixel,   N:1024, rep:1.2/TILE_TILE, rough:.30, ns:.55 },
+  { name:'微水泥', fn:cementPixel, N:512,  rep:1.2/CEM_TILE,  rough:.62, ns:.30 },
+  { name:'木地板', fn:floorPixel,  N:1024, rep:1,             rough:.50, ns:.42 }
+];
+let FLOOR_I = 0;
+['map','rough','normal'].forEach(k => TEX.floor[k].repeat.setScalar(FLOORS[0].rep));
+const BAKE_MS = Math.round(performance.now() - _bake0);
+
+/* 皮质包边和软包用同一张皮纹图，只是贴得更密（150 → 60 mm），
+   包边是 15 mm 的窄条，粒面必须比大面积软包更细才对得上尺度。 */
+function tex(src, extra){
+  const t = { map:src.map.clone(), rough:src.rough.clone(), normal:src.normal.clone() };
+  ['map','rough','normal'].forEach(k => { t[k].needsUpdate = true; });
+  return t;
+}
+TEX.piping = tex(TEX.leather);
+TEX.accent = tex(TEX.wall);      /* 盲道 / 触摸板：石膏 */
+TEX.sink   = tex(TEX.metal);
+
+function std(texSet, o){
+  return Object.assign({
+    color:0xFFFFFF, metalness:0, roughness:1, vertexColors:true,
+    map:texSet.map, roughnessMap:texSet.rough, normalMap:texSet.normal
+  }, o);
+}
+
+/* ═══ 材质 ═══════════════════════════════════════════
+   tile = 一张贴图在现实里铺多少米。grid = 要不要画 cube 模数线。
+   陶瓷 / 镜子 / 水池 / 案板 不画 —— 它们不是模块化家具，
+   身上出现 300 mm 格线会误导人以为那也是可拆装的模块。       */
+/* 下面这张表不再是"材质分组"，而是**默认外观模板**。
+   真正的分组 = 你 Rhino 里的图层名，一个图层一组、一份独立材质。
+   模板只负责决定"这个图层初始长什么样、贴图铺多大、画不画 cube 缝"。
+   分错了改 RULES 那张表就行，图层名一个字都不用动。            */
+const TMPL = {
+  wall:    { label:'墙（乳胶漆）',        tile:2.0,  grid:false,
+             mat:new THREE.MeshStandardMaterial(std(TEX.wall, {
+               roughness:.9, normalScale:new THREE.Vector2(.14,.14),
+               side:THREE.DoubleSide, envMapIntensity:1.0 })) },
+  floor:   { label:'地面',                tile:1.2,  grid:false,
+             mat:new THREE.MeshStandardMaterial(std(TEX.floor, {
+               roughness:.30, normalScale:new THREE.Vector2(.55*FLOOR_FLAT, .55*FLOOR_FLAT),
+               envMapIntensity:1.0 })) },
+  glass:   { label:'玻璃',                tile:1.0,  grid:false,
+             mat:new THREE.MeshPhysicalMaterial({ color:0xA8C2CE, roughness:.08, metalness:0,
+               transparent:true, opacity:.28, side:THREE.DoubleSide, envMapIntensity:1.0 }) },
+  mirror:  { label:'镜子',                tile:1.0,  grid:false,
+             mat:new THREE.MeshStandardMaterial({ color:0xF2F4F5, roughness:.03, metalness:1,
+               envMapIntensity:1.0 }) },
+  ceramic: { label:'陶瓷（釉面）',         tile:0.5,  grid:false,
+             mat:new THREE.MeshPhysicalMaterial(std(TEX.ceramic, {
+               roughness:.1, clearcoat:.8, clearcoatRoughness:.06,
+               normalScale:new THREE.Vector2(.25,.25), envMapIntensity:1.0 })) },
+  sink:    { label:'水池（金属）',         tile:0.35, grid:false,
+             mat:new THREE.MeshPhysicalMaterial(std(TEX.sink, {
+               metalness:1, roughness:.3, anisotropy:.7, anisotropyRotation:1.57,
+               normalScale:new THREE.Vector2(.7,.7), envMapIntensity:1.0 })) },
+  plastic: { label:'案板（塑料）',         tile:0.4,  grid:false,
+             mat:new THREE.MeshStandardMaterial(std(TEX.plastic, {
+               roughness:.62, normalScale:new THREE.Vector2(.7,.7), envMapIntensity:1.0 })) },
+  prop:    { label:'摆件（导入件）',       tile:0.5,  grid:false,
+             mat:new THREE.MeshPhysicalMaterial(std(TEX.ceramic, {
+               roughness:.15, clearcoat:.6, envMapIntensity:1.0 })) },
+  bathsoft:{ label:'浴室软包（不切分）',    tile:0.15, grid:false,
+             mat:new THREE.MeshPhysicalMaterial(std(TEX.leather, {
+               roughness:.8, sheen:.6, sheenRoughness:.6,
+               sheenColor:new THREE.Color(0xEDE0CC),
+               normalScale:new THREE.Vector2(1.35,1.35), envMapIntensity:1.0 })) },
+  leather: { label:'软包 / 软垫（皮）',    tile:0.15, grid:true,
+             mat:withCubeGrid(new THREE.MeshPhysicalMaterial(std(TEX.leather, {
+               roughness:.8, sheen:.6, sheenRoughness:.6,
+               sheenColor:new THREE.Color(0xEDE0CC),
+               normalScale:new THREE.Vector2(1.35,1.35), envMapIntensity:1.0 }))) },
+  piping:  { label:'皮质包边（15 mm）',    tile:0.06, grid:true,
+             mat:withCubeGrid(new THREE.MeshPhysicalMaterial(std(TEX.piping, {
+               roughness:.72, sheen:.5, sheenRoughness:.5,
+               sheenColor:new THREE.Color(0xF0E6D6),
+               normalScale:new THREE.Vector2(1.1,1.1), envMapIntensity:1.0 }))) },
+  metal:   { label:'金属（拉丝）',         tile:0.4,  grid:true,
+             mat:withCubeGrid(new THREE.MeshPhysicalMaterial(std(TEX.metal, {
+               metalness:1, roughness:.3, anisotropy:.6, anisotropyRotation:1.57,
+               normalScale:new THREE.Vector2(.7,.7), envMapIntensity:1.0 }))) },
+  rail:    { label:'扶手（软材质·不切分）', tile:0.2,  grid:false,
+             mat:new THREE.MeshStandardMaterial(std(TEX.rail, {
+               roughness:.86, normalScale:new THREE.Vector2(.85,.85), envMapIntensity:1.0 })) },
+  wood:    { label:'木饰面（橱柜 / 岛台）', tile:0.6, grid:true,
+             mat:withCubeGrid(new THREE.MeshPhysicalMaterial(std(TEX.wood, {
+               roughness:.5, clearcoat:.2, clearcoatRoughness:.45,
+               normalScale:new THREE.Vector2(.38,.38), envMapIntensity:1.0 }))) },
+  frame:   { label:'硬结构（沙发/床/桌椅）',       tile:0.6,  grid:true,
+             mat:withCubeGrid(new THREE.MeshPhysicalMaterial(std(TEX.board, {
+               color:0xB9B4AC,                       /* 中性哑光底色，用右边色块调 */
+               roughness:.46, clearcoat:.25, clearcoatRoughness:.3,
+               normalScale:new THREE.Vector2(.55,.55), envMapIntensity:1.0 }))) },
+  door:    { label:'柜门（烤漆·不切分）',   tile:0.6,  grid:false,
+             mat:new THREE.MeshPhysicalMaterial(std(TEX.board, {
+               roughness:.40, clearcoat:.35, clearcoatRoughness:.22,
+               normalScale:new THREE.Vector2(.55,.55), envMapIntensity:1.0 })) },
+  board:   { label:'板材（烤漆）',          tile:0.6,  grid:true,
+             mat:withCubeGrid(new THREE.MeshPhysicalMaterial(std(TEX.board, {
+               roughness:.40, clearcoat:.35, clearcoatRoughness:.22,
+               normalScale:new THREE.Vector2(.55,.55), envMapIntensity:1.0 }))) },
+  /* accent —— 盲道 + 触摸板。石膏纹、哑光、不切 cube（按件做的）。
+     polygonOffset：这两样都贴着地和墙，是「共面」关系；把它们在深度上
+     往镜头方向推一点点，共面时永远是它赢。贴花（decal）的标准做法，
+     只改深度测试，几何和画面位置一个像素不动。 */
+  accent:  { label:'无障碍标识（石膏）',   tile:1.4,  grid:false,
+             mat:new THREE.MeshStandardMaterial(std(TEX.accent, {
+               roughness:.88, normalScale:new THREE.Vector2(.10,.10),
+               envMapIntensity:.8,
+               polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2 })) },
+  /* light —— 灯。白色自发光，不投影（它自己是光源）。 */
+  light:   { label:'灯（白色发光）',       tile:1.0,  grid:false,
+             mat:new THREE.MeshStandardMaterial({
+               color:0xFFFFFF, emissive:0xFFFFFF, emissiveIntensity:1.0,
+               roughness:.45, metalness:0, vertexColors:true, envMapIntensity:.4 }) },
+  other:   { label:'未分类',              tile:0.6,  grid:true,
+             mat:withCubeGrid(new THREE.MeshPhysicalMaterial(std(TEX.board, {
+               color:0xCFC8BC, roughness:.7, envMapIntensity:1.0 }))) }
+};
+/* 建筑面（墙 / 地）不参与"每件自己的纹路方向"：
+   地板的铺设方向是全屋统一的，墙面乳胶漆本来就没有方向。 */
+const ORIENT = { wood:1, board:1, door:1, frame:1, bathsoft:1, leather:1, piping:1, metal:1, rail:1, plastic:1, other:1, sink:1 };
+
+/* ── 运行时的真正分组：按图层名建，一个图层一份独立材质 ──
+   为什么要每个图层单独一份材质实例？因为你要在预览里逐个替换。
+   如果两个图层共用一个材质对象，改一个另一个会跟着变。      */
+const MAT = {}, LABEL = {}, TILE = {}, TMPL_OF = {}, GRID_OF = {};
+const BASECOL = {};                      /* 图层 → 建组时的本色，用来判断有没有被染过 */
+const BASEOPA = {};                      /* 图层 → 建组时的不透明度 */
+const _opa    = {};                      /* 图层 → 用户调过的不透明度，优先级最高 */
+const _tint   = {};                      /* 图层 → 叠加的染色，'' / undefined 表示没染 */
+const LAYERS = [];                       /* 按模型里出现的先后顺序，接近 Rhino 的图层顺序 */
+function ensureLayer(name, tk){
+  if (MAT[name]) return;
+  const t = TMPL[tk];
+  const m = t.mat.clone();
+  /* clone() 不会带上 onBeforeCompile，cube 缝要重新挂一次 */
+  if (t.grid) withCubeGrid(m);
+  withFade(m);            /* 挂在这里 = 只在建组时编译一次；点击时只改 uniform，不重编译 */
+  MAT[name] = m; LABEL[name] = name; TILE[name] = t.tile;
+  BASECOL[name] = '#' + m.color.getHexString().toUpperCase();
+  BASEOPA[name] = m.transparent ? m.opacity : 1;
+  TMPL_OF[name] = tk; GRID_OF[name] = t.grid;
+  LAYERS.push(name);
+}
+/* 某个模板的程序化贴图重烘之后，所有用这个模板的图层都要跟着换 */
+function refreshTmpl(tk){
+  LAYERS.forEach(n => {
+    if (TMPL_OF[n] !== tk || _pick[n]) return;
+    const m = MAT[n], T = TEX[tk === 'piping' ? 'piping' : tk];
+    if (!T) return;
+    m.map = T.map; m.roughnessMap = T.rough; m.normalMap = T.normal;
+    m.needsUpdate = true;
+    if (_procTex[n]) _procTex[n] = { map:T.map, normalMap:T.normal, roughnessMap:T.rough };
+  });
+}
+
+/* ═══ 材质库（来自你本地的 V-Ray 材质库，430 种）══════════
+   这是 3D 预览"用户实时换材质"那一步的底座：每个图层都能从库里
+   任选一种，或者退回程序化。两套并存，切换是瞬时的。
+
+   库分两类，都能用：
+   · 带贴图的（279 种）—— 颜色 / 法线 / 粗糙度三张图。
+     V-Ray 的约定和 three.js 不一样，转换时做了三件事：
+       Bump（灰度高度图）→ Normal，循环边界差分，平铺不断缝；
+       Gloss（光泽度）  → Roughness，**取反**（不取反的话光滑处会变最粗糙）；
+       Refl（反射强度） → 近似 Roughness，取反后压到合理区间。
+   · 纯色的（151 种，玻璃/塑料/金属/液体这类）—— 本来就不该有贴图，
+     颜色写在 .vrmat 里，靠反射和折射参数出效果。只存几个数字，不占体积。
+
+   tile = 这张图在现实里铺多少米，直接来自 V-Ray 的文件名
+   （复合板_C01_**120cm**_ → 1.2）。 */
+const LIBDIR = './assets/tex/lib/';
+let LIB = [], LIBCAT = {};
+let TEXSCALE = 1, USE_PBR = true;
+const _libCache = {};      /* 图层|材质id → 已加载的贴图（repeat 不同，要各存一份） */
+const _procTex  = {};      /* 图层 → 程序化状态，用来随时退回 */
+const _pick     = {};      /* 图层 → 当前选的材质 id，'' = 程序化 */
+
+function snapProc(k){
+  if (_procTex[k]) return;
+  const m = MAT[k];
+  _procTex[k] = { map:m.map, normalMap:m.normalMap, roughnessMap:m.roughnessMap,
+                  color:m.color.clone(), roughness:m.roughness, metalness:m.metalness,
+                  transparent:m.transparent, opacity:m.opacity,
+                  spec:m.specularIntensity, sheen:m.sheen, sheenRoughness:m.sheenRoughness };
+}
+/* 用户调过的透明度优先级最高：换材质、退回程序化之后都要重新盖上去。
+   opacity < 0.995 才打开 transparent —— 完全不透明的物体开 transparent 会
+   进排序队列，白白多一遍排序，还可能和别的透明物穿插出错。 */
+function applyOpa(k){
+  if (_opa[k] == null) return;
+  const m = MAT[k];
+  m.opacity = _opa[k];
+  m.transparent = _opa[k] < .995;
+  m.depthWrite = !m.transparent;
+  m.needsUpdate = true;
+}
+function restoreProc(k){
+  const m = MAT[k], p = _procTex[k]; if (!p) return;
+  m.map = p.map; m.normalMap = p.normalMap; m.roughnessMap = p.roughnessMap;
+  m.color.copy(p.color); m.roughness = p.roughness; m.metalness = p.metalness;
+  if (_tint[k]) m.color.set(_tint[k]);
+  m.transparent = p.transparent; m.opacity = p.opacity;
+  if (p.spec !== undefined) m.specularIntensity = p.spec;
+  if (p.sheen !== undefined){ m.sheen = p.sheen; m.sheenRoughness = p.sheenRoughness; }
+  m.needsUpdate = true;
+  applyOpa(k);
+}
+/* 一张贴图的平均亮度（线性空间）。染色时要把贴图归一化成"平均值≈1"，
+   否则中调的布纹乘上颜色会整体压暗一大截。缩到 32×32 再平均就够准了。 */
+function meanLum(img){
+  try{
+    const c = document.createElement('canvas'); c.width = c.height = 32;
+    const x = c.getContext('2d', { willReadFrequently:true });
+    x.drawImage(img, 0, 0, 32, 32);
+    const d = x.getImageData(0, 0, 32, 32).data;
+    const s2l = v => { v /= 255; return v <= .04045 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); };
+    let s = 0;
+    for (let i = 0; i < d.length; i += 4)
+      s += .2126 * s2l(d[i]) + .7152 * s2l(d[i+1]) + .0722 * s2l(d[i+2]);
+    return Math.max(.02, s / (d.length / 4));
+  }catch(err){ return .35; }
+}
+
+function loadSet(k, e){
+  const key = k + '|' + e.id;
+  if (_libCache[key]) return Promise.resolve(_libCache[key]);
+  const rep = TILE[k] / (e.tile || 1);
+  const L = new THREE.TextureLoader();
+  const aniso = renderer.capabilities.getMaxAnisotropy();
+  const g = (fn, srgb) => fn ? new Promise(res => L.load(LIBDIR + 'img/' + fn,
+      t => { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = aniso;
+             if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+             t.repeat.setScalar(rep * TEXSCALE); res(t); },
+      undefined, () => res(null))) : Promise.resolve(null);
+  return Promise.all([g(e.c, true), g(e.n, false), g(e.r, false)])
+    .then(([c, n, r]) => (_libCache[key] = { map:c, normalMap:n, roughnessMap:r, rep:rep, e:e,
+                                             lum: c && c.image ? meanLum(c.image) : .35 }));
+}
+/* ═══ 染色：让「选蓝色」真的变蓝 ═══════════════════════
+   问题出在 PBR 的定义上：material.color 是和贴图**相乘**的。
+   一张米黄色的布纹乘上浅蓝，结果是发暗的米黄灰，不是蓝色 ——
+   有颜色的贴图会把任何色调都吃掉。这不是 bug，是乘法本身。
+
+   现实里给布料换颜色是换染料：**织纹的明暗结构不变，色相整个换掉**。
+   所以这里照着这件事做 —— 把贴图去色，再按它自己的平均亮度归一化，
+   得到一张「只剩织纹起伏、平均值≈1」的图，然后乘上用户选的颜色。
+   于是颜色说了算，织纹还在。这对木饰面同样成立（木纹保留，色相换掉）。
+
+   uDye = 0 → 完全用贴图本色，也就是方案里原来的样子
+   uDye = 1 → 色相完全由所选颜色决定
+   uDyeNorm = 这张贴图的平均亮度，不归一化的话染完会整体发暗。   */
+function withDye(m){
+  if (m.userData._dye) return m.userData._dye;
+  const u = { uDye:{ value:0 }, uDyeNorm:{ value:.35 } };
+  m.userData._dye = u;
+  /* 记下原来的 sheen 颜色，取消染色时要还回去 —— 直接写死白色的话，
+     模板本来不是纯白的材质会被悄悄改掉，"还原"就不是真的还原。 */
+  if (m.sheenColor) m.userData._sheen0 = m.sheenColor.clone();
+  const prev = m.onBeforeCompile;          /* cube 格线那套也挂在这里，得串起来 */
+  /* 这一条不能少：材质**已经编译过**之后再改 onBeforeCompile，
+     three 会按 program cache key 复用旧程序，新写的注入根本不会跑，
+     表现就是"代码改了但画面没反应"。改掉 cache key 才会重新编译。 */
+  const prevKey = m.customProgramCacheKey;
+  m.customProgramCacheKey = function(){
+    return (prevKey ? prevKey.call(this) : '') + '|dye';
+  };
+  m.onBeforeCompile = function(shader, renderer){
+    if (prev) prev.call(this, shader, renderer);
+    shader.uniforms.uDye = u.uDye;
+    shader.uniforms.uDyeNorm = u.uDyeNorm;
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>',
+        '#include <common>\nuniform float uDye;\nuniform float uDyeNorm;')
+      /* 整块换掉 map_fragment：原版是 diffuseColor *= 贴图，
+         这里在相乘之前先按 uDye 把贴图往"归一化灰度"上插值。 */
+      .replace('#include <map_fragment>', `
+        #ifdef USE_MAP
+          vec4 _tex = texture2D( map, vMapUv );
+          float _lum = dot( _tex.rgb, vec3( 0.2126, 0.7152, 0.0722 ) );
+          _tex.rgb = mix( _tex.rgb, vec3( _lum / max( 0.02, uDyeNorm ) ), uDye );
+          diffuseColor *= _tex;
+        #endif
+      `);
+  };
+  m.needsUpdate = true;
+  return u;
+}
+function setDye(k, on){
+  const m = MAT[k]; if (!m) return;
+  const u = withDye(m);
+  u.uDye.value = on ? 1 : 0;
+  const c = _libCache[k + '|' + _pick[k]];
+  u.uDyeNorm.value = (c && c.lum) || .35;
+  /* 布料的 sheen 是绒毛散射，默认是白的。染过色的布，绒毛也是那个颜色 ——
+     不跟着改的话会在表面糊一层白，颜色被冲淡，看着像蒙了灰。 */
+  if (m.sheenColor && m.userData._sheen0)
+    m.sheenColor.copy(on ? m.color : m.userData._sheen0);
+}
+
+function applySet(k, set){
+  const m = MAT[k], e = set.e;
+  m.map = set.map || null;
+  m.normalMap = set.normalMap || null;
+  m.roughnessMap = set.roughnessMap || null;
+  m.color.set(set.map ? 0xFFFFFF : (e.col || '#CCCCCC'));
+  if (_tint[k]) m.color.set(_tint[k]);      /* 染色叠在材质本色之上 */
+  m.roughness = set.roughnessMap ? 1.0 : (e.rough != null ? e.rough : .6);
+  m.metalness = e.metal || 0;
+  /* V-Ray 的 reflect（反射强度）在 PBR 里对应 specularIntensity。
+     漏掉它的话，reflect=0 的布料和地毯会照样反光 —— 因为 PBR 的
+     电介质默认永远有约 4% 的镜面反射，必须显式关掉。 */
+  if (e.spec != null && m.specularIntensity !== undefined) m.specularIntensity = e.spec;
+  /* 布料要的是"绒感"不是"高光"：sheen 是各向同性的绒毛散射，
+     反射越弱的材质越该靠 sheen 出体积感。 */
+  if (m.sheen !== undefined){
+    const soft = (e.cat === 'fabric' || e.cat === 'leather');
+    m.sheen = soft ? (e.cat === 'fabric' ? .9 : .45) : 0;
+    m.sheenRoughness = .8;
+  }
+  if (e.transp){ m.transparent = true; m.opacity = Math.max(.08, 1 - e.transp * .85); }
+  else { m.transparent = _procTex[k] ? _procTex[k].transparent : false;
+         m.opacity = _procTex[k] ? _procTex[k].opacity : 1; }
+  /* 换了贴图，染色的归一化基准也要跟着换 */
+  if (m.userData._dye) m.userData._dye.uDyeNorm.value = set.lum || .35;
+  m.needsUpdate = true;
+  applyOpa(k);
+}
+function pickMat(k, id, keepTint){
+  snapProc(k);
+  /* 选一个新材质默认回到它的本色；importScheme 传 keepTint 保住方案里的染色 */
+  if (!keepTint) delete _tint[k];
+  _pick[k] = id;
+  if (!id){ restoreProc(k); return Promise.resolve(); }
+  const e = LIB.find(x => x.id === id); if (!e) return Promise.resolve();
+  return loadSet(k, e).then(set => {
+    if (_pick[k] !== id) return;          /* 中途又换了，丢弃这次结果 */
+    if (USE_PBR) applySet(k, set);
+  });
+}
+/* 总开关：所有图层在"库材质"和"程序化"之间整体切换 */
+function setPBR(on){
+  USE_PBR = on;
+  LAYERS.forEach(k => {
+    if (!_pick[k]) return;
+    snapProc(k);
+    if (on){ const c = _libCache[k + '|' + _pick[k]]; if (c) applySet(k, c); }
+    else restoreProc(k);
+  });
+}
+function applyTexScale(){
+  Object.keys(_libCache).forEach(key => {
+    const c = _libCache[key];
+    ['map','normalMap','roughnessMap'].forEach(x => {
+      if (c[x]){ c[x].repeat.setScalar(c.rep * TEXSCALE); c[x].needsUpdate = true; }
+    });
+  });
+}
+/* 清单是 430 条，内联进 HTML 太重，改成启动时取一次。
+   取不到（比如没解压贴图库）也不影响，下拉框只是空的，程序化照常。 */
+let _libReady = fetch(LIBDIR + 'index.json').then(r => r.json()).then(j => {
+  LIB = j.sets; LIBCAT = j.cat; LIB._tw = j.tw; LIB._tt = j.tt;
+  const b = document.getElementById('texinfo');
+  if (b) b.textContent = LIB.length + ' 种';
+  if (Object.keys(MAT).length){ buildSelects();
+    document.querySelectorAll('.fcard').forEach(c => c._fill && c._fill()); }
+}).catch(() => {
+  const b = document.getElementById('texinfo');
+  if (b) b.textContent = '未找到（assets/tex/lib/index.json）';
+});
+
+/* Rhino 常把图层名放在父节点，mesh 挂在无名子节点上 —— 往上找 */
+const _GENERIC = /^(Object|mesh|node|primitive)[_\d]*$|^(Fbx_Root|RootNode|Scene|Sketchup)$/i;
+function nameOf(o){
+  /* 往上收集所有"像图层名"的名字，取**最高**的那个。
+     不能取最低的：glTF 里一个节点可能同时有 mesh 名和 node 名，
+     Rhino 导出时 mesh 名常常是图层名的截断（「扶手」vs「扶手（软材质）」），
+     完整的那个在 node 上，也就是更靠上的那一层。            */
+  let n = o, guard = 0, best = '';
+  while (n && guard++ < 8){
+    if (n.name && !_GENERIC.test(n.name)) best = n.name;
+    n = n.parent;
+  }
+  return best;
+}
+function classify(name){
+  for (const r of RULES) if (r.test.test(name)) return r;
+  return RULES[RULES.length - 1];
+}
+
+/* ═══ 世界坐标 UV ═══════════════════════════════════════
+   Rhino 导出的 UV 是按每个曲面各自算的 —— 一块板一套。
+   直接贴图会出现"这块柜门的木纹是隔壁那块的三倍大"。
+   所以按物体在空间里的实际位置重算：取法线最主的那个轴做投影
+   （水平面用 x/z，立面用 z/y 或 x/y），再除以贴图的实际米数。
+   结果是"1 米就是 1 米"，跟 cube 模数网格用的是同一套坐标系。  */
+const _uvSeen = new Set();
+const _bb = new THREE.Box3(), _sz = new THREE.Vector3(), _ct = new THREE.Vector3();
+const UV_ORIGIN = new THREE.Vector3();   /* 贴图坐标原点 = 模型包围盒的角点 */
+
+/* per-object 处理。这一步是"看着假"的真正解药，比换贴图管用。
+
+   之前的做法是：贴图按世界坐标铺，所有物体共用同一张、同一个相位。
+   结果是相邻两块柜门的木纹**连着跑**，像一整张贴纸从房间这头糊到那头 ——
+   眼睛立刻判定"这是印上去的图案"，而不是"这是一块木头做的板"。
+   真实家具是一块块单独的板，每块有自己的纹路起点、自己的深浅。
+
+   所以每个物件都拿到三样自己的东西：
+   1) 随机的贴图相位  —— 纹路不再跨件连续
+   2) 自己的纹路方向  —— 高柜门竖纹、抽屉面横纹（真实木作就是这么排的）
+   3) 轻微的整体色差  —— 写进顶点色，同一批柜门也不会完全一个颜色      */
+function objHash(mesh){
+  _bb.setFromObject(mesh);
+  _bb.getCenter(_ct); _bb.getSize(_sz);
+  return {
+    h1: hash2(_ct.x * 137.1, _ct.z * 91.7),
+    h2: hash2(_ct.z * 73.3, _ct.y * 149.3),
+    h3: hash2(_ct.y * 53.9, _ct.x * 197.1),
+    tall: _sz.y > Math.max(_sz.x, _sz.z) * 1.05
+  };
+}
+function worldUV(mesh, tile, orient){
+  let g = mesh.geometry;
+  if (_uvSeen.has(g.uuid)){ g = mesh.geometry = g.clone(); }
+  _uvSeen.add(g.uuid);
+
+  const o = objHash(mesh);
+  /* 每件自己的贴图相位。只给家具用 —— 墙和地是连续的建筑面，
+     给它们随机相位的话，两块地面之间的砖缝会对不上。 */
+  const ox = orient ? o.h1 * 7.13 : 0, oy = orient ? o.h2 * 5.71 : 0;
+  const swap = orient && o.tall;                 /* 高的板 → 竖纹 */
+
+  const pos = g.attributes.position, nrm = g.attributes.normal;
+  const n = pos.count, uv = new Float32Array(n * 2);
+  const P = new THREE.Vector3(), N = new THREE.Vector3();
+  const M = mesh.matrixWorld;
+  const NM = new THREE.Matrix3().getNormalMatrix(M);
+
+  for (let i = 0; i < n; i++){
+    P.fromBufferAttribute(pos, i).applyMatrix4(M).sub(UV_ORIGIN);
+    N.fromBufferAttribute(nrm, i).applyMatrix3(NM);
+    const ax = Math.abs(N.x), ay = Math.abs(N.y), az = Math.abs(N.z);
+    let u, v, vert = false;
+    if (ay > ax && ay > az){ u = P.x / tile; v = P.z / tile; }              /* 水平面 */
+    else if (ax >= az)     { u = P.z / tile; v = P.y / tile; vert = true; } /* 朝东西的立面 */
+    else                   { u = P.x / tile; v = P.y / tile; vert = true; } /* 朝南北的立面 */
+    if (swap && vert){ const t = u; u = v; v = t; }
+    uv[i*2] = u + ox; uv[i*2+1] = v + oy;
+  }
+  g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+
+  /* 顶点色 = 这一件的整体色差。幅度只有 ±5%，但有和没有差别很大 ——
+     现实里同一批柜门也不可能颜色完全一致，完全一致就是塑料件的特征。 */
+  const c = new Float32Array(n * 3);
+  const k = .94 + o.h3 * .12;
+  const warm = 1 + (o.h1 - .5) * .05;             /* 有的偏暖一点，有的偏冷 */
+  for (let i = 0; i < n; i++){
+    c[i*3]   = k * warm;
+    c[i*3+1] = k;
+    c[i*3+2] = k / warm;
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(c, 3));
+}
+
+/* ═══ 读模型 ═══════════════════════════════════════════ */
+/* 压缩版（房间3D-mini）：weld 合并重复顶点 + KHR_mesh_quantization
+   把位置/法线从 float32 降成整数，体积约为原来的 40-50%。
+   这个扩展 three.js 原生支持，不用额外挂 Draco / KTX2 解码器 ——
+   那两个要再下一个 wasm，手机上反而更慢。原件一个字节没动，还在 房间3D 里。 */
+const MODEL_FULL = './房间3D/vision/vision typeC OptionC.glb';
+const MODEL_MINI = MODEL_FULL.replace('./房间3D/', './房间3D-mini/');
+let MODEL = MODEL_MINI;   /* 默认压缩版，见下面 HEAD 探测处的说明 */
+const edgeMat = new THREE.LineBasicMaterial({ color:new THREE.Color('#2B2B2E') });
+const edgeGroup = new THREE.Group(); edgeGroup.visible = false; scene.add(edgeGroup);
+let root = null, wallNodes = [], glassNodes = [], stat = {}, span = 10;
+const CENTER = new THREE.Vector3();
+let MODEL_R = 5;
+
+function _startRoom(){
+new GLTFLoader().load(MODEL, gltf => {
+  root = gltf.scene;
+  scene.add(root);
+  root.updateWorldMatrix(true, true);   /* worldUV() 要用 matrixWorld，先更新 */
+
+  /* 先处理"不要的东西"，再算包围盒。
+     me1.1 / me2.2 … 是从 FBX 导入的几个小件（2~16 cm，位置在房间外），
+     来历不明，直接藏掉：既不渲染、不占分组，也不参与包围盒 ——
+     它们要是进了包围盒，相机取景和阴影相机的框都会被撑大。 */
+  /* 排除机制（现在没有要排除的东西，SKIP = null 就是全都渲染）。
+     历史：me1.1…me7.7 曾被当成来历不明的小件排除掉，后来查明**那是洗手台的水龙头**，
+     一直缺的就是它。所以默认不排除任何东西；以后真要藏什么，把正则填进 SKIP。
+     注意判断要查**整条祖先链**——这几个节点现在挂在「陶瓷（白色）」下面，
+     只看最终解析出的图层名是查不到 me1.1 的。 */
+  const SKIP = null;
+  let skipped = 0;
+  if (SKIP) root.traverse(o => {
+    if (!o.isMesh) return;
+    let n = o, g = 0, hit = false;
+    while (n && g++ < 8){ if (n.name && SKIP.test(n.name)){ hit = true; break; } n = n.parent; }
+    if (hit){ o.visible = false; skipped++; }
+  });
+
+  /* 包围盒必须在遍历之前算：贴图的原点要对到模型的角点，
+     否则 600 mm 的瓷砖缝会和 300 mm 的 cube 格线错开半格。 */
+  const box = new THREE.Box3().setFromObject(root);
+  const size = box.getSize(new THREE.Vector3());
+  CENTER.copy(box.getCenter(new THREE.Vector3()));
+  span = Math.max(size.x, size.z) * .62;
+  GOFF_BASE.copy(box.min);
+  UV_ORIGIN.copy(box.min);
+
+  const counts = {};
+  let tri = 0, meshes = 0;
+
+  root.traverse(o => {
+    if (!o.isMesh || !o.visible) return;
+    meshes++;
+    const g = o.geometry;
+    tri += g.index ? g.index.count / 3 : g.attributes.position.count / 3;
+
+    const nm = (nameOf(o) || '（无名）').trim();
+    const r  = classify(nm);
+    ensureLayer(nm, r.key);
+    o.material = MAT[nm];
+    o.userData.grp = nm;
+    o.userData.tmpl = r.key;
+    /* 三样东西不投影：
+       · 墙 —— 太阳在室外，墙一投影整屋全黑；
+       · 玻璃 —— 它是透明的；
+       · 地面 —— 这是个坑：Rhino 把地面导成了「朝上 + 朝下」两片重合的面，
+         朝下那片会在阴影图里和朝上那片同深度，结果地板把自己整片遮住，
+         看起来就像整个房间没有阳光。地面本来也不需要投影。      */
+    o.castShadow    = (r.key !== 'glass' && r.key !== 'wall' && r.key !== 'floor'
+                       && r.key !== 'light');   /* 灯是光源，自己不该挡光 */
+    o.receiveShadow = (r.key !== 'glass');
+    /* 会发光的挂到相机图层 1 —— 辉光那一遍只画这一层。仍然在图层 0 上。 */
+    if (r.key === 'accent' || r.key === 'light') o.layers.enable(1);
+    if (r.key === 'wall') wallNodes.push(o);
+    if (r.key === 'glass') glassNodes.push(o);
+    counts[nm] = (counts[nm] || 0) + 1;
+    /* 法线缺失会让网格线和光照全乱 —— Rhino 导出偶尔会漏 */
+    if (!g.attributes.normal) g.computeVertexNormals();
+    /* 有贴图的组都要重算世界坐标 UV（必须在法线补齐之后） */
+    if (TILE[nm] > 0) worldUV(o, TILE[nm], !!ORIENT[r.key]);
+  });
+
+  stat = counts;
+  $('tri').textContent = Math.round(tri).toLocaleString();
+  $('cnt').textContent = meshes;
+  const bk = document.getElementById('bake');
+  if (bk) bk.textContent = BAKE_MS + ' ms';
+
+  /* 不移动模型 —— 世界坐标就是 cube 的模数坐标，一挪网格就对不上了。
+     改成把相机对准模型。网格原点已对到模型角点，这里按面板相位微调。 */
+  applyGridOffset();
+
+  /* 阴影相机必须按模型收紧。默认是 ±5 的正交框，7.5 m 的房间会被裁掉一角；
+     而且框越大，2048 的阴影图分摊到每米的像素越少，边缘就越糊越脏。 */
+  MODEL_R = Math.max(size.x, size.y, size.z) * .80;
+  placeSun(+$('s_az').value, +$('s_el').value);
+
+  fit();
+  snapNS();
+  buildGroupUI(counts);
+  buildFurnitureUI(counts);
+  _libReady
+    .then(() => importScheme(AUTO_SCHEME))   /* 现在会等所有贴图和染色落地 */
+    .then(() => {
+      /* 两条写死的产品设定 */
+      camera = PERSP;                       /* 透视相机 */
+      controls.object = camera;
+      cullWalls = false;                    /* 近墙全显示，不自动让开 */
+      wallNodes.forEach(n => n.visible = true);
+      initWallClip();                       /* 墙体高度滑块的裁剪面，必须在材质都建好之后 */
+      fit();
+      _readyGo();                           /* 通知外层页面：模型和材质都到位了 */
+    });
+  $('load').style.display = 'none';
+},
+xhr => {
+  if (xhr.lengthComputable) $('lbar').style.width = (xhr.loaded / xhr.total * 100) + '%';
+},
+err => {
+  window.__showErr(
+    '<h2>The model did not load</h2>' +
+    '<p>It was looking for <code>' + MODEL + '</code>. Two things to check:</p>' +
+    '<p>1. that the file sits in the room-3D folder, spelled exactly the same (case and spaces count).<br>' +
+    '2. that the page was opened over http://, not from the file system.</p>' +
+    '<pre>' + (err && err.message ? err.message : err) + '</pre>');
+});
+}
+/* 默认就走压缩版；只有服务器明确说「没有这个文件」(404) 才退回原版。
+   ★ 为什么不能写成「探到了才用压缩版」——线上实测踩过：
+     · Cloudflare Pages 对找不到的文件不回 404，而是回 200 + 首页的 HTML；
+     · 部署刚完成、边缘节点还没热的时候，这个 HEAD 会抖出一次 503。
+     两件事凑一起，「探测失败就退回原版」会退到 房间3D/ 这个根本没上传的
+     路径上，拿回一段 HTML 当二进制模型解析 —— 那间房打不开，可网络面板
+     里全是 200，几乎查不出来。
+   反过来写就安全：压缩版是常态，原版只是本地开发时的后备。 */
+fetch(MODEL_MINI, { method:'HEAD' })
+  .then(r => { if (r.status === 404) MODEL = MODEL_FULL; })
+  .catch(() => {})
+  .then(_startRoom);
+
+/* ═══ 视角 ═════════════════════════════════════════════ */
+const DIR = new THREE.Vector3(1, 1.15, 1).normalize();
+function fit(){
+  const d = span * 4;
+  const pos = DIR.clone().multiplyScalar(d).add(CENTER);
+  [ORTHO, PERSP].forEach(c => c.position.copy(pos));
+  controls.target.copy(CENTER);
+  sizeOrtho();
+  const s = span * 1.6;
+  sun.shadow.camera.top = s; sun.shadow.camera.bottom = -s;
+  sun.shadow.camera.left = -s; sun.shadow.camera.right = s;
+  sun.shadow.camera.far = d * 3;
+  sun.shadow.camera.updateProjectionMatrix();
+  placeSun(+$('s_az').value, +$('s_el').value);
+  controls.update();
+}
+function sizeOrtho(){
+  const a = view.clientWidth / Math.max(1, view.clientHeight);
+  ORTHO.left = -span * a; ORTHO.right = span * a;
+  ORTHO.top = span; ORTHO.bottom = -span;
+  ORTHO.updateProjectionMatrix();
+}
+function placeSun(azDeg, elDeg){
+  const az = azDeg * Math.PI/180, el = elDeg * Math.PI/180, d = span * 3;
+  sun.position.set(CENTER.x + Math.sin(az)*Math.cos(el)*d,
+                   CENTER.y + Math.sin(el)*d,
+                   CENTER.z + Math.cos(az)*Math.cos(el)*d);
+  sun.target.position.copy(CENTER); sun.target.updateMatrixWorld();
+  /* 阴影相机要贴着模型收：框大一圈，2048 的阴影图分摊到每米的像素就少一分，
+     near/far 拉太开还会吃掉深度精度，阴影边缘就会长毛刺。 */
+  const sc = sun.shadow.camera;
+  sc.left = -MODEL_R; sc.right = MODEL_R; sc.top = MODEL_R; sc.bottom = -MODEL_R;
+  sc.near = Math.max(.05, d - MODEL_R * 1.6);
+  sc.far  = d + MODEL_R * 1.6;
+  sc.updateProjectionMatrix();
+}
+function resize(){
+  const w = view.clientWidth, h = view.clientHeight;
+  renderer.setSize(w, h, false);
+  PERSP.aspect = w / h; PERSP.updateProjectionMatrix();
+  sizeOrtho();
+  const dpr = renderer.getPixelRatio();
+  sizeAO(Math.floor(w*dpr), Math.floor(h*dpr));
+  sizeBloom(Math.floor(w*dpr), Math.floor(h*dpr));
+}
+addEventListener('resize', resize); resize();
+
+/* ═══ 面板 ═════════════════════════════════════════════ */
+function bind(id, fn){
+  const el = $(id);
+  const paint = () => {
+    fn(el.value);
+    const v = el.parentNode.querySelector('.v');
+    if (v && el.type === 'range') v.textContent = String(+el.value);
+  };
+  el.addEventListener('input', paint); paint();
+}
+function applyGridOffset(){
+  const pt = GRID.pitch.value;
+  GRID.goff.value.set(
+    GOFF_BASE.x + (+$('g_ox').value) * pt,
+    GOFF_BASE.y + (+$('g_oy').value) * pt,
+    GOFF_BASE.z + (+$('g_oz').value) * pt
+  );
+}
+bind('g_pitch', v => { GRID.pitch.value = +v; applyGridOffset(); });
+bind('g_ox', applyGridOffset);
+bind('g_oy', applyGridOffset);
+bind('g_oz', applyGridOffset);
+bind('g_lw',    v => GRID.lw.value = +v);
+bind('g_col',   v => GRID.gcol.value.set(v));
+bind('g_amt',   v => GRID.amt.value = +v);
+bind('e_col',   v => edgeMat.color.set(v));
+/* 纹理强度：一次性缩放所有材质的法线贴图强度。
+   法线图决定"表面凹凸有多明显"，也就是你说的"看得出是不是真材质"。
+   开局值 1 是我调的，觉得不够就往上拨，觉得吵就往下拨。 */
+const _nsBase = {};
+function snapNS(){ LAYERS.forEach(k => { if (MAT[k].normalScale && !_nsBase[k]) _nsBase[k] = MAT[k].normalScale.clone(); }); }
+bind('x_det',   v => { const f = +v; snapNS();
+  Object.keys(_nsBase).forEach(k => MAT[k].normalScale.copy(_nsBase[k]).multiplyScalar(f)); });
+bind('x_texs',  v => { TEXSCALE = +v; applyTexScale(); });
+bind('a_int',   v => AO.intensity = +v);
+bind('a_rad',   v => AO.radius = +v);
+bind('s_soft',  v => { sun.shadow.radius = Math.max(.001, +v); });
+bind('x_exp',   v => renderer.toneMappingExposure = +v);
+bind('x_env',   v => scene.environmentIntensity = +v);
+bind('s_az',    v => placeSun(+v, +$('s_el').value));
+bind('s_el',    v => placeSun(+$('s_az').value, +v));
+bind('e_ang',   () => {});
+
+function buildGroupUI(counts){
+  const wrap = $('groups');
+  wrap.innerHTML = '';
+  LAYERS.forEach(k => {
+    if (!counts[k]) return;
+    const row = document.createElement('div');
+    row.className = 'grp';
+    const nm = document.createElement('span');
+    nm.className = 'nm'; nm.textContent = LABEL[k];
+    const ct = document.createElement('span');
+    ct.className = 'ct'; ct.textContent = counts[k];
+    const c = document.createElement('input');
+    c.type = 'color';
+    c.dataset.k = k;
+    c.value = '#' + MAT[k].color.getHexString();
+    c.addEventListener('input', () => {
+      _tint[k] = c.value.toUpperCase();
+      MAT[k].color.set(c.value);
+      if (MAT[k].userData._dye) setDye(k, MAT[k].userData._dye.uDye.value > .5);   /* 重设 sheen 颜色 */
+    });
+    /* 「染」= 把贴图去色再乘颜色（换色相）。灭着就是原来的相乘叠色。
+       有颜色的贴图会把叠上去的色调吃掉，想真的换色相就得打开这个。 */
+    const dy = document.createElement('button');
+    dy.type = 'button'; dy.className = 'dye'; dy.textContent = '染';
+    dy.dataset.k = k;
+    dy.title = '换色相（把贴图去色后再上色）';
+    dy.setAttribute('aria-pressed', 'false');
+    dy.addEventListener('click', () => {
+      const on = dy.getAttribute('aria-pressed') !== 'true';
+      dy.setAttribute('aria-pressed', on ? 'true' : 'false');
+      setDye(k, on);
+    });
+    row.append(nm, ct, c, dy);
+    wrap.appendChild(row);
+
+    /* 玻璃类图层多给一条透明度滑块。只给玻璃是因为 26 个图层每个都挂一条
+       面板会长得没法用；要给别的图层也开，把这个条件放宽即可。 */
+    if (TMPL_OF[k] === 'glass'){
+      const r2 = document.createElement('div');
+      r2.className = 'row';
+      r2.style.cssText = 'grid-template-columns:56px 1fr 34px;margin:-3px 0 8px';
+      const lb = document.createElement('label'); lb.textContent = '透明度';
+      const sl = document.createElement('input');
+      sl.type = 'range'; sl.min = '0.02'; sl.max = '1'; sl.step = '0.01';
+      sl.value = String(_opa[k] != null ? _opa[k] : BASEOPA[k]);
+      const vv = document.createElement('span'); vv.className = 'v'; vv.textContent = sl.value;
+      sl.addEventListener('input', () => {
+        _opa[k] = +sl.value; vv.textContent = sl.value; applyOpa(k);
+      });
+      sl.dataset.k = k;
+      r2.append(lb, sl, vv);
+      wrap.appendChild(r2);
+    }
+
+    /* 材质选择器的容器。库是异步取的，晚到就晚填。
+       玻璃和镜子没有贴图槽（TILE=0），跳过。 */
+    if (TILE[k] > 0){
+      const box = document.createElement('div');
+      box.className = 'mtl'; box.dataset.k = k;
+      box.innerHTML = '<button class="mtl-cur" type="button">' +
+                      '<span class="tw">程序化</span><span class="ar">▾</span></button>';
+      wrap.appendChild(box);
+    }
+  });
+  buildSelects();
+}
+
+/* 把 430 种材质按分类填成可折叠列表：
+   点分类标题展开该类，点材质就换上。缩略图来自一张雪碧图，
+   430 个预览一共只有 217 KB —— 逐个加载原图要 35 MB。 */
+function buildSelects(){
+  if (!LIB.length) return;
+  const TW = LIB._tw || 22, TT = LIB._tt || 64;
+  document.querySelectorAll('.mtl').forEach(box => {
+    const k = box.dataset.k;
+    if (box.querySelector('.mtl-pop')) return;      /* 已经建过 */
+    const cur = box.querySelector('.mtl-cur');
+    const pop = document.createElement('div');
+    pop.className = 'mtl-pop'; pop.hidden = true;
+
+    Object.keys(LIBCAT).forEach(cat => {
+      const items = LIB.filter(x => x.cat === cat);
+      if (!items.length) return;
+      const head = document.createElement('div');
+      head.className = 'mtl-cat';
+      head.setAttribute('aria-expanded', 'false');
+      head.innerHTML = '<span class="ar">▸</span><span class="n">' + LIBCAT[cat] +
+                       '</span><span class="c">' + items.length + '</span>';
+      const list = document.createElement('div');
+      list.className = 'mtl-list'; list.hidden = true;
+
+      head.addEventListener('click', () => {
+        const open = head.getAttribute('aria-expanded') === 'true';
+        /* 同一时间只展开一类，不然要滚很久 */
+        pop.querySelectorAll('.mtl-cat').forEach(h => h.setAttribute('aria-expanded','false'));
+        pop.querySelectorAll('.mtl-list').forEach(l => l.hidden = true);
+        if (!open){ head.setAttribute('aria-expanded','true'); list.hidden = false; fill(); }
+      });
+
+      let filled = false;
+      function fill(){
+        if (filled) return; filled = true;
+        items.forEach(it => {
+          const row = document.createElement('div');
+          row.className = 'mtl-it';
+          row.setAttribute('aria-selected', _pick[k] === it.id ? 'true' : 'false');
+          const th = document.createElement('span');
+          th.className = 'th';
+          /* 雪碧图定位：整张按 22 格宽缩放，再挪到这一格 */
+          th.style.backgroundSize = (TW * 22) + 'px auto';
+          th.style.backgroundPosition = (-(it.ti % TW) * 22) + 'px ' + (-Math.floor(it.ti / TW) * 22) + 'px';
+          const nm = document.createElement('span');
+          nm.className = 'nm2'; nm.textContent = it.name + (it.c ? '' : ' ·纯色');
+          const tl = document.createElement('span');
+          tl.className = 'tl'; tl.textContent = it.tile + 'm';
+          row.append(th, nm, tl);
+          row.addEventListener('click', () => {
+            pickMat(k, it.id);
+            cur.querySelector('.tw').textContent = it.name;
+            pop.querySelectorAll('.mtl-it').forEach(x => x.setAttribute('aria-selected','false'));
+            row.setAttribute('aria-selected','true');
+            pop.hidden = true; cur.querySelector('.ar').textContent = '▾';
+          });
+          list.appendChild(row);
+        });
+      }
+      pop.append(head, list);
+    });
+
+    /* 第一项：退回程序化 */
+    const reset = document.createElement('div');
+    reset.className = 'mtl-cat';
+    reset.innerHTML = '<span class="ar" style="color:#68686E">×</span><span class="n">程序化（默认）</span>';
+    reset.addEventListener('click', () => {
+      pickMat(k, '');
+      cur.querySelector('.tw').textContent = '程序化';
+      pop.querySelectorAll('.mtl-it').forEach(x => x.setAttribute('aria-selected','false'));
+      pop.hidden = true; cur.querySelector('.ar').textContent = '▾';
+    });
+    pop.insertBefore(reset, pop.firstChild);
+
+    cur.addEventListener('click', () => {
+      pop.hidden = !pop.hidden;
+      cur.querySelector('.ar').textContent = pop.hidden ? '▾' : '▴';
+    });
+    box.appendChild(pop);
+  });
+}
+
+function toggle(id, on, fn, a, b){
+  const btn = $(id);
+  btn.addEventListener('click', function(){
+    on = !on;
+    this.setAttribute('aria-pressed', on ? 'true' : 'false');
+    this.textContent = on ? a : b;
+    fn(on);
+  });
+}
+/* ═══ 夜间模式 ═══════════════════════════════════════════
+   开夜间：太阳压成月光、环境光压暗、盲道和触摸板自发光。
+   **不动 scene.background** —— 产品页的画布是透明的（alpha:true），
+   背景要透出外层卡片。变暗由 flow.html 那边改卡片底色，不在这里做。
+   发光色每帧从图层色抄，所以外层换了盲道的颜色，光会跟着变。 */
+const NIGHT = { on:false, glow:1.4, amb:0.12, sunI:null, sunC:null, envDay:null };
+function accentLayers(){
+  if (typeof LAYERS === 'undefined' || !LAYERS) return [];
+  return LAYERS.filter(k => TMPL_OF[k] === 'accent');
+}
+function syncGlow(){
+  const g = NIGHT.on ? NIGHT.glow : 0;
+  accentLayers().forEach(k => {
+    const m = MAT[k]; if (!m || !m.emissive) return;
+    m.emissive.copy(m.color);
+    m.emissiveIntensity = g;
+  });
+}
+function setNight(on){
+  on = !!on;
+  if (on === NIGHT.on){ syncGlow(); return; }
+  NIGHT.on = on;
+  if (on){
+    NIGHT.sunI = sun.intensity; NIGHT.sunC = sun.color.getHex();
+    if (NIGHT.envDay == null) NIGHT.envDay = scene.environmentIntensity;
+    sun.intensity = .10; sun.color.set(0x9FB4D8);
+    scene.environmentIntensity = NIGHT.amb;
+  } else {
+    if (NIGHT.sunI != null){ sun.intensity = NIGHT.sunI; sun.color.setHex(NIGHT.sunC); }
+    if (NIGHT.envDay != null) scene.environmentIntensity = NIGHT.envDay;
+  }
+  syncGlow();
+}
+
+toggle('t_grid', true, v => GRID.gon.value = v ? 1 : 0, '网格：开', '网格：关');
+toggle('t_bg', false, v => scene.background = new THREE.Color(v ? 0x0B0B0C : 0xBBBBBB),
+       '底色：深', '底色：浅');
+toggle('t_wall', true, v => { cullWalls = v; }, '近墙：自动让开', '近墙：全显示');
+toggle('t_wallon', true, v => setWalls(v), '墙体：显示', '墙体：隐藏');
+toggle('t_ao',   true, v => { AO.on = v; }, '遮蔽：开', '遮蔽：关');
+toggle('t_pbr',  true, setPBR, '贴图：真实优先', '贴图：程序化');
+toggle('t_env',  true, v => buildEnv(v ? 'room' : 'window'), '环境：摄影棚', '环境：住宅窗光');
+
+/* 木色切换：重新烘地板和木饰面两张贴图。
+   颜色不是简单地"给材质换个 color" —— 深木和浅木的纹理对比度本来就不同
+   （胡桃木的纹路比浅橡木明显得多），所以对比度是跟着色号一起变的。 */
+function rebakeFloor(){
+  const f = FLOORS[FLOOR_I], old = TEX.floor;
+  TEX.floor = bakeMaps(f.N, floorFn(f.fn));
+  ['map','rough','normal'].forEach(k => TEX.floor[k].repeat.setScalar(f.rep));
+  LAYERS.forEach(n => {
+    if (TMPL_OF[n] !== 'floor') return;
+    const m = MAT[n];
+    const ns = f.ns * FLOOR_FLAT;
+    m.roughness = f.rough; m.normalScale.set(ns, ns);
+    if (_nsBase[n]) _nsBase[n].set(ns, ns);          /* 纹理强度滑块的基准也要跟着换 */
+  });
+  refreshTmpl('floor');
+  ['map','rough','normal'].forEach(x => old[x].dispose());
+}
+$('t_floor').addEventListener('click', () => {
+  FLOOR_I = (FLOOR_I + 1) % FLOORS.length;
+  $('t_floor').textContent = '地面：' + FLOORS[FLOOR_I].name;
+  rebakeFloor();
+});
+$('t_wood').addEventListener('click', () => {
+  WOOD_I = (WOOD_I + 1) % WOODS.length;
+  setWoodColors(WOOD_I);
+  $('t_wood').textContent = '木色：' + WOODS[WOOD_I].name;
+  const old = TEX.wood;
+  TEX.wood = bakeMaps(768, veneerPixel);
+  refreshTmpl('wood');
+  ['map','rough','normal'].forEach(x => old[x].dispose());
+  if (FLOORS[FLOOR_I].fn === floorPixel) rebakeFloor();   /* 地面还是木的才跟着换色 */
+});
+
+/* ═══ 家具卡片（家属版预览的原型）════════════════════════
+   一件家具往往是好几个图层：床 = 床（硬边）+ 床（软包…）+ 床（15MM 包边）。
+   所以用户面对的单位应该是"这张床"，不是"这张床的硬边图层" ——
+   点一个选项，这件家具涉及的所有图层一起换。
+
+   缩略图必须实时渲染：把这件家具以外的东西临时藏掉，用一个单独的
+   相机框住它，画进一张离屏贴图，再读回像素画到 canvas 上。
+   预先烘成图片的话，换了材质缩略图不会变，整个交互就废了。       */
+const FURN = [
+  { key:'bed',    name:'床',        en:'Bed',           test:/^床/ },
+  { key:'sofa',   name:'沙发',      en:'Sofa',          test:/^沙发/ },
+  /* 衣柜必须排在 kitchen 之前：「衣柜柜门（木板）」里有「柜门」两个字，
+     kitchen 会先把它抢走，衣柜就只剩一个白柜体、门变成厨房的一部分。 */
+  { key:'wardrobe',name:'衣柜',     en:'Wardrobe',      test:/衣柜/ },
+  { key:'kitchen',name:'橱柜 / 柜门', en:'Kitchen units', test:/橱柜|柜门|抽屉/ },
+  /* typeB OptionC 岛台和衣柜**都有** —— OptionB 那次删掉的这一条要加回来。
+     排在 kitchen 之后没问题：「岛台，木色…」里没有「橱柜/柜门/抽屉」。 */
+  { key:'island', name:'岛台',      en:'Island',        test:/岛台/ },
+  { key:'table',  name:'桌子',      en:'Table',         test:/桌/ },
+  /* 换鞋凳：typeB 没有，typeA OptionC 有 6 件。 */
+  { key:'bench',  name:'换鞋凳',    en:'Hall bench',    test:/换鞋凳/ },
+  /* 2026-09-01 加：typeA OptionC 有茶几和 14 把椅子。
+     不加的话它们会掉进最后那条 arch，悬停报「Structure」——
+     一张茶几被叫成"结构"是错的。不可换，但要有自己的名字。 */
+  { key:'coffee', name:'茶几',      en:'Coffee table',  test:/茶几/ },
+  { key:'chair',  name:'椅子',      en:'Chair',         test:/椅子/ },
+  /* 下面这几组 typeC OptionC 用不上（换鞋凳/椅子/洗碗机/衣柜这一版没有），
+     留着是空组，一行代码都不用删 —— 空组不会出现在任何界面上。 */
+  /* 架子：这一版有（typeB 那两个房间也有）。不可换，但不该被报成"结构"。 */
+  { key:'shelf',  name:'架子',      en:'Shelf',         test:/架子/ },
+  { key:'rail',   name:'扶手',      en:'Grab rail',     test:/扶手/ },
+  { key:'bath',   name:'卫浴',      en:'Bathroom',      test:/马桶|水池|花洒|镜子|陶瓷|浴室/ },
+  { key:'board2', name:'案板',      en:'Worktop',       test:/案板/ },
+  { key:'dish',   name:'洗碗机',    en:'Dishwasher',    test:/洗碗机/ },   /* 必须在 win 之前 */
+  { key:'win',    name:'窗',        en:'Window',        test:/窗框|玻璃/ },
+  { key:'arch',   name:'墙 / 地 / 其它', en:'Structure', test:/.*/ }
+];
+const FGROUP = {};                 /* key → { name, layers:[], box } */
+function buildFurniture(counts){
+  FURN.forEach(f => FGROUP[f.key] = { name:f.name, layers:[], box:new THREE.Box3() });
+  LAYERS.forEach(L => {
+    if (!counts[L]) return;
+    const f = FURN.find(x => x.test.test(L)) || FURN[FURN.length-1];
+    FGROUP[f.key].layers.push(L);
+  });
+  /* 每件家具的包围盒只算一次。除了整体包围盒，还攒一份**真正的顶点**点云，
+     缩略图取景要用它。
+
+     为什么不能用包围盒（无论整组的还是每个 mesh 的）：包围盒是几何体的
+     外接框，框里有大片是空的。床最典型 —— 它是个 L 形，一个 mesh 往往
+     是一整排 cube 合并出来的长条，外接框把整片 L 的空缺也框了进去。
+     按框取景，画面里就多出一大块空气，床被挤到角落还缩得很小。
+     顶点是精确的，没有这个误差。
+
+     数据量：三件可换的家具加起来 ~2900 个三角形，点云也就几千个数，
+     一次算好存 Float32Array，之后每次取景直接投影，不用再碰几何体。
+     墙地那种上万面的组做了抽样，免得白占内存。 */
+  const acc = {}, _bp = new THREE.Vector3();
+  FURN.forEach(f => acc[f.key] = []);
+  root.traverse(o => {
+    if (!o.isMesh || !o.visible) return;
+    const f = FURN.find(x => x.test.test(o.userData.grp)) || FURN[FURN.length-1];
+    FGROUP[f.key].box.expandByObject(o);
+    const pos = o.geometry.attributes.position;
+    if (!pos) return;
+    const a = acc[f.key];
+    const step = Math.max(1, Math.ceil(pos.count / 1200));
+    for (let i = 0; i < pos.count; i += step){
+      _bp.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);
+      a.push(_bp.x, _bp.y, _bp.z);
+    }
+  });
+  FURN.forEach(f => FGROUP[f.key].pts = new Float32Array(acc[f.key]));
+}
+
+let thumbRT = new THREE.WebGLRenderTarget(176, 176,
+  { minFilter:THREE.LinearFilter, magFilter:THREE.LinearFilter });
+const thumbCam = new THREE.PerspectiveCamera(28, 1, .01, 300);
+/* 缩略图专用的 AO 缓冲。为什么不借用主画面那三张：
+   主画面的 RT 每帧都在用，尺寸跟着窗口走；每拍一张缩略图去改一次尺寸，
+   等于每次都重新分配一遍显存。缩略图固定 176，单独开三张更省事。 */
+let TSZ = 176, THALF = 88;
+const thumbDepthRT = new THREE.WebGLRenderTarget(TSZ, TSZ, rtOpt);
+const thumbAoRT  = new THREE.WebGLRenderTarget(THALF, THALF,
+  { minFilter:THREE.LinearFilter, magFilter:THREE.LinearFilter, depthBuffer:false });
+const thumbAoRT2 = new THREE.WebGLRenderTarget(THALF, THALF,
+  { minFilter:THREE.LinearFilter, magFilter:THREE.LinearFilter, depthBuffer:false });
+
+/* ═══ 缩略图的可调参数 ═══════════════════════════════
+   和整屋一样的路子：在 _thumb-lab.html 里调，导出 JSON，写死回这里。
+     az / el  相机方位角、仰角（度）。默认 45 / 28.9 就是原来那个 (1,.78,1)
+     fill     轮廓占画面的比例，留一圈呼吸的边
+     fov      镜头视角；小 = 长焦，透视变形小，家具更"正"
+     bg       底色，和卡片里画布的底色对齐，边缘看不出接缝
+     ao       缝隙暗影，关掉会明显变平
+     size     渲染分辨率。卡片上显示 124 px，二倍屏要 248，所以 176 是偏软的
+     grid     格线强度，1 = 和大图一样。缩略图小，格线相对变粗，压到 0.35 左右
+     per      单件覆盖，比如 per.bed = { az:20 }，只改床的角度         */
+const THUMB = { az:45, el:28.9, fill:.84, fov:28, bg:0xF0ECE4, ao:true, size:176, grid:.35, per:{} };
+function thumbCfg(key){
+  const o = Object.assign({}, THUMB, THUMB.per[key] || {});
+  delete o.per; return o;
+}
+function sizeThumb(n){
+  n = Math.max(64, Math.min(512, Math.round(n / 2) * 2));
+  if (n === TSZ) return;
+  TSZ = n; THALF = n >> 1;
+  thumbRT.setSize(TSZ, TSZ);
+  thumbDepthRT.setSize(TSZ, TSZ);
+  thumbAoRT.setSize(THALF, THALF);
+  thumbAoRT2.setSize(THALF, THALF);
+  _tbuf = new Uint8Array(TSZ * TSZ * 4);
+}
+/* 渲染到 RenderTarget 时 three 不做色彩空间转换（只有画到画布上才做），
+   读回来的是**线性**值，直接写进 canvas（sRGB）会整体偏暗一大截 ——
+   和之前"贴图偏暗"踩的是同一个坑。所以这里自己补一次线性 → sRGB。
+   查表做：只有 256 个可能的值，30976 个像素一次也就零点几毫秒。 */
+const _lin2srgb = new Uint8Array(256);
+for (let i = 0; i < 256; i++){
+  const c = i / 255;
+  const v = c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1/2.4) - 0.055;
+  _lin2srgb[i] = Math.round(Math.min(1, Math.max(0, v)) * 255);
+}
+let _tbuf = new Uint8Array(176*176*4);
+const _tdir = new THREE.Vector3();
+function setDir(az, el){
+  const a = az * Math.PI/180, e = el * Math.PI/180;
+  _tdir.set(Math.sin(a) * Math.cos(e), Math.sin(e), Math.cos(a) * Math.cos(e)).normalize();
+}
+
+/* ── 缩略图取景 ────────────────────────────────────────
+   之前是"把相机对准包围盒中心"，结果床看着偏。原因是透视投影：
+   斜着看一个又扁又长的东西，近端被放大、远端被缩小，
+   **轮廓在画面里的中心并不等于几何中心的投影点**。物体越扁越明显，
+   床正好是最扁的那件，所以它偏得最厉害。
+
+   所以改成量出来再调：把包围盒八个角投到屏幕上，取轮廓的外接框，
+   再平移相机让这个框居中、缩放距离让它占满画面的固定比例。
+   迭代三次就收敛了（平移会轻微改变投影，所以不能只算一次）。   */
+const _fbC = new THREE.Vector3(), _fbT = new THREE.Vector3();
+const _fbP = new THREE.Vector3(), _fbR = new THREE.Vector3(), _fbU = new THREE.Vector3();
+function frameBox(g, cfg){
+  const box = g.box, pts = g.pts;
+  const th = Math.tan(cfg.fov * Math.PI / 360);
+  const r  = box.getSize(_fbC).length() * .5;
+  box.getCenter(_fbT);
+  let dist = r / th * 1.05;
+
+  for (let pass = 0; pass < 3; pass++){
+    thumbCam.position.copy(_tdir).multiplyScalar(dist).add(_fbT);
+    thumbCam.lookAt(_fbT);
+    thumbCam.near = Math.max(.01, dist - r * 2);
+    thumbCam.far  = dist + r * 2;
+    thumbCam.fov  = cfg.fov;
+    thumbCam.updateProjectionMatrix();
+    thumbCam.updateMatrixWorld();
+
+    let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+    for (let i = 0; i < pts.length; i += 3){
+      _fbP.set(pts[i], pts[i+1], pts[i+2]).project(thumbCam);
+      if (_fbP.x < x0) x0 = _fbP.x;   if (_fbP.x > x1) x1 = _fbP.x;
+      if (_fbP.y < y0) y0 = _fbP.y;   if (_fbP.y > y1) y1 = _fbP.y;
+    }
+    /* 平移：把轮廓框的中心挪到画面正中。
+       NDC 里的 1 对应世界里的 dist*tan(halfFov)（画幅是正方形，所以横竖一样）。 */
+    const half = dist * th;
+    _fbR.setFromMatrixColumn(thumbCam.matrixWorld, 0);
+    _fbU.setFromMatrixColumn(thumbCam.matrixWorld, 1);
+    _fbT.addScaledVector(_fbR, (x0 + x1) / 2 * half)
+        .addScaledVector(_fbU, (y0 + y1) / 2 * half);
+    /* 缩放：让长边正好占到 FRAME_FILL */
+    dist *= Math.max(x1 - x0, y1 - y0) / 2 / cfg.fill;
+  }
+}
+
+function renderThumb(key, cv){
+  /* 拼装动画进行中所有网格的矩阵都是临时的，这时候渲缩略图会拍到半截的家具。
+     直接把动画收到终态再画 —— 比"这一次不画"好，因为用户是刚换了材质在等结果。 */
+  if (_asm) stopAsm();
+  const g = FGROUP[key];
+  if (!g || !g.layers.length || g.box.isEmpty() || !g.pts || !g.pts.length) return;
+  const set = new Set(g.layers);
+  const saved = [];
+  root.traverse(o => { if (o.isMesh){ saved.push(o.visible); o.visible = set.has(o.userData.grp); } });
+  /* 缩略图是单件家具的样品图，剖口和它无关，整组藏掉 */
+  const _capV = capGroup ? capGroup.visible : false;
+  if (capGroup) capGroup.visible = false;
+
+  const cfg = thumbCfg(key);
+  sizeThumb(cfg.size);
+  setDir(cfg.az, cfg.el);
+  frameBox(g, cfg);
+
+  const bg = scene.background; scene.background = null;
+  /* 缩略图**永远按白天渲**，哪怕房间正处在夜间。
+     这张图是"这件家具是什么颜色、什么材质"的样品图，不是场景截图 ——
+     夜里的沙发是一团深灰，用户拿它没法挑布料。
+     只临时把太阳和环境光借回白天的值，画完立刻还回去。 */
+  const _nOn = NIGHT.on;
+  let _nSunI, _nSunC, _nEnvI;
+  if (_nOn){
+    _nSunI = sun.intensity; _nSunC = sun.color.getHex(); _nEnvI = scene.environmentIntensity;
+    if (NIGHT.sunI != null){ sun.intensity = NIGHT.sunI; sun.color.setHex(NIGHT.sunC); }
+    if (NIGHT.envDay != null) scene.environmentIntensity = NIGHT.envDay;
+  }
+  /* 格线只在缩略图里压淡。改的是 uniform，不重编译着色器，所以不卡。 */
+  const _gs0 = GRID.gstr.value;
+  GRID.gstr.value = (cfg.grid === undefined ? 1 : cfg.grid);
+  /* 卡片开着的时候换材质会重画缩略图，这时全屋正淡着 —— 不撤掉会把淡化烤进缩略图 */
+  if (_dimKeys.length) applyDim([]);
+
+  /* 深度 → AO → 模糊，用的是大图那一套一模一样的 shader。
+     少了这一步，缩略图里的家具会平得像贴纸 —— 之前缩略图看着比大图"廉价"，
+     根源不是分辨率低，是缝隙里不够暗。现在两边的暗影是同一个算法算出来的。
+     texel 这两个 uniform 是和主循环共用的，改完必须还回去。 */
+  const _texA = aoMat.uniforms.texel.value.clone();
+  const _texB = blurMat.uniforms.texel.value.clone();
+  if (AO.on && cfg.ao){
+    /* 玻璃先藏掉 —— 它是透明的，让它参与遮挡会糊出一片假暗影 */
+    const gv = glassNodes.map(n => n.visible);
+    glassNodes.forEach(n => n.visible = false);
+    scene.overrideMaterial = depthMat;
+    renderer.setRenderTarget(thumbDepthRT);
+    renderer.setClearColor(0xffffff, 1); renderer.clear();
+    renderer.render(scene, thumbCam);
+    scene.overrideMaterial = null;
+    glassNodes.forEach((n, i) => n.visible = gv[i]);
+
+    aoMat.uniforms.tDepth.value = thumbDepthRT.texture;
+    aoMat.uniforms.texel.value.set(1/TSZ, 1/TSZ);
+    aoMat.uniforms.proj.value.copy(thumbCam.projectionMatrix);
+    aoMat.uniforms.projInv.value.copy(thumbCam.projectionMatrixInverse);
+    aoMat.uniforms.radius.value = AO.radius;
+    aoMat.uniforms.intensity.value = AO.intensity;
+    aoMat.uniforms.bias.value = AO.bias;
+    renderer.setRenderTarget(thumbAoRT);
+    renderer.render(aoScene, quadCam);
+
+    blurMat.uniforms.tAO.value = thumbAoRT.texture;
+    blurMat.uniforms.texel.value.set(1/THALF, 1/THALF);
+    renderer.setRenderTarget(thumbAoRT2);
+    renderer.render(blurScene, quadCam);
+  }
+
+  renderer.setRenderTarget(thumbRT);
+  renderer.setClearColor(cfg.bg, 1); renderer.clear();
+  renderer.render(scene, thumbCam);
+  if (AO.on && cfg.ao){
+    /* 正片叠底压上去。背景那些像素深度是 1，AO 算出来正好是 1，
+       乘上去不变色，所以浅色底不会被压灰。 */
+    compMat.uniforms.tAO.value = thumbAoRT2.texture;
+    renderer.autoClear = false;
+    renderer.render(compScene, quadCam);
+    renderer.autoClear = true;
+  }
+  renderer.readRenderTargetPixels(thumbRT, 0, 0, TSZ, TSZ, _tbuf);
+  renderer.setRenderTarget(null);
+  aoMat.uniforms.texel.value.copy(_texA);
+  blurMat.uniforms.texel.value.copy(_texB);
+  GRID.gstr.value = _gs0;
+  if (_dimKeys.length) applyDim(_dimKeys);
+  if (_nOn){ sun.intensity = _nSunI; sun.color.setHex(_nSunC); scene.environmentIntensity = _nEnvI; }
+  scene.background = bg;
+
+  if (capGroup) capGroup.visible = _capV;
+  let i = 0;
+  root.traverse(o => { if (o.isMesh) o.visible = saved[i++]; });
+
+  cv.width = cv.height = TSZ;
+  const ctx = cv.getContext('2d');
+  const im = ctx.createImageData(TSZ, TSZ);
+  const d = im.data;
+  /* WebGL 的像素是从下往上读的，写进 canvas 要翻过来；顺便做线性 → sRGB */
+  for (let y = 0; y < TSZ; y++){
+    let src = (TSZ - 1 - y) * TSZ * 4, dst = y * TSZ * 4;
+    for (let x = 0; x < TSZ; x++, src += 4, dst += 4){
+      d[dst]     = _lin2srgb[_tbuf[src]];
+      d[dst + 1] = _lin2srgb[_tbuf[src + 1]];
+      d[dst + 2] = _lin2srgb[_tbuf[src + 2]];
+      d[dst + 3] = 255;
+    }
+  }
+  ctx.putImageData(im, 0, 0);
+}
+
+/* 示意选项：每件家具从库里自动挑几个同类材质。真方案由你定。 */
+function demoOptions(key){
+  const g = FGROUP[key]; if (!LIB.length) return [];
+  const tm = g.layers.map(L => TMPL_OF[L]);
+  let cat = 'wood';
+  if (tm.some(t => t === 'leather' || t === 'bathsoft')) cat = 'fabric';
+  if (key === 'bath') cat = 'stone';
+  if (key === 'arch') cat = 'paint';
+  if (key === 'win')  cat = 'metal';
+  return LIB.filter(x => x.cat === cat && x.c).slice(0, 6);
+}
+/* 换一件家具的材质：只动"主材"图层，金属五金和玻璃不跟着变 —— 
+   现实里换一张床的面料，把手和脚是不会跟着换的。 */
+const MAIN_TMPL = { wood:1, board:1, door:1, frame:1, leather:1, piping:1, bathsoft:1, plastic:1, other:1, ceramic:1, wall:1, floor:1 };
+function setFurniture(key, id, cv){
+  /* 必须等贴图真的加载完再重画缩略图 —— 用定时器猜时间会拍到旧材质上 */
+  const jobs = FGROUP[key].layers
+    .filter(L => MAIN_TMPL[TMPL_OF[L]])
+    .map(L => pickMat(L, id));
+  Promise.all(jobs).then(() => { renderThumb(key, cv); buildSelects(); });
+}
+
+function buildFurnitureUI(counts){
+  buildFurniture(counts);
+  const wrap = $('furn'); wrap.innerHTML = '';
+  FURN.forEach(f => {
+    const g = FGROUP[f.key];
+    if (!g.layers.length) return;
+    const card = document.createElement('div'); card.className = 'fcard';
+    const cv = document.createElement('canvas'); cv.width = cv.height = 176;
+    const meta = document.createElement('div'); meta.className = 'meta';
+    meta.innerHTML = '<div class="fn">' + g.name + '</div><div class="fl">' +
+                     g.layers.join(' · ') + '</div>';
+    const top = document.createElement('div'); top.className = 'top';
+    top.append(cv, meta);
+    const opts = document.createElement('div'); opts.className = 'opts';
+    card.append(top, opts);
+    wrap.appendChild(card);
+    renderThumb(f.key, cv);
+    card._fill = () => {
+      opts.innerHTML = '';
+      demoOptions(f.key).forEach(it => {
+        const b = document.createElement('div');
+        b.className = 'op'; b.title = it.name;
+        b.style.backgroundSize = (LIB._tw * 30) + 'px auto';
+        b.style.backgroundPosition = (-(it.ti % LIB._tw) * 30) + 'px ' +
+                                     (-Math.floor(it.ti / LIB._tw) * 30) + 'px';
+        b.addEventListener('click', () => {
+          opts.querySelectorAll('.op').forEach(x => x.setAttribute('aria-selected','false'));
+          b.setAttribute('aria-selected','true');
+          setFurniture(f.key, it.id, cv);
+        });
+        opts.appendChild(b);
+      });
+    };
+    card._fill();
+  });
+}
+
+/* ═══ 这一版的方案（打开即定型）═════════════════════════ */
+const AUTO_SCHEME = {"v": 1, "name": "vision-typeC-optionC", "floor": "白瓷砖", "wood": "中性橡木", "env": "window", "exposure": 0.85, "envInt": 0.64, "detail": 0, "floorTex": 0.5, "texScale": 1, "ao": {"on": true, "int": 0.2, "rad": 0.085}, "sun": {"az": -107, "el": 60, "soft": 20}, "grid": {"on": true, "pitch": 0.3, "lw": 0, "col": "#3A342C", "amt": 0}, "layers": {"PATH": {"c": "#ED7119"}, "触摸板": {"c": "#CC95F9"}, "橱柜，木制或者整体性强的材质": {"c": "#D8CDBA"}, "厕所墙": {"c": "#6E6960"}, "储物柜，木制或者整体性强的材质": {"c": "#FFFFFF"}, "柜门，区别于整体的柜子": {"m": "m398", "c": "#7E5C20"}, "客厅墙": {"c": "#FAF4E7"}, "卧室墙": {"c": "#376CBF"}, "厨房墙": {"c": "#B35125"}, "架子（木板）": {"m": "m398", "c": "#EED9B4"}, "沙发硬边": {"m": "m157", "c": "#FEEBD7"}, "沙发（软包，软垫，皮纹细腻）": {"m": "m067", "c": "#EBECEA"}, "床（硬边）": {"m": "m157", "c": "#B9AB9A"}, "床（软包，软垫，皮纹细腻）": {"m": "m064", "c": "#FFF8E5"}, "床15MM 软包边-皮质": {"m": "m157", "c": "#BBB39F"}}, "night": {"on": false, "glow": 0.75, "amb": 0.12, "bloom": 0.25, "bloomR": 1.2}};
+
+/* ═══ 方案：把当前这一版的全部选择导出成一段 JSON ═══════
+   记录两类东西：
+   · 每个图层选了哪个材质（id）+ 叠加的染色（只在和默认不同时才记）
+   · 全局的光、遮蔽、网格、木色、地面这些参数
+   目的是让"你在这里调、我在代码里落"这件事零转录误差。      */
+function exportScheme(){
+  const layers = {};
+  LAYERS.forEach(k => {
+    const o = {};
+    if (_pick[k]) o.m = _pick[k];
+    /* 染色和"选了哪个材质"是两件独立的事，必须分开记。
+       之前只在"没选库材质"时才记，导致选了库材质再染色的话染色会丢。 */
+    const hex = '#' + MAT[k].color.getHexString().toUpperCase();
+    if (hex !== BASECOL[k] || _tint[k]) o.c = hex;
+    /* 染色开关和颜色是两件事：同一个颜色，"乘上去"和"换色相"出来的
+       完全不是一个东西。不记这一位的话，导出再导入会退回相乘的老样子。 */
+    if (MAT[k].userData._dye && MAT[k].userData._dye.uDye.value > .5) o.d = 1;
+    if (_opa[k] != null && Math.abs(_opa[k] - BASEOPA[k]) > 1e-4) o.o = +_opa[k].toFixed(3);
+    if (Object.keys(o).length) layers[k] = o;
+  });
+  return {
+    v: 1,
+    name: ($('sch_name').value || '未命名').trim(),
+    floor: FLOORS[FLOOR_I].name,
+    wood: WOODS[WOOD_I].name,
+    env: $('t_env').getAttribute('aria-pressed') === 'true' ? 'room' : 'window',
+    exposure: +$('x_exp').value,
+    envInt: +$('x_env').value,
+    detail: +$('x_det').value,
+    texScale: TEXSCALE,
+    ao: { on: AO.on, int: +$('a_int').value, rad: +$('a_rad').value },
+    sun: { az: +$('s_az').value, el: +$('s_el').value, soft: +$('s_soft').value },
+    grid: { on: GRID.gon.value > .5, pitch: GRID.pitch.value, lw: GRID.lw.value,
+            col: '#' + GRID.gcol.value.getHexString().toUpperCase(), amt: GRID.amt.value },
+    layers: layers
+  };
+}
+function importScheme(j){
+  const setR = (id, v) => { const e = $(id); if (e && v != null){ e.value = v; e.dispatchEvent(new Event('input')); } };
+  if (j.name) $('sch_name').value = j.name;
+  /* 地面纹理系数要在烘地面之前定下来 */
+  if (j.floorTex != null && j.floorTex !== FLOOR_FLAT){ FLOOR_FLAT = +j.floorTex; rebakeFloor(); }
+  /* 地面 / 木色 / 环境是循环按钮，点到对为止 */
+  let guard = 0;
+  while (j.floor && FLOORS[FLOOR_I].name !== j.floor && guard++ < 8) $('t_floor').click();
+  guard = 0;
+  while (j.wood && WOODS[WOOD_I].name !== j.wood && guard++ < 8) $('t_wood').click();
+  if (j.env){ const now = $('t_env').getAttribute('aria-pressed') === 'true' ? 'room' : 'window';
+              if (now !== j.env) $('t_env').click(); }
+  setR('x_exp', j.exposure); setR('x_env', j.envInt); setR('x_det', j.detail);
+  setR('x_texs', j.texScale);
+  if (j.ao){ setR('a_int', j.ao.int); setR('a_rad', j.ao.rad);
+             if (AO.on !== j.ao.on) $('t_ao').click(); }
+  if (j.sun){ setR('s_az', j.sun.az); setR('s_el', j.sun.el); setR('s_soft', j.sun.soft); }
+  if (j.grid){ setR('g_pitch', j.grid.pitch); setR('g_lw', j.grid.lw);
+               setR('g_col', j.grid.col); setR('g_amt', j.grid.amt);
+               if ((GRID.gon.value > .5) !== j.grid.on) $('t_grid').click(); }
+  /* ⚠ 夜间必须放在所有 setR **之后**：上面那句 setR('x_env', j.envInt)
+     会把 environmentIntensity 设回白天的 0.64，夜间要是先套就被冲掉了。
+     踩过一次：night() 返回 true，画面却是亮的。 */
+  if (j.night){
+    NIGHT.glow = j.night.glow  != null ? +j.night.glow  : NIGHT.glow;
+    NIGHT.amb  = j.night.amb   != null ? +j.night.amb   : NIGHT.amb;
+    BLOOM.amt  = j.night.bloom != null ? +j.night.bloom : BLOOM.amt;
+    BLOOM.rad  = j.night.bloomR!= null ? +j.night.bloomR: BLOOM.rad;
+    NIGHT.envDay = +$('x_env').value;      /* 白天的环境光以滑块为准 */
+    NIGHT.on = false;                      /* 强制走一遍完整的 setNight */
+    setNight(!!j.night.on);
+  }
+  /* 每个图层的加载链都收进来 —— 外层要知道"整套方案什么时候真的到位"。
+     以前这个函数是同步返回的，调用方紧接着去读材质颜色，读到的是**贴图还没到、
+     染色还没叠**的中间态。表现是随机的：网快就读到旧色，网慢就读到白色。 */
+  const jobs = [];
+  Object.keys(j.layers || {}).forEach(k => {
+    if (!MAT[k]) return;                                  /* 图层改过名就跳过，不报错 */
+    const o = j.layers[k];
+    if (o.c) _tint[k] = o.c.toUpperCase();
+    else delete _tint[k];
+    if (o.o != null) _opa[k] = o.o; else delete _opa[k];
+    /* 贴图是异步加载的，applySet 会重设颜色 —— 染色必须等它落地之后再叠，
+       否则先设的颜色会被 applySet 覆盖掉。 */
+    const done = o.m ? pickMat(k, o.m, true) : Promise.resolve(pickMat(k, '', true));
+    jobs.push(Promise.resolve(done).then(() => {
+      if (_tint[k]) MAT[k].color.set(_tint[k]);
+      /* 只在需要时才碰 setDye：它会给材质挂 onBeforeCompile 并触发重编译，
+         对没染色的图层调一遍等于白白重编一百多个材质。 */
+      if (o.d) setDye(k, true);
+      else if (MAT[k].userData._dye) setDye(k, false);
+      const dsw = document.querySelector('#groups .dye[data-k="' + CSS.escape(k) + '"]');
+      if (dsw) dsw.setAttribute('aria-pressed', o.d ? 'true' : 'false');
+      applyOpa(k);
+      const sw = document.querySelector('#groups input[type=color][data-k="' + CSS.escape(k) + '"]');
+      if (sw) sw.value = '#' + MAT[k].color.getHexString();
+      const os = document.querySelector('#groups input[type=range][data-k="' + CSS.escape(k) + '"]');
+      if (os){ os.value = String(_opa[k] != null ? _opa[k] : BASEOPA[k]);
+               const vv = os.parentNode.querySelector('.v'); if (vv) vv.textContent = os.value; }
+    }));
+  });
+  buildSelects();
+  return Promise.all(jobs);
+}
+$('t_export').addEventListener('click', () => {
+  const j = exportScheme();
+  const t = JSON.stringify(j);
+  $('sch_txt').value = t;
+  $('sch_txt').select();
+  /* 剪贴板可能被浏览器拦（非 https 或没授权）—— 拦了也没关系，框里的字已经选中了 */
+  try { const r = navigator.clipboard && navigator.clipboard.writeText(t); if (r) r.catch(() => {}); } catch(e){}
+  const b = $('t_export'); const old = b.textContent;
+  b.textContent = '已复制到剪贴板';
+  setTimeout(() => b.textContent = old, 1400);
+});
+$('t_import').addEventListener('click', () => {
+  try { importScheme(JSON.parse($('sch_txt').value)); }
+  catch(e){ $('sch_txt').value = '解析失败：' + e.message; }
+});
+
+/* 轮廓线按需生成 —— 13 万面全算一遍要几秒，不能在加载时就做 */
+let edgesBuilt = false;
+toggle('t_edge', false, v => {
+  if (v && !edgesBuilt && root){
+    root.updateMatrixWorld(true);
+    const ang = +$('e_ang').value;
+    root.traverse(o => {
+      if (!o.isMesh || o.userData.grp === 'glass') return;
+      const ln = new THREE.LineSegments(new THREE.EdgesGeometry(o.geometry, ang), edgeMat);
+      o.matrixWorld.decompose(ln.position, ln.quaternion, ln.scale);
+      edgeGroup.add(ln);
+    });
+    edgesBuilt = true;
+  }
+  edgeGroup.visible = v;
+}, '轮廓：开', '轮廓：关');
+
+$('t_cam').addEventListener('click', function(){
+  const p = camera.position.clone();
+  camera = (camera === ORTHO) ? PERSP : ORTHO;
+  camera.position.copy(p);
+  controls.object = camera; controls.update();
+  this.textContent = (camera === ORTHO) ? '切透视' : '切正等测';
+  $('note2').textContent = (camera === ORTHO) ? '正等测 · 正交相机' : '透视相机';
+});
+$('t_fit').addEventListener('click', fit);
+
+/* ═══ 挡视线的墙自动让开 ════════════════════════════════
+   建筑轴测图里近处的墙要拿掉才看得见室内。这里逐帧判断：
+   哪片墙在「相机 → 房间中心」这条线的相机一侧，就隐藏哪片。
+   转视角时墙会自己让开，不用手动删。                        */
+const _c = new THREE.Vector3(), _v = new THREE.Vector3(), _d = new THREE.Vector3();
+let cullWalls = true;
+/* 墙的总开关（外层放大界面上那个按钮）。和上面的"自动让开"是两回事：
+   自动让开是**转到哪边挡视线就藏哪边**，这个是**全部藏掉**，
+   为的是一眼看清整套布局 —— 建筑图里叫拆顶拆墙的轴测。
+   地面不跟着藏：地面在，房间的范围和家具的落位关系才还读得出来。 */
+let wallsOn = true;
+
+/* ═══ 墙体高度 ══════════════════════════════════════════
+   不是"显示 / 隐藏"两个状态，而是一条**连续的高度**：拖到底是一张平面图，
+   拖到顶是完整房间，中间任意高度。建筑图里的拆墙轴测本来就是渐变的。
+
+   做法是一张水平裁剪面，只挂在墙和窗的材质上（家具不挂，所以不受影响）。
+   法向取 (0,-1,0)：着色器保留 dot(n,p)+c >= 0 的部分，也就是 y <= c，
+   所以 c 就是"墙切到多高"。
+
+   窗跟着一起切 —— 窗是墙上的洞，墙降下去它必须一起降，否则会悬在半空。
+   注意别把「洗碗机玻璃」也收进来（它也带"玻璃"两个字，但那是柜门）。
+
+   **裁剪面一次挂好，之后只动 constant。** 因为 numClippingPlanes 是个
+   编译期 define，clippingPlanes 从 null 变成数组会触发整批着色器重编译，
+   拖滑杆的第一下就会卡一下。挂着不动、只改数值则完全不重编译。      */
+const WALL_CLIP = new THREE.Plane(new THREE.Vector3(0, -1, 0), 1e6);
+let _wy0 = 0, _wy1 = 0, wallT = 1;
+let _clipNodes = [];                       /* 被裁的那些 mesh，AO 那一遍要临时藏掉 */
+function isWallLayer(L){
+  return TMPL_OF[L] === 'wall' || /^窗框/.test(L) || L === '玻璃';
+}
+function initWallClip(){
+  const b = new THREE.Box3();
+  wallNodes.forEach(n => b.expandByObject(n));
+  if (b.isEmpty()) return;
+  _wy0 = b.min.y; _wy1 = b.max.y;
+  LAYERS.forEach(L => { if (isWallLayer(L) && MAT[L]) MAT[L].clippingPlanes = [WALL_CLIP]; });
+  _clipNodes = [];
+  root && root.traverse(o => { if (o.isMesh && isWallLayer(o.userData.grp || '')) _clipNodes.push(o); });
+  setWallH(1);
+  initWallCap();
+}
+function setWallH(t){
+  wallT = Math.max(0, Math.min(1, t));
+  /* 顶上多给 1 cm，t=1 时保证一点都不切 */
+  WALL_CLIP.constant = _wy0 + (_wy1 - _wy0) * wallT + .01;
+  wallsOn = wallT > 0;
+  syncCap();
+}
+/* 老接口留着：外层现在还可能按开关用 */
+function setWalls(on){ setWallH(on ? 1 : 0); }
+
+/* ═══ 切面填充 ═══════════════════════════════════════════
+   只裁不填的话墙是**空心**的：切开之后能看进墙芯，一堵 120 的墙变成
+   两张贴在一起的纸片，读起来不像砌起来的实体。Rhino 的 clipping plane
+   会给剖口补一块实心填充（建筑图里叫「涂黑 / poché」），这里做的是同一件事 ——
+   它同时也是这套图的制图语言：被切到的是墙，没被切到的是家具。
+
+   three 没有现成的 cap。标准做法是**模板缓冲**（官方例子
+   webgl_clipping_stencil 就是这个），三步：
+
+     1) 把墙的几何**再画两遍**，都只写模板、不写颜色也不写深度：
+        背面 +1，正面 -1，两遍都挂同一张裁剪面。
+     2) 于是对每个像素，模板里存的是「视线穿过的背面数 - 正面数」。
+        没被切到的地方一进一出，正负抵消 = 0；
+        剖口那一块，进去的那张正面在裁剪面上方、已经被裁掉了，
+        只剩出来的背面，计数 ≠ 0。**这就是剖口的形状**。
+     3) 在裁剪面的高度上铺一张大平面，模板测试设成「≠ 0 才画」，
+        画出来的正好是剖口。
+
+   所以填充是从墙自己的几何**算**出来的，不是照着平面图描一圈假盖子 ——
+   墙怎么摆、开多少个洞都对，换一个房间也不用重画。
+
+   ⚠ depthTest 必须关掉（两遍模板都是）。模板要统计的是视线穿过的
+   **所有**面，不只是看得见的那些；开着深度测试的话被家具挡住的那半堵墙
+   不计数，剖口就会缺一块。                                        */
+let capGroup = null, capPlanes = [], capPairs = [];
+/* 填充色 = 那一段墙自己的颜色 × CAP.k。整块纯色平铺会比墙面亮（它正对着
+   天光），压暗一点才像"被切开的截面"而不是"发光的台面"。
+   挂在 __ROOM.CAP 上，想调深浅改这一个数就行。 */
+const CAP = { k:.82 };
+function initWallCap(){
+  if (!wallNodes.length || capGroup) return;
+  capGroup = new THREE.Group();
+  scene.add(capGroup);
+
+  /* 两遍模板用的"隐形"材质 */
+  const stencilMat = (side, op) => {
+    const m = new THREE.MeshBasicMaterial();
+    m.side = side;
+    m.depthWrite = false; m.depthTest = false; m.colorWrite = false;
+    m.clippingPlanes = [WALL_CLIP];
+    m.stencilWrite = true;
+    m.stencilFunc  = THREE.AlwaysStencilFunc;
+    m.stencilFail = m.stencilZFail = m.stencilZPass = op;
+    return m;
+  };
+
+  /* **按材质分组**，一组一块盖板。
+     vision / memory 两条线的墙是按房间分层的（卧室紫、卫浴蓝、厨房黄…），
+     全屋共用一块盖板的话剖口就是一个颜色，房间的色彩编码在平面图里全丢了。
+     分组之后每个剖口是那间房自己的颜色 —— 平面图和立体图说的是同一件事。
+
+     分组之间模板必须**清零再算下一组**，否则上一组的计数会漏给下一组。
+     清零挂在每块盖板的 onAfterRender 上，靠 renderOrder 排出
+     「组1背面 → 组1正面 → 组1盖板(清零) → 组2背面 → …」的顺序。 */
+  const groups = new Map();
+  wallNodes.forEach(n => {
+    if (!groups.has(n.material)) groups.set(n.material, []);
+    groups.get(n.material).push(n);
+  });
+
+  const b = new THREE.Box3();
+  wallNodes.forEach(n => b.expandByObject(n));
+  const s = b.getSize(new THREE.Vector3()), c = b.getCenter(new THREE.Vector3());
+  const R = Math.max(s.x, s.z) * 2 + 4;          /* 盖板比房间大一圈，任何角度都盖得住 */
+  const planeGeo = new THREE.PlaneGeometry(R, R);
+
+  capPairs = []; capPlanes = [];
+  let gi = 0;
+  groups.forEach((nodes, srcMat) => {
+    const ro = 10 + gi * 3;
+    nodes.forEach(n => {
+      n.updateWorldMatrix(true, false);
+      const pair = { src:n, m:[] };
+      [[THREE.BackSide,  THREE.IncrementWrapStencilOp],
+       [THREE.FrontSide, THREE.DecrementWrapStencilOp]].forEach((d, i) => {
+        /* 共用墙自己的 geometry，不复制顶点；矩阵直接抄墙的世界矩阵。
+           挂在 scene 上而**不是**挂进 root —— root 会被 assemble() 和
+           拾取射线整棵遍历，混进去会被当成家具一起动、一起点中。 */
+        const o = new THREE.Mesh(n.geometry, stencilMat(d[0], d[1]));
+        o.matrixAutoUpdate = false;
+        o.matrix.copy(n.matrixWorld);
+        o.renderOrder = ro + i;
+        o.raycast = () => {};
+        capGroup.add(o);
+        pair.m.push(o);
+      });
+      capPairs.push(pair);
+    });
+
+    const mat = new THREE.MeshBasicMaterial({
+      color:0xffffff, side:THREE.DoubleSide,
+      /* 盖板和墙顶那一排像素正好同深度，会闪。往相机方向偏一点点。 */
+      polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2,
+      stencilWrite:true, stencilRef:0, stencilFunc:THREE.NotEqualStencilFunc,
+      stencilFail:THREE.ReplaceStencilOp, stencilZFail:THREE.ReplaceStencilOp,
+      stencilZPass:THREE.ReplaceStencilOp });
+    const pl = new THREE.Mesh(planeGeo, mat);
+    pl.rotation.x = -Math.PI / 2;
+    pl.position.set(c.x, 0, c.z);
+    pl.renderOrder = ro + 2;
+    pl.raycast = () => {};
+    pl.onAfterRender = r => r.clearStencil();   /* 交给下一组一块干净的模板 */
+    capGroup.add(pl);
+    capPlanes.push({ pl:pl, mat:mat, src:srcMat });
+    gi++;
+  });
+  syncCap();
+}
+/* 墙高一变就调用：盖板跟到新的高度，颜色跟着墙走（换配色 / 换房间色也对） */
+function syncCap(){
+  if (!capGroup) return;
+  const on = wallT < 1;
+  capGroup.visible = on;
+  if (!on) return;
+  for (const c of capPlanes){
+    c.pl.position.y = WALL_CLIP.constant;
+    if (c.src && c.src.color) c.mat.color.copy(c.src.color).multiplyScalar(CAP.k);
+  }
+}
+/* 每帧跟一下墙自己的可见性。
+   · 近墙让开（updateWallCull）会把挡镜头的那几堵墙藏掉 —— 藏了的墙
+     不能还留着剖口，否则空中飘着一条色带。
+   · 但墙高拖到 0 时 wallsOn=false、**所有**墙都被藏起来，那一档反而要
+     全部留着：这时画面上只剩地面和家具，加上墙的剖口就是一张标准平面图。*/
+function syncCapVis(){
+  if (!capGroup || !capGroup.visible) return;
+  const all = !wallsOn;
+  for (const p of capPairs){
+    const v = all || p.src.visible;
+    p.m[0].visible = p.m[1].visible = v;
+  }
+}
+function updateWallCull(){
+  if (!wallNodes.length) return;
+  /* 关掉的时候每帧都要按住 —— 循环里每帧都会跑这个函数，不按住会被下面两行放回来 */
+  if (!wallsOn){ wallNodes.forEach(n => n.visible = false); return; }
+  if (!cullWalls){ wallNodes.forEach(n => n.visible = true); return; }
+  _d.copy(camera.position).sub(controls.target).normalize();
+  for (const n of wallNodes){
+    if (!n.geometry.boundingBox) n.geometry.computeBoundingBox();
+    n.geometry.boundingBox.getCenter(_c);
+    n.localToWorld(_c);
+    _v.copy(_c).sub(controls.target);
+    _v.y = 0;
+    n.visible = (_v.lengthSq() < 1e-6) ? true : (_v.normalize().dot(_d) < 0.30);
+  }
+}
+
+/* ═══ 拼装动画 ══════════════════════════════════════════
+   全屋的网格按**世界高度从下往上**逐个升起、由小放大到位。
+   你这套房子本来就是 300 mm 的 cube 拼的，所以这段动画不是装饰 ——
+   它把"这是一套模块化系统"这句话演了一遍，不用配任何文字。
+
+   为什么改的是 o.matrix 而不是 o.position / o.scale：
+   Rhino 导出的网格把世界坐标烘进了几何体，物体自身的矩阵多半是单位阵。
+   这种情况下直接改 scale 是**绕世界原点缩放** —— 模型在 x≈−10、z≈−200，
+   一缩就会整个飞到原点去。所以这里明确地做「平移到自己脚底 → 缩放 → 平移回去」，
+   乘在保存下来的原始矩阵上，无论原始矩阵是什么都对。            */
+const _amA = new THREE.Matrix4(), _amB = new THREE.Matrix4(), _amP = new THREE.Vector3();
+let _asm = null;
+/* span = 从最低的一件到最高的一件铺开用多久；dur = 每一件自己升起用多久；
+   rise = 从下方多高的地方升上来（米）。挂在 __ROOM.ASM 上，方便直接调。 */
+const ASM = { span:1700, dur:520, rise:.34, up:.55 };
+function assemble(){
+  if (!root || _asm) return;
+  const list = [];
+  const bb = new THREE.Box3();
+  root.traverse(o => {
+    if (!o.isMesh) return;
+    if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+    bb.copy(o.geometry.boundingBox).applyMatrix4(o.matrix);   /* 父空间，不是世界空间 */
+    list.push({ o, m0:o.matrix.clone(), auto:o.matrixAutoUpdate,
+                y:(bb.min.y + bb.max.y) / 2,                  /* 用中心高度，不是底面 —— 见下 */
+                d:(bb.min.x + bb.max.x) / 2 + (bb.min.z + bb.max.z) / 2,
+                p:new THREE.Vector3((bb.min.x + bb.max.x) / 2, bb.min.y, (bb.min.z + bb.max.z) / 2) });
+  });
+  if (!list.length) return;
+  /* 出场顺序 = 高度 + 平面对角线的混合。
+     只按高度排不行：墙从地面通到天花，家具也都坐在地上，**几乎所有网格的
+     底面都在同一个标高**，算出来的延迟全是 0，于是所有东西一起冒出来，
+     看着只是"整体淡入"，读不出"一件件拼起来"。
+     所以改用中心高度（把高的东西真正排到后面），再叠一道沿 x+z 的对角扫掠，
+     让它像一道波从房间的一角推到另一角 —— 这才有"在装配"的感觉。 */
+  let lo = 1e9, hi = -1e9, dlo = 1e9, dhi = -1e9;
+  list.forEach(it => {
+    if (it.y < lo) lo = it.y; if (it.y > hi) hi = it.y;
+    if (it.d < dlo) dlo = it.d; if (it.d > dhi) dhi = it.d;
+  });
+  list.forEach(it => {
+    const a = hi > lo ? (it.y - lo) / (hi - lo) : 0;
+    const b = dhi > dlo ? (it.d - dlo) / (dhi - dlo) : 0;
+    it.dly = (ASM.up * a + (1 - ASM.up) * b) * ASM.span;
+  });
+  list.forEach(it => { it.o.matrixAutoUpdate = false; it.o.visible = false; });
+  _asm = { t0:performance.now(), list };
+}
+function stepAsm(){
+  if (!_asm) return;
+  const t = performance.now() - _asm.t0;
+  let done = true;
+  for (const it of _asm.list){
+    const u = (t - it.dly) / ASM.dur;
+    if (u < 1) done = false;
+    if (u <= 0){ it.o.visible = false; continue; }
+    it.o.visible = true;
+    const c = Math.min(1, u);
+    const e = 1 - Math.pow(1 - c, 3);                       /* easeOutCubic */
+    const sc = .02 + e * .98;             /* 从几乎看不见的一点长到实际尺寸 */
+    _amP.copy(it.p);
+    _amA.makeTranslation(_amP.x, _amP.y, _amP.z);
+    _amB.makeScale(sc, sc, sc);            _amA.multiply(_amB);
+    _amB.makeTranslation(-_amP.x, -_amP.y, -_amP.z); _amA.multiply(_amB);
+    _amB.makeTranslation(0, -(1 - e) * ASM.rise, 0);       /* 从下方升上来 */
+    it.o.matrix.copy(_amB).multiply(_amA).multiply(it.m0);
+    it.o.matrixWorldNeedsUpdate = true;
+  }
+  if (done) stopAsm();
+}
+function stopAsm(){
+  if (!_asm) return;
+  _asm.list.forEach(it => {
+    it.o.matrix.copy(it.m0);
+    it.o.matrixAutoUpdate = it.auto;
+    it.o.matrixWorldNeedsUpdate = true;
+    it.o.visible = true;
+  });
+  _asm = null;
+  updateWallCull();
+}
+
+/* ═══ 循环 ═════════════════════════════════════════════ */
+let frames = 0, t0 = performance.now();
+
+function renderAO(){
+  /* 1. 深度预渲染。玻璃先藏掉 —— 它是透明的，
+     让它参与遮挡的话淋浴房会在墙上糊一大片假暗影。 */
+  /* 墙被切矮之后也要藏掉：深度用的是 overrideMaterial（depthMat），
+     它身上没有裁剪面，墙照样会写进深度图 —— 结果是地上留着一圈
+     已经看不见的墙投下来的暗影。整墙藏掉，代价是墙脚那圈 AO 没了，
+     但"看得见的鬼影"比"少一点暗角"严重得多。
+
+     ⚠ 这份快照必须在**玻璃被藏起来之前**拍。
+     玻璃同时属于 glassNodes 和 _clipNodes（两组是重叠的）：
+     先藏玻璃再拍 _clipNodes 的快照，快照里玻璃就记成了"本来就不可见"，
+     最后按快照还原时又把它按回 false —— 玻璃于是**永久消失**，
+     而窗框还在，看起来就是"窗户只剩一圈边"。
+     两组重叠的东西各自存/还原，顺序错一步就会互相覆盖。 */
+  const cv = wallT < 1 ? _clipNodes.map(n => n.visible) : null;
+  const gv = glassNodes.map(n => n.visible);
+  glassNodes.forEach(n => n.visible = false);
+  if (cv) _clipNodes.forEach(n => n.visible = false);
+  const bg = scene.background; scene.background = null;
+  /* 剖口那三块也要藏：深度用的是 overrideMaterial，
+     它把材质整个换掉了 —— 裁剪面、colorWrite:false 全都不作数，
+     两份墙的拷贝会按**整堵墙**写进深度图，AO 于是在地上糊一圈鬼影。 */
+  const _capV = capGroup ? capGroup.visible : false;
+  if (capGroup) capGroup.visible = false;
+  scene.overrideMaterial = depthMat;
+  renderer.setRenderTarget(depthRT);
+  renderer.setClearColor(0xffffff, 1); renderer.clear();
+  renderer.render(scene, camera);
+  scene.overrideMaterial = null;
+  if (capGroup) capGroup.visible = _capV;
+  scene.background = bg;
+  /* 还原也要反着来：先还 _clipNodes，再还玻璃 —— 重叠的部分以后还的为准 */
+  if (cv) _clipNodes.forEach((n, i) => n.visible = cv[i]);
+  glassNodes.forEach((n, i) => n.visible = gv[i]);
+
+  /* 2. 算 AO */
+  aoMat.uniforms.tDepth.value = depthRT.texture;
+  aoMat.uniforms.proj.value.copy(camera.projectionMatrix);
+  aoMat.uniforms.projInv.value.copy(camera.projectionMatrixInverse);
+  aoMat.uniforms.radius.value = AO.radius;
+  aoMat.uniforms.intensity.value = AO.intensity;
+  aoMat.uniforms.bias.value = AO.bias;
+  renderer.setRenderTarget(aoRT);
+  renderer.render(aoScene, quadCam);
+
+  /* 3. 模糊去噪 */
+  blurMat.uniforms.tAO.value = aoRT.texture;
+  renderer.setRenderTarget(aoRT2);
+  renderer.render(blurScene, quadCam);
+  renderer.setRenderTarget(null);
+}
+
+const BLACK = new THREE.Color(0x000000);
+function tightenDepth(){
+  /* 正交相机的深度精度是线性摊在 near→far 之间的。开局写死的 .01～500
+     等于把深度摊到 500 m 上，贴着墙的盲道和触摸板必闪。收到贴着模型。 */
+  if (!MODEL_R) return;
+  const d = camera.position.distanceTo(CENTER);
+  const n = Math.max(.01, d - MODEL_R * 1.6), f = d + MODEL_R * 1.6;
+  if (camera.near !== n || camera.far !== f){
+    camera.near = n; camera.far = f; camera.updateProjectionMatrix();
+  }
+}
+function renderBloom(){
+  const bg = scene.background, env = scene.environment;
+  const ei = scene.environmentIntensity, si = sun.intensity;
+  const su = renderer.shadowMap.autoUpdate;
+  scene.background = BLACK; scene.environment = null;
+  scene.environmentIntensity = 0; sun.intensity = 0;
+  renderer.shadowMap.autoUpdate = false;
+  camera.layers.set(1);
+  renderer.setRenderTarget(bloomA);
+  renderer.setClearColor(0x000000, 1); renderer.clear();
+  renderer.render(scene, camera);
+  camera.layers.set(0);
+  scene.background = bg; scene.environment = env;
+  scene.environmentIntensity = ei; sun.intensity = si;
+  renderer.shadowMap.autoUpdate = su;
+  gaussMat.uniforms.tSrc.value = bloomA.texture;
+  for (let i = 0; i < 2; i++){
+    const r = BLOOM.rad * (i ? 2 : 1);
+    gaussMat.uniforms.dir.value.set(r, 0);
+    renderer.setRenderTarget(bloomB); renderer.render(gaussScene, quadCam);
+    gaussMat.uniforms.tSrc.value = bloomB.texture;
+    gaussMat.uniforms.dir.value.set(0, r);
+    renderer.setRenderTarget(bloomA); renderer.render(gaussScene, quadCam);
+    gaussMat.uniforms.tSrc.value = bloomA.texture;
+  }
+  renderer.setRenderTarget(null);
+}
+
+renderer.setAnimationLoop(() => {
+  controls.update();
+  tightenDepth();
+  if (NIGHT.on) syncGlow();
+  stepAsm();
+  hoverTick();
+  /* 拼装期间墙的可见性归动画管，updateWallCull 每帧都会把墙设回 true，会打架 */
+  if (!_asm) updateWallCull();
+  /* 每帧过一遍：换房间配色（setPalette）改的是 MAT[L].color，
+     不走 setWallH，剖口的颜色得在这儿跟上，否则换完色剖口还是旧颜色。
+     拼装动画期间墙的矩阵是临时的、剖口那两份拷贝跟不上，整组先藏掉。 */
+  if (capGroup){ syncCap(); if (_asm) capGroup.visible = false; }
+  syncCapVis();
+  if (AO.on) renderAO();
+  const doBloom = NIGHT.on && BLOOM.amt > 0.001;
+  if (doBloom) renderBloom();
+  renderer.setClearColor(0x000000, 0);
+  renderer.render(scene, camera);
+  renderer.autoClear = false;
+  /* 先 AO 正片叠底（压暗），后辉光加色（提亮）——
+     辉光是额外洒出来的光，不该被 AO 压掉。 */
+  if (AO.on){
+    compMat.uniforms.tAO.value = aoRT2.texture;
+    renderer.render(compScene, quadCam);
+  }
+  if (doBloom){
+    bloomCompMat.uniforms.tBloom.value = bloomA.texture;
+    bloomCompMat.uniforms.amount.value = BLOOM.amt;
+    renderer.render(bloomCompScene, quadCam);
+  }
+  renderer.autoClear = true;
+  frames++;
+  const now = performance.now();
+  if (now - t0 > 500){
+    $('fps').textContent = Math.round(frames * 1000 / (now - t0)) + ' fps';
+    frames = 0; t0 = now;
+  }
+});
+
+/* ═══ 点选家具 ═══════════════════════════════════════════
+   外层页面把预览放大之后才打开。只认可点的那几件，点别处不响应。
+   选中用 emissive 提亮整件家具 —— 比描边便宜得多，也不用改几何。 */
+/* 能点出信息卡的 = 除了「墙 / 地 / 其它」以外的所有家具组。
+   墙和地不算家具，点它们弹卡片只会挡视线。 */
+const INFO_KEYS = FURN.map(f => f.key).filter(k => k !== 'arch');
+/* 其中这三件还能换材质和颜色 —— 和 EDIT_ONLY / editLayers 是同一套范围 */
+/* typeC OptionA 可换**两件**：沙发、床。九个房间里唯一一个只放两件的 ——
+   这个房间没有岛台，也没有衣柜 / 储物柜 / 茶几，剩下的架子和卧室桌子不放开。
+   顺序 = 第 4 步翻页卡的顺序，必须和 flow.html 里 PV_LIST 的那一行完全一致。 */
+const EDITABLE = ['sofa', 'bed'];
+
+/* 「按整件报名字」的那几件。**和 EDITABLE 不是一回事** ——
+   可换材质的必然是整件，但整件的不一定可换：这个户型的衣柜就是。
+   之前这里直接用 EDITABLE 判断，衣柜从可换里拿掉之后，悬停就会去读它的
+   图层名，把「衣柜柜门（木板）」读成 Cabinet door，而柜体那一层读成
+   Wardrobe —— 同一个衣柜两个名字。分成两张表就不会再串。 */
+const WHOLE = ['sofa', 'bed', 'shelf'];
+const _ray = new THREE.Raycaster();
+const _ndc = new THREE.Vector2();
+let pickOn = false, picked = '', pickedMesh = null;
+/* 点中的那个**三维点**。存下来是为了让引线在转动模型时能跟着动 ——
+   只存屏幕坐标的话，相机一转，线就指到空气里去了。 */
+const _pickPt = new THREE.Vector3();
+function furnOf(layer){
+  const f = FURN.find(x => x.test.test(layer));
+  return f ? f.key : '';
+}
+/* 提亮分两档：选中的那件亮一档，鼠标掠过的那件亮**半档**。
+   两档必须拉得开又都看得见 —— 悬停如果和选中一样亮，用户会以为已经点上了。 */
+function highlight(key){
+  LAYERS.forEach(L => {
+    const m = MAT[L];
+    if (!m.emissive) return;
+    /* 盲道 / 触摸板 / 灯的 emissive 归夜间模式管，选中提亮别去踩它 ——
+       否则一悬停就会把夜里的光按灭一帧。 */
+    if (TMPL_OF[L] === 'accent' || TMPL_OF[L] === 'light') return;
+    const g = furnOf(L);
+    const sel = key && g === key;
+    const hov = !sel && hoverKey && g === hoverKey;
+    m.emissive.setHex(sel ? 0x2A1B0A : hov ? 0x150D04 : 0x000000);
+  });
+}
+
+/* ═══ 悬停预反馈 ════════════════════════════════════════
+   在鼠标真正按下去之前先告诉用户"这个能点"。没有这一步，
+   一个陌生人站在屏幕前是不会想到去点家具的 —— 界面上没有任何东西暗示它可以点。
+
+   射线检测放在渲染循环里、按时间节流，不放在 pointermove 里：
+   移动事件一秒能来一百多次，每次都打一遍 229 个网格的射线纯属浪费；
+   而且相机转动时鼠标没动，光标下面的东西却变了，只听 pointermove 会漏掉。 */
+let hoverKey = '', _hvX = -1, _hvY = -1, _hvT = 0;
+const _hRay = new THREE.Raycaster(), _hNdc = new THREE.Vector2();
+function hoverTick(){
+  if (!pickOn || !root){ if (hoverKey){ hoverKey = ''; highlight(picked); } return; }
+  const now = performance.now();
+  if (now - _hvT < 60) return;                 /* 最快 ~16 次/秒，够跟手了 */
+  _hvT = now;
+  let k = '', en = '';
+  if (_hvX >= 0){
+    const r = renderer.domElement.getBoundingClientRect();
+    _hNdc.x = (_hvX / r.width) * 2 - 1;
+    _hNdc.y = -(_hvY / r.height) * 2 + 1;
+    _hRay.setFromCamera(_hNdc, camera);
+    for (const h of _hRay.intersectObject(root, true)){
+      if (!h.object.visible) continue;
+      const g = furnOf(h.object.userData.grp || '');
+      if (INFO_KEYS.indexOf(g) < 0) continue;
+      const pc = pieceOf(g, h.object);
+      if (pc && pc.off) continue;              /* 标了不弹卡的，射线穿过去 */
+      k = g; en = enOf(g, h.object);      /* 和信息卡走同一个函数，不会再分叉 */
+      break;
+    }
+  }
+  renderer.domElement.style.cursor = k ? 'pointer' : (pickOn ? 'default' : '');
+  if (k === hoverKey) return;
+  hoverKey = k;
+  highlight(picked);
+  if (typeof window.__ROOM.onHover === 'function')
+    window.__ROOM.onHover(k ? { key:k, en:en, x:_hvX, y:_hvY } : null);
+}
+function setPick(on){
+  pickOn = !!on;
+  if (!pickOn){ picked = ''; highlight(''); setDim(''); hoverKey = ''; }
+  renderer.domElement.style.cursor = pickOn ? 'pointer' : '';
+}
+renderer.domElement.addEventListener('pointermove', e => {
+  const r = renderer.domElement.getBoundingClientRect();
+  _hvX = e.clientX - r.left; _hvY = e.clientY - r.top;
+});
+renderer.domElement.addEventListener('pointerleave', () => { _hvX = -1; });
+/* ═══ 点选：必须是"点"，不能是"拖" ═════════════════════
+   原来直接挂在 pointerdown 上 —— 于是**每一次转动模型都会先选中一件家具**，
+   因为转动也是从一次按下开始的。用户的感受就是"老是误触"。
+   改成在 pointerup 时判断：从按下到抬起，指针挪动不超过 5 px、时间不超过
+   600 ms，才算一次点击；否则当成拖动，什么也不做。
+   这是根因；工具条上的"Rotate only"是在这之上再给一道保险。 */
+let _pdX = 0, _pdY = 0, _pdT = 0, _pdArmed = false;
+renderer.domElement.addEventListener('pointerdown', e => {
+  _pdX = e.clientX; _pdY = e.clientY; _pdT = performance.now(); _pdArmed = true;
+});
+renderer.domElement.addEventListener('pointercancel', () => { _pdArmed = false; });
+renderer.domElement.addEventListener('pointerup', e => {
+  if (!_pdArmed) return;
+  _pdArmed = false;
+  if (!pickOn || !root) return;
+  if (Math.hypot(e.clientX - _pdX, e.clientY - _pdY) > 5) return;   /* 拖过 → 是在转模型 */
+  if (performance.now() - _pdT > 600) return;                       /* 按太久 → 也不是点击 */
+  const r = renderer.domElement.getBoundingClientRect();
+  _ndc.x = ((e.clientX - r.left) / r.width) * 2 - 1;
+  _ndc.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+  _ray.setFromCamera(_ndc, camera);
+  const hits = _ray.intersectObject(root, true);
+  for (const h of hits){
+    const k = furnOf(h.object.userData.grp || '');
+    if (INFO_KEYS.indexOf(k) < 0) continue;     /* 墙地之类直接跳过，继续往后找 */
+    const pc = pieceOf(k, h.object);
+    if (pc && pc.off) continue;                 /* 表里标了不弹卡的，射线穿过去找后面的 */
+    picked = k; pickedMesh = h.object; _pickPt.copy(h.point); highlight(k);
+    /* 把点击位置一起给外层 —— 信息卡要贴着被点的东西弹出来，
+       而不是永远飘在屏幕正中，那样看不出卡片说的是哪一件。 */
+    if (typeof window.__ROOM.onPick === 'function')
+      window.__ROOM.onPick(k, { x:e.clientX - r.left, y:e.clientY - r.top });
+    return;
+  }
+  picked = ''; pickedMesh = null; highlight('');
+  if (typeof window.__ROOM.onPick === 'function') window.__ROOM.onPick('');
+});
+
+/* ═══ 屏幕投影：图解模式和尺寸线都靠它 ═════════════════
+   3D 里只负责算"这一点投到屏幕的哪里"，线和字全部交给外层页面用 SVG / DOM 画。
+   为什么不在 3D 里画：WebGL 里画文字要么烘贴图要么做 sprite，缩放会糊，
+   而且和外层已有的那套引线语言（细线 + 小圆点 + 毛玻璃）对不上。
+   投影出来的是 0~1 的比例坐标，外层乘上画布尺寸就行，和分辨率无关。
+   （曾经还有 piecesScreen / dimLines 两个函数在这里，用来做"图解模式"和
+     "尺寸标注"。两个都拆掉了：引线不做遮挡判断，躲在墙后的那几件会指在墙面上，
+     读起来像指错了对象；尺寸线同理，贴不到该贴的边上。留着不如不留。） */
+const _psV = new THREE.Vector3();
+function toScreen(v){
+  /* 必须先刷新一次相机矩阵。project() 用的是 matrixWorldInverse，而那个矩阵
+     只在 renderer.render() 里才更新 —— controls 的 change 事件是在渲染**之前**
+     触发的，此刻相机的位置已经变了、逆矩阵却还是上一帧的。
+     差这一帧，快速拖动时引线就会甩出去几十上百像素，看起来像指错了东西。 */
+  camera.updateMatrixWorld();
+  _psV.copy(v).project(camera);
+  return { x:_psV.x * .5 + .5, y:-_psV.y * .5 + .5, z:_psV.z };
+}
+/* 给整件家具换材质 / 染色。只动主材，五金玻璃不跟着变。 */
+/* 哪些图层允许用户换。**缩略图和 3D 里展示的仍然是整件家具**，
+   只是能被改的部分收窄了 —— 现实里换一张床的面料，木框、脚、
+   包边条是不会跟着换的，一起变反而假。
+     沙发 / 床 → 只有「（软包，软垫，皮纹细腻）」那一层
+     其余（硬边、15MM 软包边-皮质）不动
+   岛台没有单独限制，用这一组里所有主材图层。 */
+const EDIT_ONLY = {
+  sofa:   L => /软包/.test(L) && !/软包边/.test(L),
+  bed:    L => /软包/.test(L) && !/软包边/.test(L),
+  /* 衣柜这个户型根本没有，这条留着是空转（editLayers 只对 EDITABLE 里的调）。
+     留着是因为哪天这一页要放开衣柜，规则就在这儿，不用再想一遍。 */
+  wardrobe: L => /柜门/.test(L)
+  /* 岛台**不给条目** = 整件都换。它本来就只有一个图层，
+     没有"边和面"之分，和 optionC 里的处理一致。 */
+};
+function editLayers(key){
+  const only = EDIT_ONLY[key];
+  return FGROUP[key].layers.filter(L =>
+    MAIN_TMPL[TMPL_OF[L]] && (!only || only(L)));
+}
+function furnMat(key, id){
+  return Promise.all(editLayers(key).map(L => pickMat(L, id)));
+}
+/* 外层的卡片要在打开时就把当前这套方案标成选中，所以得能读到
+   每件家具现在挂的是哪个库材质、叠的是什么颜色。
+   读第一个可换图层就够 —— 同一件家具的可换图层永远是一起改的。 */
+/* ── 用户点的那一件到底多大 ─────────────────────────
+   不能直接量"整组"的包围盒。一个组是一个图层集合，里面往往有好几件散在
+   房间各处：「橱柜 / 柜门」量出来 6900×4330×3000 —— 那是整个屋子的尺寸，
+   不是一个柜子；两根扶手分别在卧室和卫生间，量出来是两根之间的距离。
+   把这种数字标给用户是错的。
+
+   所以按**空间连通性**把一个组拆成若干件：每个 mesh 的包围盒外扩 30 mm，
+   相交的并进同一件（并查集）。外扩是因为拼缝和倒角会让相邻块差几毫米碰不上。
+   然后只报用户点中的那一件。
+
+   代价是 O(N²)：柜门那一组有 900 多个 mesh，约 40 万次盒盒相交，几十毫秒，
+   而且只在第一次点到这一组时算一次，之后走缓存。 */
+const _clCache = {};
+function clustersOf(key){
+  if (_clCache[key]) return _clCache[key];
+  const set = new Set(FGROUP[key].layers);
+  const items = [];
+  root.traverse(o => {
+    if (!o.isMesh || !set.has(o.userData.grp)) return;
+    if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+    items.push({ o, bb: o.geometry.boundingBox.clone()
+                        .applyMatrix4(o.matrixWorld).expandByScalar(.03) });
+  });
+  const par = items.map((_, i) => i);
+  const find = a => { while (par[a] !== a){ par[a] = par[par[a]]; a = par[a]; } return a; };
+  for (let i = 0; i < items.length; i++)
+    for (let j = i + 1; j < items.length; j++)
+      if (items[i].bb.intersectsBox(items[j].bb)){
+        const a = find(i), b = find(j);
+        if (a !== b) par[a] = b;
+      }
+  const boxes = {};
+  items.forEach((it, i) => {
+    const r = find(i);
+    it.o.userData._cl = key + '#' + r;
+    (boxes[key + '#' + r] = boxes[key + '#' + r] || new THREE.Box3()).union(it.bb);
+  });
+  /* 把外扩的 30 mm 收回去 */
+  Object.keys(boxes).forEach(k => boxes[k].expandByScalar(-.03));
+  return (_clCache[key] = boxes);
+}
+
+/* 这件是什么、多大。模型单位是米，×1000 之后取整到 10 mm ——
+   再精确没意义，包围盒本来就带着倒角和拼缝的余量，标到个位数是假精度。 */
+/* ═══ 家具名对照表 ═══════════════════════════════════
+   模型里**没有物体名**：229 个带网格的节点里 224 个自身名字是空的，
+   能读到的只有图层名，而图层名写的是材质（陶瓷（白色）/ 金属 / 软包…），
+   同一个图层里既有马桶也有台盆。所以名字只能由人指定。
+
+   这张表用**这一件的质心水平坐标**当身份（x,z，米）。这是唯一稳定的线索。
+   代价必须说清楚：**模型一挪，键就对不上**。匹配用 12 cm 容差，
+   对不上就退回原来的类别名并在控制台报一句 —— 那句话就是"该重新对一遍表了"的信号。
+   想彻底不失配：以后在 Rhino 里给物体命名（Properties → Name），
+   glTF 会带上节点名，到时候优先读它，这张表退居备用。
+
+   off:true = 这一件不弹信息卡。射线会**穿过去**继续找后面的东西，
+   不是"点了没反应"，而是根本不当它是可点的目标。 */
+/* ── 逐件对照表 ────────────────────────────────────────
+   optionC 那份是**按世界坐标手写**的（哪个坐标上那一件叫什么），
+   只对那个模型有效，换个户型全部对不上。
+
+   OptionB 这里是**空的**，而且不需要填 —— 因为每一件都能从**图层名**
+   得到正确的名字（见下面 PART_EN）：水池→Basin、马桶→Toilet、
+   花洒→Shower、镜子→Mirror、扶手→Grab rail、抽屉把手→Handle、
+   柜门→Cabinet door、橱柜→Kitchen unit、窗框/玻璃→Window；
+   床 / 沙发 / 衣柜 / 桌子是整件，组名本身就是最准的说法。
+
+   optionC 之所以要这张表，是为了给几件东西更贴切的叫法
+   （Cupboard / Commode / Mirror + Washbasin / Shower tray），
+   以及把花洒、案板、洗碗机、窗标成"点了不弹卡"。
+   那是**手工判断**出来的，不是算出来的 —— 要给 OptionB 也做一份，
+   得先由你告诉我每一件叫什么，我不能靠尺寸猜。 */
+const PIECES = [];
+const PIECE_TOL = 0.12;                     /* 12 cm 以内算同一件 */
+const _pmV = new THREE.Vector3();
+const _pmWarned = {};
+function matchPiece(box, key){
+  if (!PIECES.length) return null;      /* 表是空的（OptionB）—— 名字交给 PART_EN，别每点一次警告一次 */
+  box.getCenter(_pmV);
+  let best = null, bd = 1e9;
+  for (const p of PIECES){
+    const d = Math.hypot(_pmV.x - p.at[0], _pmV.z - p.at[1]);
+    if (d < bd){ bd = d; best = p; }
+  }
+  if (bd <= PIECE_TOL) return best;
+  const sig = key + '@' + _pmV.x.toFixed(2) + ',' + _pmV.z.toFixed(2);
+  if (!_pmWarned[sig]){
+    _pmWarned[sig] = 1;
+    console.warn('[MNEMO] 对照表里找不到这一件（最近的差 ' + bd.toFixed(2) + ' m）：' + sig +
+                 ' —— 模型多半动过了，PIECES 需要重新对一遍');
+  }
+  return null;
+}
+/* 这一件（按点中的 mesh）对应表里的哪一条 */
+function pieceOf(key, mesh){
+  if (!mesh) return null;
+  const boxes = clustersOf(key);
+  const b = boxes[mesh.userData._cl];
+  return b ? matchPiece(b, key) : null;
+}
+
+/* 点到具体哪一层就报得更准一点：对着一个洗手盆说「Bathroom」太笼统。
+   只用于不可换材质的那些组 —— 沙发/床/岛台本来就是整件，组名就是最准的说法。 */
+const PART_EN = [
+  [/水池|台盆|洗手/, 'Basin'],       [/马桶/, 'Toilet'],
+  [/花洒/, 'Shower'],               [/镜子/, 'Mirror'],
+  [/浴室/, 'Bath panel'],           [/案板/, 'Worktop'],
+  [/洗碗机/, 'Dishwasher'],          [/抽屉把手/, 'Handle'],
+  [/柜门/, 'Cabinet door'],         [/橱柜/, 'Kitchen unit'],
+  [/窗框|玻璃/, 'Window'],          [/扶手/, 'Grab rail'],
+  [/陶瓷/, 'Ceramic fitting']
+];
+function partEn(grp){
+  for (const [re, en] of PART_EN) if (re.test(grp)) return en;
+  return '';
+}
+/* ── 一件东西叫什么，只在这里算一次 ──────────────────────
+   悬停提示和信息卡必须给同一个名字。原来这段逻辑写了两遍，
+   于是分叉了：点中桌子，卡上写 Table；鼠标划过同一张桌子，
+   提示写「桌子」—— 因为悬停那份的兜底直接掉到了中文组名。
+
+   优先级：逐件对照表 → 图层部件名 → 组的英文名 → 组的中文名。
+   **可换材质的那几件（沙发/床/衣柜）跳过"图层部件名"**：它们本来就是整件，
+   组名最准；不跳的话衣柜会被它自己的图层名读成「Cabinet door」。 */
+function enOf(key, mesh){
+  const f   = FURN.find(x => x.key === key) || {};
+  const g   = FGROUP[key];
+  const hit = pieceOf(key, mesh);
+  const part = (WHOLE.indexOf(key) < 0 && mesh) ? partEn(mesh.userData.grp || '') : '';
+  return (hit && hit.en) || part || f.en || (g && g.name) || '';
+}
+
+const _fiV = new THREE.Vector3();
+function furnInfo(key, mesh){
+  const g = FGROUP[key];
+  if (!g || g.box.isEmpty()) return null;
+  const boxes = clustersOf(key);
+  const one = mesh && mesh.userData._cl && boxes[mesh.userData._cl];
+  (one || g.box).getSize(_fiV);
+  const mm = v => Math.round(v * 100) * 10;
+  const editable = EDITABLE.indexOf(key) >= 0;
+  return { key, name:g.name, en:enOf(key, mesh),
+           w:mm(_fiV.x), d:mm(_fiV.z), h:mm(_fiV.y),
+           pieces: Object.keys(boxes).length,      /* 这一组一共几件 */
+           whole: !one,                            /* true = 报的是整组，不是单件 */
+           editable: editable };
+}
+function furnState(key){
+  const L = editLayers(key)[0];
+  if (!L || !MAT[L]) return null;
+  return { layer:L, mat:_pick[L] || '',
+           col:'#' + MAT[L].color.getHexString().toUpperCase() };
+}
+/* dye=false 表示"回到方案原本的颜色"：这时不去色，贴图按原样显示。
+   dye=true 表示用户挑了一个新颜色：去色 + 归一化，让色相真的换掉。 */
+function furnTint(key, hex, dye){
+  editLayers(key).forEach(L => {
+    _tint[L] = hex.toUpperCase();
+    MAT[L].color.set(hex);
+    setDye(L, dye !== false);
+  });
+}
+let _readyGo;
+const _ready = new Promise(r => { _readyGo = r; });
+
+/* 相机一动就通知外层重画引线。
+   原来外层是自己开一个 rAF 轮询，每帧比较相机位置有没有变 —— 但父页面的 rAF
+   和这个 iframe 抢同一个主线程，3D 一忙轮询就滞后，引线于是停在上一次的位置，
+   看起来就是"指到别的地方去了"。改成事件通知：谁动的谁说话，一帧都不差。 */
+controls.addEventListener('change', () => {
+  if (typeof window.__ROOM.onCam === 'function') window.__ROOM.onCam();
+});
+
+
+/* ═══ 整套房间配色 ══════════════════════════════════════════
+   vision 这一档的规则是「一房一色」：颜色本身就是导航 ——
+   老人不靠记路线，靠"这间是绿的、那间是蓝的"认房间。
+   所以配色不是装修风格，是**可辨识性参数**，四套方案是四个强度。
+
+   ⚠ 三条硬规则，四套都必须过：
+   1. **让开两个锁死的色相**：盲道 #ED7119（H 56°）和触摸板 #CC95F9（H 313°）
+      是无障碍指标，房间色的色相要离它们 ≥28°，否则指标会"藏"进背景。
+      原方案的厨房 #7E4D27 是 H 61° —— 和盲道只差 5°，这一条没过。
+   2. **让开两个锁死的明度**：盲道 L*61.6、触摸板 L*70.3。
+      要让它们压在房间上还看得见（对比 ≥1.95 / ≥1.8），房间必须
+      **明显比它们亮（L*≥90）或明显比它们暗（L*≤42）**，中间那一整段用不了。
+      → 所以房间只有"浅"和"深"两种，没有中间调。这不是审美选择，是这两个数逼出来的。
+   3. **房间两两之间 ΔE00 ≥12**（实际做到 15.7–28.5）。
+
+   ⚠ **四套差在两件事上，缺一件就会"看着都一样"**：
+     ① 明暗结构：bright 四间全浅 / focus 一亮三深 / zones 公共亮·私密深 / deep 四间全深。
+     ② **色相分配跟着轮换** —— 哪个房间是什么色相，四套里各不相同。
+
+     两次返工都栽在这上面：
+       第一版只调饱和度，明暗结构和色相分配都不动 → 四张几乎一模一样。
+       第二版换了明暗结构，但色相按房间写死（卫浴永远是绿的）→
+       换来换去只是"同一间绿卫浴的灯亮了一点"。
+     所以现在色相是搜出来的（gen6.py）：每个房间在四套里尽量拿到四个不同的色相，
+     卫浴这一间做到了淡蓝 / 酒红 / 靛紫 / 深绿，全屋 15/16。
+
+   ⚠ 搜的时候多加一条：**黄色（H 84–115）压暗会发闷发脏**，只允许出现在
+     L*≥40 的房间上。黄的天然明度就高，硬压暗出来的不是"深黄"，是土色。
+
+   墙和地同色（你定的）。好处是"一个房间就是一块色"，从门口一眼认得出；
+   代价是深色地面 —— 深度知觉退化的老人可能把深色地面读成台阶。
+   deep 那一套这个代价最大，bright 那一套最小（但 bright 的房间区分也最弱，
+   ΔE 只有 16.5）。这个取舍记在这里，不在代码里偷偷解决。 */
+/* typeA OptionC 起，**地板和墙合并成同一个图层**（你 09-01 定的）——
+   所以一个房间只有一层，不再是"地板 + 墙"两层。
+   「墙地同色」从一个可以选的取舍变成了模型本身的结构，配色规则不用改：
+   本来那四套就是按同色算的。
+
+   **走廊是第五个面，但它不是房间。** 它是连接件，所以不参与"一房一色"，
+   四套里一律给最低彩度的中性色 —— 让它当背景，四个房间的颜色在它上面
+   才不会互相打架，走廊自己也不会被当成第五个房间去记。
+   模型里它本来就是 #E5E9EE（近中性的浅蓝灰），和这条规则是一致的。 */
+/* typeC OptionC **没有走廊**，回到四个房间（和 typeB 一样）。
+   所以这一版用的是 typeB 那四套四色配色，不是 typeA 的五色版 ——
+   同名的方案在不同户型里应该是同一件事，用户选了 Focus，
+   在哪个户型里都该是"一间亮、其余深"。 */
+const ROOM_LAYERS = {
+  living : ['客厅墙'],
+  kitchen: ['厨房墙'],
+  bath   : ['厕所墙'],
+  bed    : ['卧室墙']
+};
+const PALETTES = [
+  { id:'orig', name:'Original', note:'The scheme as modelled',
+    c:{ living:'#FAF4E7', kitchen:'#B35125', bath:'#6E6960', bed:'#376CBF' } },
+  { id:'bright', name:'Bright', note:'All four rooms pale and airy — the lightest scheme',
+    c:{ living:'#FFE8ED', kitchen:'#9DF6DF', bath:'#D6EEFF', bed:'#F0E9C6' } },
+  { id:'focus', name:'Focus', note:'One bright living room, three deep rooms around it',
+    c:{ living:'#E0F5EF', kitchen:'#6B6526', bath:'#873D51', bed:'#004C6C' } },
+  { id:'zones', name:'Zones', note:'Bright where you gather, deep where you wash and rest',
+    c:{ living:'#F3ECC9', kitchen:'#FFDCE3', bath:'#3B5487', bed:'#004F40' } },
+  { id:'deep', name:'Deep', note:'Four deep rooms — the guiding path stands out most',
+    c:{ living:'#6A643C', kitchen:'#00597D', bath:'#005647', bed:'#71293F' } }
+];
+let _palId = 'orig';
+/* 染色走的是和图层色板一模一样的那条路（_tint + MAT.color），
+   所以方案导出、贴图异步落地、夜间自发光全都不用为它开特例。 */
+function setPalette(id){
+  const p = PALETTES.filter(x => x.id === id)[0] || PALETTES[0];
+  _palId = p.id;
+  Object.keys(ROOM_LAYERS).forEach(room => {
+    const hex = p.c[room];
+    ROOM_LAYERS[room].forEach(L => {
+      if (!MAT[L]) return;
+      _tint[L] = hex.toUpperCase();
+      MAT[L].color.set(hex);
+    });
+  });
+  return p;
+}
+
+window.__ROOM = { scene, renderer, MAT, GRID, AO, pickMat, setPBR, fit, onCam:null,
+                  /* 夜间模式：外层（flow.html 的两个按钮）用这两个 */
+                  setNight, night: () => NIGHT.on,
+                  /* 整套房间配色：外层那张 Room colour 卡用这三个 */
+                  setPalette, PALETTES, palette: () => _palId, ROOM_LAYERS,
+                  ready:_ready, thumb:renderThumb, furn:FGROUP, furnMat, furnTint, editLayers, furnState, INFO_KEYS, EDITABLE, THUMB, DIM, setDim,
+                  setWalls, wallsOn:() => wallsOn,
+                  setWallH, wallH:() => wallT, CAP, syncCap,
+                  assemble, stopAsm, asmOn:() => !!_asm, ASM,
+                  ZONES,
+                  /* 点中那个点现在投在屏幕的哪儿（0~1 比例），转动模型时引线靠它跟随 */
+                  pickedScreen: () => (picked && pickedMesh) ? toScreen(_pickPt) : null,
+                  onHover:null, hover:() => hoverKey,
+                  furnInfo: k => furnInfo(k, pickedMesh),
+                  setPick, picked: () => picked, onPick:null,
+                  /* 外层从缩略图点进来时用：3D 里同步高亮同一件家具 */
+                  pick: k => { picked = k || ''; pickedMesh = null; highlight(picked); },
+                  lib: () => LIB, layers: () => LAYERS, controls, PERSP, ORTHO, sun,
+                  cam: () => camera, setCam: c => { camera = c; controls.object = c; },
+                  center: () => CENTER, span: () => span,
+                  stat: () => stat, tri: () => $('tri').textContent };
+</script>
+</body>
+</html>

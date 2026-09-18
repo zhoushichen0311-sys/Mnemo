@@ -1,0 +1,1725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MNEMOSYNE — Home File</title>
+
+<style>
+/* 本地字体：不依赖网络，不阻塞渲染，不会加载后二次替换 */
+@font-face{
+  font-family:'InterLocal';
+  src:url('assets/fonts/inter-var.woff2') format('woff2-variations');
+  font-weight:100 900; font-style:normal; font-display:block;
+}
+@font-face{
+  font-family:'SpaceMonoLocal';
+  src:url('assets/fonts/space-mono-700.woff2') format('woff2');
+  font-weight:700; font-style:normal; font-display:block;
+}
+</style>
+
+<style>
+/* ============================================================
+   MNEMOSYNE · Home File — 满状态仪表盘
+   对应 Figma frame 635:85
+   从 flow.html 完成后跳转过来，卡片依次填满
+   ============================================================ */
+
+:root{
+  --cream-a:#F8ECDC; --cream-b:#F1ECE5;
+  --ink:#0E0D0F; --ink-soft:#1A1917;
+  --muted:#736E66; --soft:#9E9891;
+  --hair:#DEDACD; --hair-strong:#C2BDB4;
+  --accent:#ED7119; --amber:#F2B82F;
+  --blue:#7399C7; --purple:#A99AC8; --green:#8DA973;
+  --taupe:#CFC5B3;
+  --white:#fff;
+  --field:#EBE7DF;
+
+  --radius-card:14px; --radius-pill:999px;
+  --rail-w:136px; --gutter:48px;
+}
+
+*,*::before,*::after{ box-sizing:border-box }
+/* ⚠️ hidden 属性必须压得住（2026-09-16）
+   浏览器自带的 [hidden]{display:none} 在 UA 样式表里，作者写的任何
+   display 都盖得过它 —— .room-link 就写着 display:inline-flex。 */
+[hidden]{ display:none !important }
+html{ -webkit-text-size-adjust:100%; scrollbar-gutter:stable; background:var(--cream-b) }
+body{
+  margin:0; min-height:100dvh;
+  font-family:'InterLocal','Inter',system-ui,-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+  color:var(--ink);
+  background:
+    url('assets/bg/bg-family-carer.webp') center center / cover no-repeat fixed,
+    linear-gradient(160deg,var(--cream-a) 0%,var(--cream-b) 100%);
+  -webkit-font-smoothing:antialiased;
+}
+.mono{
+  font-family:'SpaceMonoLocal','Space Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-weight:700; text-transform:uppercase; letter-spacing:.09em;
+}
+
+.shell{
+  display:grid; grid-template-columns:var(--rail-w) minmax(0,1fr);
+  max-width:1440px; margin-inline:auto; min-height:100dvh;
+  padding:34px var(--gutter) 48px 0;
+}
+
+/* ── 侧边栏 ─────────────────────────────────────────────── */
+.rail{
+  position:sticky; top:34px; align-self:start; height:calc(100dvh - 82px);
+  display:flex; flex-direction:column; align-items:center; padding-left:34px;
+}
+.logo{ width:68px; height:68px; display:block; flex:none; object-fit:contain }
+/* ── 田字格 = 工具栏开关（2026-09-17）─────────────────
+   点左上那个田字格，底下三个（+ / 通知 / 设置）一起收进去，
+   白胶囊缩成一个圆。再点一次放出来。
+
+   为什么把 gap 改成 margin-top：
+   flex 的 gap 是「容器」的属性，子元素高度变 0 了 gap 还占着，
+   收不干净会留一条 8px 的空。改成子元素自己的 margin-top，
+   高度和间距就能一起归零。展开时两种写法的间距完全一样，
+   Figma 的样子一个像素都没动。 */
+.rail-nav{ margin-top:34px; display:flex; flex-direction:column; gap:0; align-items:center }
+.rail-nav > * + *{ margin-top:18px }
+.pill{
+  background:var(--white); border:1px solid var(--hair); border-radius:var(--radius-pill);
+  padding:10px; display:flex; flex-direction:column; gap:0; align-items:center;
+}
+.pill > * + *{ margin-top:8px }
+/* 第一个胶囊里那个 +：高度和上边距一起归零，胶囊自己就跟着缩了 */
+.tuck{
+  overflow:hidden;
+  transition:height .26s cubic-bezier(.4,0,.2,1), margin-top .26s cubic-bezier(.4,0,.2,1),
+             opacity .17s ease, transform .26s cubic-bezier(.4,0,.2,1);
+}
+.rail-nav.is-tucked .tuck{
+  height:0; margin-top:0; opacity:0; transform:scale(.55); pointer-events:none;
+}
+/* 第二个胶囊整个收掉。高度必须写成具体值 —— 从 auto 过渡到 0
+   浏览器不认，算式摊开写在这里：
+   1px 边框×2 + 10px 内边距×2 + 48px 按钮×2 + 8px 间距 = 126px，
+   和原来 auto 算出来的一模一样。 */
+.pill--more{
+  --btn:48px;
+  height:calc(2px + 20px + var(--btn) + 8px + var(--btn));
+  overflow:hidden;
+  transition:height .26s cubic-bezier(.4,0,.2,1), padding .26s cubic-bezier(.4,0,.2,1),
+             margin-top .26s cubic-bezier(.4,0,.2,1), border-width .26s cubic-bezier(.4,0,.2,1),
+             opacity .17s ease;
+}
+.rail-nav.is-tucked .pill--more{
+  height:0; padding-top:0; padding-bottom:0; border-top-width:0; border-bottom-width:0;
+  margin-top:0; opacity:0; pointer-events:none;
+}
+/* 恢复上次的状态时不要当着人面演一遍动画 */
+.rail-nav.no-anim, .rail-nav.no-anim *{ transition:none !important }
+.nav-btn{
+  width:48px; height:48px; border:0; border-radius:50%; background:transparent;
+  display:grid; place-items:center; cursor:pointer; color:var(--muted);
+  transition:background .18s ease, color .18s ease, transform .12s ease;
+  position:relative;
+}
+.nav-btn:hover{ background:#F3EFE8 }
+.nav-btn:active{ transform:scale(.94) }
+.nav-btn[aria-current="page"]{ background:var(--ink); color:var(--white) }
+.nav-btn:focus-visible{ outline:2px solid var(--accent); outline-offset:3px }
+.nav-btn .badge{
+  position:absolute; right:8px; top:8px; width:9px; height:9px; border-radius:50%;
+  background:var(--accent); border:2px solid var(--white);
+}
+.rail-spacer{ flex:1 1 auto; min-height:24px }
+.me{
+  width:56px; height:56px; border-radius:50%; background:#CDC4B3;
+  display:grid; place-items:center; color:var(--white);
+  font-size:32px; font-weight:600; line-height:1;
+  border:3px solid var(--white);
+}
+.person .av svg{ width:100%; height:100%; display:block }
+
+/* ── 主区 ───────────────────────────────────────────────── */
+.main{ min-width:0; padding-left:38px }
+.topbar{ display:flex; align-items:flex-start; justify-content:space-between; gap:24px; margin-bottom:36px }
+.greeting h1{ margin:0; font-size:34px; line-height:1.1; letter-spacing:-.022em; font-weight:700 }
+.greeting p{ margin:14px 0 0; font-size:14.5px; color:var(--muted) }
+.tools{ display:flex; align-items:center; gap:16px; flex:none }
+.search{
+  position:relative;
+  display:flex; align-items:center; gap:12px; width:262px; height:48px;
+  background:var(--white); border:1px solid var(--hair); border-radius:var(--radius-pill);
+  padding:0 20px; color:var(--soft);
+  transition:border-color .16s ease, box-shadow .2s ease;
+}
+.search:focus-within{ border-color:var(--accent); box-shadow:0 0 0 3px rgba(237,113,25,.16) }
+/* ── 搜这份档案（2026-09-17）────────────────────────────────
+   这个框原来能打字，但**一个监听都没绑** —— 打完什么都不会发生，
+   比医护版那个假输入框只好一点点。
+   现在按**行**搜：对上的那一行描橙边，同卡里没对上的行压暗，
+   一条都没中的整卡压暗，框底下报一句「几行 · 在哪几张卡里」。 */
+.findnote{
+  position:absolute; left:20px; top:54px; width:320px; margin:0;
+  font-size:9.5px; line-height:13px; color:var(--accent-d); pointer-events:none;
+}
+/* 压暗。注意下面第 182 行有一条 body.is-ready .card{opacity:1}，权重 (0,2,1)，
+   只写 .card.dim(0,2,0) 是压不住它的 —— 必须把 body.is-ready 一起写上。
+   这和 [hidden] 那个坑是同一类问题：后写的规则不一定赢，权重才算数。 */
+body.is-ready .card.dim{ opacity:.3 }
+.card.dim, .frow.dim{ opacity:.3; transition:opacity .2s ease }
+.frow.hit{ box-shadow:0 0 0 2px var(--accent); border-radius:10px; transition:box-shadow .2s ease }
+.card.hitcard{ box-shadow:0 0 0 1px var(--accent) }
+.search input{
+  flex:1; min-width:0; border:0; outline:0; background:transparent; font:inherit;
+  font-size:13.5px; color:var(--ink);
+}
+.search input::placeholder{ color:#9B958D }
+.btn{
+  display:inline-flex; align-items:center; gap:11px; height:48px; padding:0 24px;
+  background:var(--ink); color:var(--white); border:0; border-radius:var(--radius-pill);
+  font:inherit; font-size:13.5px; font-weight:600; cursor:pointer; text-decoration:none;
+  box-shadow:0 1px 2px rgba(0,0,0,.16);
+  transition:background .2s ease, transform .14s ease, box-shadow .2s ease;
+}
+.btn:hover{ background:#221F23; box-shadow:0 6px 18px rgba(20,16,12,.22) }
+.btn:active{ transform:translateY(1px) scale(.99) }
+.btn:focus-visible{ outline:2px solid var(--accent); outline-offset:3px }
+.btn .plus{ color:var(--accent) }
+
+/* ── 栅格 ───────────────────────────────────────────────── */
+.grid{ display:flex; flex-direction:column; gap:24px }
+.row{ display:grid; gap:24px }
+.row--top{ grid-template-columns:760fr 468fr }
+.row--bottom{ grid-template-columns:368fr 860fr }
+.stack{ display:grid; grid-template-rows:auto auto; gap:24px }
+/* 原来两行都写死 176px。实测「Changed twice since 2019」的内容需要 196，
+   一直被 overflow:hidden 剪着；而「The Room」放真平面又需要更高。
+   改成按内容定高，两张卡各拿各的，谁都不被剪。 */
+.room{ min-height:176px }
+.hist{ min-height:196px }
+
+.card{
+  position:relative; border-radius:var(--radius-card); overflow:hidden;
+  background:var(--white); border:1px solid var(--hair);
+  padding:26px 30px;
+}
+.card--taupe{ background:#CFC7B6; border-color:transparent }
+.card--dark{ background:var(--cream-b); border:0 }
+.card--dark{ background:#0E0D0F }
+/* 卡片高度写死 + 页脚 absolute 钉底 = 内容一换行就被压住。
+   窗口窄一点，.obs .n 多折一行，"See what MNEMO suggests" 就会
+   从上面那条观察记录底下穿过去（1240px 以上才会犯，因为响应式
+   那一档早就改成 static 了 —— 宽屏这一档漏了）。
+   改成"最小高度 + 弹性列 + 页脚 margin-top:auto"，撑高就撑高，
+   永远不会重叠。 */
+.card--tall{ min-height:360px }
+.card--wide{ min-height:376px }
+.watch,.hist,.cond{ display:flex; flex-direction:column }
+.watch .suggest,.hist .hist-foot{ position:static; margin-top:auto; align-self:flex-start }
+.watch .obs{ margin-bottom:20px }
+.hist .hist-foot{ align-self:stretch; padding-top:14px }
+
+/* 进场：从空白依次填满 */
+.card{ opacity:0; transform:translateY(12px) }
+body.is-ready .card{
+  opacity:1; transform:none;
+  transition:opacity .7s cubic-bezier(.22,.7,.3,1), transform .7s cubic-bezier(.22,.7,.3,1);
+}
+body.is-ready .card:nth-of-type(1){ transition-delay:.05s }
+.row--top   .card:nth-child(1){ transition-delay:.10s }
+.row--top   .card:nth-child(2){ transition-delay:.22s }
+.stack      .card:nth-child(1){ transition-delay:.34s }
+.stack      .card:nth-child(2){ transition-delay:.46s }
+.row--bottom > .card{ transition-delay:.58s }
+
+/* ── A · 她现在的状态 ───────────────────────────────────── */
+.cond h2{ margin:0; font-size:19px; font-weight:600; line-height:1.25 }
+.cond .upd{ margin:8px 0 0; font-size:11.5px; color:#6B6459 }
+.cond-menu{
+  position:absolute; right:28px; top:28px; width:36px; height:36px; border-radius:50%;
+  background:var(--ink); border:0; cursor:pointer; display:grid; place-items:center;
+}
+.cond-menu span{ display:block; width:12px; height:3px; border-radius:1.5px; background:var(--amber); margin:1.5px 0 }
+
+.blobs{ position:absolute; inset:0; pointer-events:none }
+.blobs i{ position:absolute; border-radius:50%; filter:blur(34px) }
+.blob-mob{ left:400px; top:60px;  width:250px; height:250px; background:var(--accent); opacity:.86 }
+.blob-vis{ left:330px; top:180px; width:130px; height:130px; background:var(--blue);   opacity:.60; filter:blur(26px) }
+.blob-mem{ left:560px; top:200px; width:115px; height:115px; background:var(--purple); opacity:.58; filter:blur(24px) }
+.score-dot{
+  position:absolute; left:236px; top:148px; width:104px; height:104px; border-radius:50%;
+  background:var(--ink); color:var(--white); display:grid; place-items:center; text-align:center;
+}
+.score-dot b{ display:block; font-size:22px; font-weight:700; line-height:1 }
+.score-dot span{ display:block; margin-top:5px; font-size:10px; color:#C6C2BB }
+
+/* 色斑标签同样限宽 —— 卡片右缘在 730（760 − 30 内边距） */
+.blab{ position:absolute; z-index:2; max-width:150px }
+.blab b{ display:block; font-weight:600; line-height:1.25; color:#1A1917 }
+.blab span{ display:block; margin-top:3px; font-size:10.5px; color:#524D45 }
+.blab--mob{ left:462px; top:146px } .blab--mob b{ font-size:15px }
+.blab--vis{ left:368px; top:228px } .blab--vis b{ font-size:13.5px }
+.blab--mem{ left:596px; top:236px } .blab--mem b{ font-size:13px }
+
+/* 图例必须限宽：右边 236px 起就是 score-dot 和色斑标签，
+   不限宽的话长文案会横穿整张卡片压在它们上面。
+   限宽后允许折行，色块用 align-items:flex-start 对齐首行。 */
+/* 底部锚定而不是 top:220 —— 文案折成两行时若从上往下长，会压到底部那行说明。
+   锚在下沿则向上生长：三行各 1 行时顶边正好落回 Figma 的 220，
+   各 2 行时顶边 174，离标题区（约 96）仍有余量。 */
+.legend{ position:absolute; left:30px; bottom:61px; width:190px; display:grid; gap:16px; z-index:2 }
+.legend div{ display:flex; align-items:flex-start; gap:10px; font-size:11.5px; line-height:1.35; color:#4D4740 }
+.legend i{ width:26px; height:8px; border-radius:4px; flex:none; margin-top:4px }
+.legend span{ min-width:0; overflow-wrap:anywhere }
+.cond-note{ position:absolute; left:30px; bottom:26px; margin:0; font-size:8.5px; color:#665F54 }
+
+/* ── B · MNEMO 观察 ─────────────────────────────────────── */
+.watch h2{ margin:0; font-size:17.5px; font-weight:600; color:var(--white) }
+.watch .since{ margin:6px 0 0; font-size:11px; color:#99938C }
+.calm{
+  position:absolute; right:30px; top:24px; display:inline-flex; align-items:center; gap:7px;
+  border:1px solid #4C6142; border-radius:12.5px; padding:5px 13px; font-size:8px; color:#9EC78E;
+}
+.calm i{ width:7px; height:7px; border-radius:50%; background:#8CBF7A }
+.days-k{ margin:22px 0 0; font-size:8px; color:#807A72 }
+.days{ display:flex; gap:2.6px; margin-top:12px }
+.days i{ width:11px; height:30px; border-radius:3px; background:#38352F; flex:none }
+.days i.flag{ background:var(--amber) }
+.days i.today{ background:transparent; border:1.4px solid var(--white) }
+.days-ends{ display:flex; justify-content:space-between; margin-top:8px; font-size:7.5px; color:#706A62 }
+.watch-legend{ display:flex; gap:22px; margin-top:14px; font-size:10.5px; color:#99938C }
+.watch-legend div{ display:flex; align-items:center; gap:8px }
+.watch-legend i{ width:8px; height:8px; border-radius:50%; background:#3D3A34 }
+.watch-legend i.a{ background:var(--amber) }
+.watch hr{ border:0; height:1px; background:#38352F; margin:18px 0 0 }
+/* 空态：格子只留描边，读起来是"这些天还没到"，而不是"这些天什么都没发生"。
+   实心灰会被误读成已经观察过、结果一切正常 —— 那是另一回事。 */
+.days i.void{ background:transparent; border:1px solid #35322C }
+.calm.is-new{ border-color:#4A4640; color:#A8A29A }
+.calm.is-new i{ background:#6E6960 }
+.obs--empty{ display:block; margin-top:18px }
+.obs--empty .t{ margin:0; font-size:12.5px; font-weight:500; color:var(--white) }
+.obs--empty .n{ margin:8px 0 0; font-size:11px; line-height:1.55; color:#8F8981 }
+.suggest.is-off{ color:#7C766E; border-bottom-color:#3D3A34; pointer-events:none }
+.suggest.is-off svg{ display:none }
+.hist-empty{ margin:10px 0 0; font-size:10.5px; line-height:1.45; color:#736E66 }
+/* ── 示例档案 ?demo=1（2026-09-17）────────────────────
+   空态是对的 —— 档案今天才建，MNEMO 一天都还没看过，
+   画成有数据就是撞活。但空态有个代价：没人知道它有数据时长什么样。
+   所以另开一个只读的示例态，顶上挂明牌，随时能退回空态。
+   没新建文件 —— 同一份 html，只是换了一套数据。
+   里面那三条观察不是我新编的，就是空态文案自己写着的那三件事：
+   「a doorway she pauses at, a trip to the bathroom after midnight,
+     a chair that stops being used —— with the measurement behind it」。 */
+/* ⚠️ 这条别删：.obs .t 和 .obs .n 都写着 grid-column:2（见下面 343/344 行），
+   空态那两段文字其实一直待在第 2 列，第 1 列是空的、宽度塌成 0，所以看着像通栏。
+   这个链接不写列号的话会被自动排进**第 1 列**，第 1 列一有内容就撑开，
+   右边那两段文字当场被挤成窄条 —— 我第一版就是这么翻车的。 */
+.obs--empty .exlink{ grid-column:2; justify-self:start }
+.exlink{
+  display:inline-flex; align-items:center; gap:8px; margin:14px 0 0;
+  font-size:11px; font-weight:600; color:var(--amber); text-decoration:none;
+  border-bottom:1px solid transparent; padding-bottom:2px;
+  transition:border-color .16s ease;
+}
+.exlink:hover{ border-bottom-color:var(--amber) }
+.exlink:focus-visible{ outline:2px solid var(--amber); outline-offset:3px }
+.demobar{
+  display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+  margin:0 0 24px; padding:13px 20px; border-radius:16px;
+  background:#2B2823; color:#D8D2C9; font-size:11.5px; line-height:1.55;
+}
+.demobar b{ color:var(--amber); font-weight:600; letter-spacing:.08em; font-size:9px }
+.demobar a{
+  margin-left:auto; color:#F1ECE4; font-weight:600; text-decoration:none;
+  white-space:nowrap; border-bottom:1px solid #5A554D; padding-bottom:2px;
+  transition:border-color .16s ease;
+}
+.demobar a:hover{ border-bottom-color:var(--accent) }
+/* 履历卡的满状态：.tl 是 22/62/1fr 三列，空态只用到前两列，
+   标题和注解要明写第三列，不然 .n 会滑到下一行的第一列去。 */
+.tl div .t, .tl div .n{ grid-column:3 }
+/* 示例态的时间线比空态长四倍，最后一行会顶到底栏那条分割线上，给它一点余地 */
+body.is-demo #tl{ margin-bottom:14px }
+.obs{ display:grid; gap:14px; margin-top:16px }
+.obs div{ display:grid; grid-template-columns:18px 1fr; gap:0 10px }
+.obs i{ width:9px; height:9px; border-radius:50%; background:var(--amber); margin-top:4px }
+.obs .d{ grid-column:2; font-size:8px; color:var(--amber) }
+.obs .t{ grid-column:2; margin-top:4px; font-size:12.5px; font-weight:500; color:var(--white) }
+.obs .n{ grid-column:2; margin-top:3px; font-size:11px; color:#8F8981 }
+.suggest{
+  position:absolute; left:30px; bottom:24px;
+  display:inline-flex; align-items:center; gap:10px;
+  font-size:12.5px; font-weight:600; color:var(--white); text-decoration:none;
+  border-bottom:1px solid #59554E; padding-bottom:3px;
+}
+.suggest:hover{ border-bottom-color:var(--accent) }
+.suggest svg{ color:var(--accent) }
+
+/* ── C · 房间 ───────────────────────────────────────────── */
+.room{ padding:16px 26px }
+.room h3{ margin:0; font-size:17px; font-weight:600; line-height:1.3 }
+.room .sub{ margin:4px 0 0; font-size:11.5px; color:var(--muted) }
+.room-body{ display:flex; gap:20px; margin-top:16px }
+.miniplan{
+  position:relative; height:72px; width:120px; flex:none;
+  border-radius:8px; background:#F7F4EE; border:1px solid var(--hair); overflow:hidden;
+}
+/* 换成真平面之后：高度固定、宽度由图自己的比例决定。
+   typeA 是方的（230×230）→ 72×72；typeB/C 是竖的（226×300）→ 54×72。
+   硬塞进 120×72 会把竖着的平面压扁。 */
+.miniplan.is-real{
+  /* 真平面比抽象示意图信息密度高得多，72px 高的时候房间标注全糊了。
+     给到 112 才读得出这是哪个方案。 */
+  height:112px; width:auto; min-width:76px; max-width:150px;
+  display:flex; align-items:center; justify-content:center; padding:6px;
+}
+.miniplan.is-real svg{ height:100%; width:auto; display:block }
+.miniplan i{ position:absolute; border-radius:3px }
+.miniplan .r1{ left:8px;  top:8px;  width:46px; height:30px; background:var(--amber);  opacity:.75 }
+.miniplan .r2{ left:58px; top:8px;  width:54px; height:30px; background:var(--blue);   opacity:.5 }
+.miniplan .r3{ left:8px;  top:42px; width:54px; height:22px; background:var(--purple); opacity:.55 }
+.miniplan .r4{ left:66px; top:42px; width:46px; height:22px; background:var(--green);  opacity:.5 }
+.miniplan .turn{
+  left:42px; top:22px; width:40px; height:40px; border-radius:50%;
+  border:1.3px dashed var(--accent); background:rgba(255,255,255,.35);
+}
+.room-meta .k{ margin:0; font-size:8.5px; color:var(--muted) }
+.room-meta .v{ margin:6px 0 0; font-size:13.5px; font-weight:600; line-height:1.3 }
+.room-link{
+  display:inline-flex; align-items:center; gap:8px; margin-top:8px;
+  font:inherit; font-size:11.5px; font-weight:500; color:var(--ink);
+  background:transparent; border:1px solid var(--hair-strong); border-radius:13px;
+  padding:5px 13px; cursor:pointer;
+}
+.room-link:hover{ border-color:var(--ink) }
+
+/* ── D · 改造履历 ───────────────────────────────────────── */
+.hist{ padding:14px 26px }
+.hist h3{ margin:0; font-size:16px; font-weight:600; line-height:1.35; color:#1A1917 }
+
+/* 时间线：坐标全部对齐 Figma 637:78
+   圆点 x=26 · 日期 x=48 · 文字 x=110 · 竖线 x=31 · 行距 42 */
+.tl{ position:relative; margin-top:6px }
+.tl div{
+  position:relative; display:grid; grid-template-columns:22px 62px 1fr;
+  align-items:start; margin-bottom:12px;
+}
+.tl div:last-child{ margin-bottom:0 }
+
+/* 连接线：画在每一条上，自动适配 1 次 / 2 次改造 */
+.tl div:not(:last-child)::after{
+  content:''; position:absolute; left:5.25px; top:13px; bottom:-13px;
+  width:1.5px; background:#E3E0DB;
+}
+.tl i{
+  width:12px; height:12px; border-radius:50%; box-sizing:border-box;
+  background:#C2BDB5; border:2.5px solid var(--white); position:relative; z-index:1;
+}
+.tl div.now i{ background:var(--accent) }
+.tl div.start i{ background:transparent; border:1.5px solid #D1CCC4 }
+.tl .d{ font-size:7.5px; color:#9E9991; padding-top:1px }
+.tl div.now .d{ color:var(--accent) }
+.tl div.start .d{ color:#B8B2AB }
+.tl .t{ margin:0; font-size:12px; font-weight:600; line-height:1.33; color:#1A1917 }
+.tl .n{ margin:0; font-size:10.5px; color:#736E66; line-height:1.33 }
+.hist-foot{
+  position:absolute; left:26px; right:26px; bottom:13px;
+  display:flex; align-items:baseline; justify-content:space-between; gap:12px;
+  padding-top:9px; border-top:1px solid #EDEBE5;
+}
+.hist-foot .s{ font-size:8px; color:#9E9991 }
+.hist-foot .g{ font-size:10.5px; font-weight:600; color:#6B8C5C }
+
+/* ── E · Circle ─────────────────────────────────────────
+   列位置全部对齐 Figma 637:98（行内相对坐标）：
+   头像 16 · 姓名 76 · 状态 362 · 点条 566 · 计数 710 · 更多 772 */
+.circle{ padding:30px }
+.circle h2{ margin:0; font-size:19px; font-weight:600; line-height:1.2; color:#1A1917 }
+.circle .sub{ margin:3px 0 0; font-size:12px; color:#736E66 }
+.invite{ position:absolute; right:30px; top:28px; display:flex; align-items:center; gap:17px }
+.invite span{ font-size:12.5px; color:#736E66 }
+.invite button{
+  width:32px; height:32px; border:0; border-radius:50%; background:var(--accent);
+  color:var(--white); cursor:pointer; display:grid; place-items:center;
+  font-size:20px; font-weight:400; line-height:1;
+}
+/* 与点条同一起点左对齐，不是靠右 */
+.sess-k{ position:absolute; left:596px; top:62px; font-size:8.5px; color:#9E9991 }
+
+.people{ display:grid; gap:16px; margin-top:19px }
+.person{
+  display:grid; grid-template-columns:44px 270px 188px 190px 12px;
+  align-items:center; gap:16px;
+  background:#F8F6F3; border-radius:12px; padding:14px 16px;
+}
+.person .av{
+  width:44px; height:44px; border-radius:50%; overflow:hidden;
+  background:var(--av-bg,#CDC4B3); color:var(--av-fg,#999185);
+  display:grid; place-items:center;
+}
+.person .nm{ display:block; font-size:14px; font-weight:600; color:#1A1917 }
+.person .rl{ display:block; margin-top:5px; font-size:11.5px; color:#736E66 }
+.status{
+  display:inline-flex; align-items:center; gap:6px; justify-self:start;
+  height:28px; border:1px solid #D9D4CB; border-radius:14px; padding:0 14px;
+  font-size:11.5px; color:#403D38; white-space:nowrap;
+}
+.status i{ width:7px; height:7px; border-radius:50%; flex:none }
+.status.ok i{ background:#8DA973 } .status.wait i{ background:var(--amber) } .status.new i{ background:#B8B2AB }
+.dots{ display:flex; gap:6px; align-items:center }
+.dots i{ width:7px; height:12px; border-radius:1.5px; background:#E0DED9; flex:none }
+.dots i.on{ background:var(--accent) }
+.dots span{ margin-left:20px; font-size:10px; color:#736E66 }
+.more{ display:grid; gap:2px; justify-items:center; background:none; border:0; cursor:pointer; padding:0 }
+.more i{ width:4px; height:4px; border-radius:50%; background:#9E9991 }
+.circle-note{ position:absolute; left:30px; bottom:15px; margin:0; font-size:8.5px; color:#948F87 }
+
+/* ── 首次进入的提示条 ───────────────────────────────────── */
+.toast{
+  position:fixed; left:50%; bottom:30px; transform:translateX(-50%) translateY(10px);
+  display:flex; align-items:center; gap:14px;
+  background:var(--ink); color:var(--white); border-radius:var(--radius-pill);
+  padding:13px 16px 13px 22px; font-size:13px;
+  box-shadow:0 10px 30px rgba(0,0,0,.26); opacity:0; pointer-events:none; z-index:60;
+  transition:opacity .3s ease, transform .3s cubic-bezier(.22,.7,.3,1);
+}
+.toast.is-on{ opacity:1; transform:translateX(-50%) translateY(0); pointer-events:auto }
+.toast b{ color:var(--amber); font-weight:600 }
+.toast button{
+  border:0; background:#26232A; color:var(--white); font:inherit; font-size:12px;
+  border-radius:var(--radius-pill); padding:7px 14px; cursor:pointer;
+}
+.toast button:hover{ background:#322E36 }
+
+/* ── 响应式 ─────────────────────────────────────────────── */
+@media (max-width:1240px){
+  :root{ --gutter:32px }
+  .row--top,.row--bottom{ grid-template-columns:1fr }
+  .card--tall,.card--wide{ height:auto; min-height:320px }
+  .blobs,.score-dot,.blab{ display:none }
+  .legend{ position:static; margin-top:24px }
+  .cond-note{ position:static; margin-top:20px }
+  .suggest,.circle-note,.hist-foot{ position:static; margin-top:20px }
+}
+@media (max-width:900px){
+  :root{ --rail-w:0px; --gutter:22px }
+  .shell{ grid-template-columns:1fr; padding:22px var(--gutter) 36px }
+  .rail{ position:static; height:auto; width:100%; flex-direction:row;
+    align-items:center; padding-left:0; margin-bottom:26px }
+  .rail-nav{ margin-top:0; flex-direction:row } .pill{ flex-direction:row }
+  .main{ padding-left:0 }
+  .topbar{ flex-direction:column }
+  .tools{ width:100%; flex-wrap:wrap } .search{ flex:1 }
+  .stack{ grid-template-rows:auto auto }
+  .person{ grid-template-columns:44px 1fr; row-gap:12px }
+  .status,.dots,.more{ grid-column:2 }
+}
+/* ── 手机 ─────────────────────────────────────────────────
+   桌面这页是 1440 的看板：侧栏竖着、卡片并排、几处小标签靠绝对坐标
+   （left:596px）和右栏对齐。900 那档已经把栏拆成一列，剩下三处
+   还是按 1440 的宽度算的，在 393 上要么顶出屏幕、要么跑到屏幕外面去。 */
+/* ── 胶囊横过来之后的高度 ──────────────────────────────
+   竖栏里两颗按钮是上下叠的，所以：
+     · .pill > * + * 用 margin-top:8px 拉开它们
+     · .pill--more 的高度写死成 calc(…48+8+48…)=126px
+       （必须写具体值，从 auto 过渡到 0 浏览器不认，收起动画就没了）
+   900 那档只把 flex-direction 改成了 row，这两条没跟着改：
+   那 8px 的 margin-top 变成了凭空多出来的上边距，126px 更是按"两颗竖着"
+   算的 —— 于是第二颗胶囊在手机上高出一大截，成了个立着的椭圆。
+   这里按同一个算式重算横排的高度：1px 边框×2 + 内边距×2 + 一颗按钮。 */
+@media (max-width:900px){
+  /* 两个胶囊之间的间距也是竖版留下的：margin-top 在横排里
+     变成了整条导航凭空高出 18px，一收起就又缩回去，页面跟着跳一下。 */
+  .rail-nav > * + *{ margin-top:0; margin-left:14px }
+  .pill > * + *{ margin-top:0; margin-left:8px }
+  .pill--more{ height:calc(2px + 20px + var(--btn)) }
+
+  /* 收起动画同理：竖栏里收的是高度，横过来要收的是宽度。
+     照搬竖版的话按钮塌成 0 高、横向位置还占着，旁边留一个空洞。 */
+  .tuck{
+    transition:width .26s cubic-bezier(.4,0,.2,1), margin-left .26s cubic-bezier(.4,0,.2,1),
+               opacity .17s ease, transform .26s cubic-bezier(.4,0,.2,1);
+  }
+  .pill--more{
+    transition:width .26s cubic-bezier(.4,0,.2,1), padding .26s cubic-bezier(.4,0,.2,1),
+               margin-left .26s cubic-bezier(.4,0,.2,1), border-width .26s cubic-bezier(.4,0,.2,1),
+               opacity .17s ease;
+  }
+  .rail-nav.is-tucked .tuck{ height:var(--btn,48px); width:0; margin-top:0; margin-left:0 }
+  .rail-nav.is-tucked .pill--more{
+    height:calc(2px + 20px + var(--btn)); width:0;
+    padding:10px 0; margin-left:0;
+    border-top-width:1px; border-bottom-width:1px;
+    border-left-width:0; border-right-width:0;
+  }
+}
+
+@media (max-width:620px){
+  :root{ --gutter:16px }
+
+  /* 顶部这条横过来之后放不下：logo 68 + 两个胶囊 + 头像，整条收一档 */
+  .rail{ gap:10px }
+  .logo{ width:44px; height:44px }
+  .rail-nav > * + *{ margin-top:0; margin-left:10px }
+  .pill{ padding:6px }
+  .pill > * + *{ margin-left:6px }
+  .nav-btn{ width:38px; height:38px }
+  .pill--more{ --btn:38px; height:calc(2px + 12px + var(--btn)) }
+  .rail-nav.is-tucked .tuck{ height:38px }
+  .rail-nav.is-tucked .pill--more{
+    height:calc(2px + 12px + var(--btn)); padding:6px 0;
+  }
+  .me{ width:40px; height:40px; font-size:14px }
+
+  /* 30 天观察条：30 × 11px + 29 × 2.6 间隙 = 405，比屏幕还宽。
+     改成等分 —— 这条读的是"哪几天有事"，格子多宽并不重要。 */
+  .days{ gap:2px }
+  .days i{ width:auto; flex:1 1 0; min-width:0 }
+
+  /* 这行小标原本用 left:596px 和桌面右栏的点条对齐。
+     一列布局里那个坐标落在屏幕外，标签整个看不见。 */
+  .sess-k{ position:static; margin:16px 0 0 }
+
+  /* 提示条。fixed + left:50% 而没有 right —— 这种写法的可用宽度
+     只剩容器的一半（左边那 50% 被 left 吃掉了），393 的屏幕上就是 196px，
+     减掉内边距和右边那颗按钮，留给文字的只有 70 来像素，
+     于是一句话折成四行、竖着叠在观察卡上。
+     窄屏不玩居中那一套，左右各留 16 直接拉通。 */
+  .toast{
+    left:16px; right:16px; transform:translateY(10px);
+    width:auto; border-radius:18px; padding:12px 14px;
+  }
+  .toast.is-on{ transform:translateY(0) }
+  .toast button{ white-space:nowrap }   /* 不然「Got it」会在按钮里折成两行 */
+}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    animation-duration:.01ms !important; transition-duration:.01ms !important;
+  }
+  .card{ opacity:1; transform:none }
+}
+</style>
+</head>
+
+<body>
+<div class="shell">
+
+  <aside class="rail">
+    <a href="./index.html" aria-label="MNEMOSYNE home">
+      <img class="logo" src="assets/logo.png" alt="MNEMOSYNE">
+    </a>
+    <nav class="rail-nav" aria-label="Main">
+      <div class="pill pill--main">
+        <button class="nav-btn" type="button" id="railtoggle" aria-current="page"
+                aria-label="Home file" aria-expanded="true" title="Hide tools">
+          <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true">
+            <rect x="1" y="1" width="9" height="9" rx="2.5" fill="#F2B82F"/>
+            <rect x="12" y="1" width="9" height="9" rx="2.5" fill="currentColor"/>
+            <rect x="1" y="12" width="9" height="9" rx="2.5" fill="currentColor"/>
+            <rect x="12" y="12" width="9" height="9" rx="2.5" fill="currentColor"/>
+          </svg>
+        </button>
+        <a class="nav-btn tuck" href="./flow.html" aria-label="Start a new rebuild">
+          <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true">
+            <path d="M13 4v18M4 13h18" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"/>
+          </svg>
+        </a>
+      </div>
+      <div class="pill pill--more">
+        <button class="nav-btn" aria-label="Notifications" data-act="say" data-say="Anything that changes in her home lands here — and only what she has let you see.">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
+            <path d="M5.5 9a5.5 5.5 0 0 1 11 0v4.2l1.3 2.3H4.2L5.5 13.2V9Z"
+                  stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+            <path d="M8.8 18.2a2.4 2.4 0 0 0 4.4 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+          </svg>
+          <span class="badge"></span>
+        </button>
+        <button class="nav-btn" aria-label="Settings" data-act="say" data-say="Language, text size, and who in her circle can open this file.">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M3 9h18M3 16h18" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+            <circle cx="9" cy="9" r="3.1" fill="#fff" stroke="currentColor" stroke-width="1.9"/>
+            <circle cx="16" cy="16" r="3.1" fill="#fff" stroke="currentColor" stroke-width="1.9"/>
+          </svg>
+        </button>
+      </div>
+    </nav>
+    <div class="rail-spacer"></div>
+    <div class="me" id="me" aria-hidden="true">U</div>
+  </aside>
+
+  <main class="main">
+
+    <header class="topbar">
+      <div class="greeting">
+        <h1 id="hi">Hi.</h1>
+        <p id="hi-sub">Here is how the home is doing today.</p>
+      </div>
+      <div class="tools">
+        <label class="search">
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+            <circle cx="6.4" cy="6.4" r="5.5" stroke="currentColor" stroke-width="1.6"/>
+            <path d="m10.6 10.6 3.4 3.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+          <input type="search" id="find" placeholder="Search this file" aria-label="Search this file">
+          <span class="findnote mono" id="findnote" hidden></span>
+        </label>
+        <a class="btn" href="./flow.html">
+          <span class="plus" aria-hidden="true">
+            <svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+          </span>
+          Start new rebuild
+        </a>
+      </div>
+    </header>
+
+    <!-- 只在 ?demo=1 时显示。文案要把话说死：这不是真人也不是真数据。 -->
+    <div class="demobar" id="demobar" hidden>
+      <b>EXAMPLE FILE</b>
+      <span id="demobar-t"></span>
+      <a href="#" id="demobar-x">Back to the real file</a>
+    </div>
+
+    <div class="grid">
+
+      <div class="row row--top">
+
+        <!-- A · 她现在的状态 -->
+        <section class="card card--taupe card--tall cond">
+          <h2>Her condition<br>right now</h2>
+          <p class="upd" id="cond-upd">Recorded today, from what you told MNEMO</p>
+          <button class="cond-menu" type="button" aria-label="Card options" data-act="say" data-say="This card can be renamed, put away, or used as the starting point for the next rebuild."><span></span><span></span><span></span></button>
+
+          <div class="blobs" aria-hidden="true">
+            <i class="blob-mob"></i><i class="blob-vis"></i><i class="blob-mem"></i>
+          </div>
+          <div class="score-dot"><span><b id="room-score">8.2</b><span>room score</span></span></div>
+
+          <div class="blab blab--mob"><b id="lab-mob">Wheelchair indoors</b><span>mobility</span></div>
+          <div class="blab blab--vis"><b id="lab-vis">Good</b><span>vision</span></div>
+          <div class="blab blab--mem"><b id="lab-mem">Mild</b><span>memory</span></div>
+
+          <div class="legend">
+            <div><i style="background:var(--accent)"></i><span id="leg-mob">Mobility — wheelchair indoors</span></div>
+            <div><i style="background:var(--blue)"></i><span id="leg-vis">Vision — good in daylight</span></div>
+            <div><i style="background:var(--purple)"></i><span id="leg-mem">Memory — colour cues help</span></div>
+          </div>
+          <p class="cond-note mono">Circle size shows how much each need shapes the room</p>
+        </section>
+
+        <!-- B · MNEMO 观察 -->
+        <section class="card card--dark card--tall watch">
+          <h2>What MNEMO noticed</h2>
+          <p class="since" id="watch-since">Watching starts today</p>
+          <p class="calm mono is-new"><i></i>Day 1</p>
+
+          <p class="days-k mono">Last 30 days</p>
+          <div class="days" id="days" aria-hidden="true"></div>
+          <div class="days-ends"><span class="mono">Nothing before today</span><span class="mono">Today</span></div>
+
+          <div class="watch-legend">
+            <div><i></i><span>Nothing unusual</span></div>
+            <div><i class="a"></i><span>Worth a look</span></div>
+          </div>
+          <hr>
+          <!-- 空态。措辞刻意说清「还没有」而不是「一切正常」——
+               档案刚建，MNEMO 一天都还没看过，说"平安无事"是撒谎。 -->
+          <div class="obs obs--empty">
+            <p class="t">Nothing noticed yet.</p>
+            <p class="n" id="obs-empty-n">The file was opened today. MNEMO needs a few days in the room
+              before it has anything worth telling you — a doorway <span id="oe-they">she</span> pauses at,
+              a trip to the bathroom after midnight, a chair that stops being used.
+              Whatever turns up appears here, with the measurement behind it.</p>
+            <a class="exlink" id="seeex" href="?demo=1">See what this looks like with data
+              <svg width="13" height="9" viewBox="0 0 13 9" fill="none" aria-hidden="true">
+                <path d="M1 4.5h10M7.6 1l3.6 3.5-3.6 3.5" stroke="currentColor"
+                      stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </a>
+          </div>
+          <a class="suggest is-off" href="#" aria-disabled="true">Nothing to suggest yet</a>
+        </section>
+      </div>
+
+      <div class="row row--bottom">
+        <div class="stack">
+
+          <!-- C · 房间 -->
+          <section class="card room">
+            <h3>The Room</h3>
+            <p class="sub" id="room-sub">Bedroom · last changed 12 Mar</p>
+            <div class="room-body">
+              <div class="miniplan" aria-hidden="true">
+                <i class="r1"></i><i class="r2"></i><i class="r3"></i><i class="r4"></i><i class="turn"></i>
+              </div>
+              <div class="room-meta">
+                <p class="k mono">Step-free · Ø1500 turning</p>
+                <p class="v">Level throughout,<br>wide doors, no sills</p>
+                <button class="room-link" type="button" id="open3d">Open in 3D →</button>
+              </div>
+            </div>
+          </section>
+
+          <!-- D · 改造履历 -->
+          <section class="card hist">
+            <h3 id="hist-h">Nothing changed yet</h3>
+            <div class="tl" id="tl">
+              <div class="now start">
+                <i></i>
+                <span class="d mono" id="hist-when" style="grid-column:2/-1;white-space:nowrap">File opened · today</span>
+              </div>
+            </div>
+            <p class="hist-empty">This is Rebuild 01. From here on, every change lands in this list —
+              with what prompted it, not just what moved.</p>
+            <div class="hist-foot">
+              <span class="s mono">Nothing built yet</span>
+              <span class="g">Nothing bought</span>
+            </div>
+          </section>
+        </div>
+
+        <!-- E · Circle -->
+        <section class="card card--wide circle">
+          <h2>Her Circle</h2>
+          <p class="sub" id="circle-sub">2 of 3 have approved this rebuild</p>
+          <div class="invite"><span>Invite</span><button type="button" aria-label="Invite someone" data-act="say" data-say="Whoever you invite sees only what she allows — and she is told the day you change it.">+</button></div>
+          <p class="sess-k mono">Sessions this month</p>
+
+          <div class="people" id="people"></div>
+          <p class="circle-note mono">MNEMO keeps this file — next rebuild starts from here, not from zero</p>
+        </section>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- data-mnemo-toast：assets/toast.js 认这两个属性，认到了就复用这一条，
+     不再自己造一个 —— 同一页上两种样式的提示条是设计事故。 -->
+<div class="toast" id="toast" role="status" data-mnemo-toast>
+  <span id="toast-msg" data-mnemo-toast-msg>Room 01 is on file. <b>MNEMO starts watching from today.</b></span>
+  <button type="button" id="toast-x">Got it</button>
+</div>
+
+<!-- ═══ 平面模板 ═══════════════════════════════════════════
+     和 v3/flow.html 里的 lay-* 是同一批 SVG，原样搬过来。
+     内嵌而不是去读 sessionStorage —— 只要地址栏带着 ?plan=A-C，
+     刷新、换标签页、清缓存、直接双击打开都能画出正确那张。 -->
+<template id="hf-lay-A-A"><svg viewBox="0 0 230 230" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Option A layout: compact services">
+<path d="M3 7V139H126.2V200.6H152.6V227H223V7H3Z" fill="white"/>
+<path d="M3 7V139H62.66V119.45C62.66 116.69 60.43 114.45 57.66 114.45H17.42C14.65 114.45 12.42 112.21 12.42 109.45V69.04C12.42 67.78 13.44 66.75 14.7 66.75V66.75C15.97 66.75 16.99 65.73 16.99 64.46V7H3Z" fill="#A9B49A"/>
+<path d="M14.7 66.75C13.44 66.75 12.42 67.78 12.42 69.04V109.45C12.42 112.21 14.65 114.45 17.42 114.45H57.66C60.43 114.45 62.66 116.69 62.66 119.45V139H3V7H16.99V64.46C16.99 65.73 15.97 66.75 14.7 66.75ZM14.7 66.75V66.75Z" stroke="#8A8378" stroke-width="0.6" stroke-linejoin="round"/>
+<mask id="mA0" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="3" y="7" width="60" height="132">
+<path d="M3 7V139H62.66V119.45C62.66 116.69 60.43 114.45 57.66 114.45H17.42C14.65 114.45 12.42 112.21 12.42 109.45V69.04C12.42 67.78 13.44 66.75 14.7 66.75V66.75C15.97 66.75 16.99 65.73 16.99 64.46V7H3Z" fill="#A9B49A"/>
+</mask>
+<g mask="url(#mA0)">
+<rect x="11.5" y="7" width="0.6" height="132" fill="white"/>
+<rect x="20.3008" y="7" width="0.6" height="132" fill="white"/>
+<rect x="29.0996" y="7" width="0.6" height="132" fill="white"/>
+<rect x="37.9004" y="7" width="0.6" height="132" fill="white"/>
+<rect x="46.6992" y="7" width="0.6" height="132" fill="white"/>
+<rect x="55.5" y="7" width="0.6" height="132" fill="white"/>
+<rect x="3" y="15.5" width="59.664" height="0.6" fill="white"/>
+<rect x="3" y="24.3008" width="59.664" height="0.6" fill="white"/>
+<rect x="3" y="33.0996" width="59.664" height="0.6" fill="white"/>
+<rect x="3" y="41.9004" width="59.664" height="0.6" fill="white"/>
+<rect x="3" y="50.6992" width="59.664" height="0.6" fill="white"/>
+<rect x="3" y="59.5" width="59.664" height="0.6" fill="white"/>
+<rect x="3" y="68.3008" width="59.664" height="0.6" fill="white"/>
+<rect x="3" y="77.0996" width="59.664" height="0.6" fill="white"/>
+<rect x="3" y="85.9004" width="59.664" height="0.6" fill="white"/>
+<rect x="3" y="94.6992" width="59.664" height="0.6" fill="white"/>
+<rect x="3" y="103.5" width="59.664" height="0.6" fill="white"/>
+<rect x="3" y="112.301" width="59.664" height="0.6" fill="white"/>
+<rect x="3" y="121.1" width="59.664" height="0.6" fill="white"/>
+<rect x="3" y="129.9" width="59.664" height="0.6" fill="white"/>
+</g>
+<path d="M17.6092 7L17.3066 33.5H59.6466C62.4066 33.5 64.9492 32.39 64.9492 29.63V7H17.6092Z" fill="#D9D3C7" stroke="#8A8378" stroke-width="0.6" stroke-linejoin="round"/>
+<mask id="mA1" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="17" y="7" width="48" height="28">
+<path d="M17.6094 7V34.63H59.9494C62.7094 34.63 64.9494 32.39 64.9494 29.63V7H17.6094Z" fill="#D9D3C7"/>
+</mask>
+<g mask="url(#mA1)">
+<rect x="20.3008" y="7" width="0.6" height="27.632" fill="white"/>
+<rect x="29.0996" y="7" width="0.6" height="27.632" fill="white"/>
+<rect x="37.9004" y="7" width="0.6" height="27.632" fill="white"/>
+<rect x="46.6992" y="7" width="0.6" height="27.632" fill="white"/>
+<rect x="55.5" y="7" width="0.6" height="27.632" fill="white"/>
+<rect x="17.6074" y="15.5" width="47.344" height="0.6" fill="white"/>
+<rect x="17.6074" y="24.3008" width="47.344" height="0.6" fill="white"/>
+</g>
+<path d="M86.4199 7V25.5C86.4199 28.26 88.6599 30.5 91.4199 30.5H123.93C126.69 30.5 128.93 32.73 128.93 35.5V63.69C128.93 66.45 131.17 68.69 133.93 68.69H155.24V7H86.4199Z" fill="#A9B49A" stroke="#8A8378" stroke-width="0.6" stroke-linejoin="round"/>
+<mask id="mA2" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="86" y="7" width="70" height="62">
+<path d="M86.4199 7V25.5C86.4199 28.26 88.6599 30.5 91.4199 30.5H123.93C126.69 30.5 128.93 32.73 128.93 35.5V63.69C128.93 66.45 131.17 68.69 133.93 68.69H155.24V7H86.4199Z" fill="#A9B49A"/>
+</mask>
+<g mask="url(#mA2)">
+<rect x="90.6992" y="7" width="0.6" height="61.688" fill="white"/>
+<rect x="99.5" y="7" width="0.6" height="61.688" fill="white"/>
+<rect x="108.301" y="7" width="0.6" height="61.688" fill="white"/>
+<rect x="117.1" y="7" width="0.6" height="61.688" fill="white"/>
+<rect x="125.9" y="7" width="0.6" height="61.688" fill="white"/>
+<rect x="134.699" y="7" width="0.6" height="61.688" fill="white"/>
+<rect x="143.5" y="7" width="0.6" height="61.688" fill="white"/>
+<rect x="152.301" y="7" width="0.6" height="61.688" fill="white"/>
+<rect x="86.4238" y="15.5" width="68.816" height="0.6" fill="white"/>
+<rect x="86.4238" y="24.3008" width="68.816" height="0.6" fill="white"/>
+<rect x="86.4238" y="33.0996" width="68.816" height="0.6" fill="white"/>
+<rect x="86.4238" y="41.9004" width="68.816" height="0.6" fill="white"/>
+<rect x="86.4238" y="50.6992" width="68.816" height="0.6" fill="white"/>
+<rect x="86.4238" y="59.5" width="68.816" height="0.6" fill="white"/>
+</g>
+<path d="M95.9102 47.3906C93.1502 47.3906 90.9102 49.6306 90.9102 52.3906V58.3206C90.9102 61.0806 93.1502 63.3206 95.9102 63.3206H102.81C105.57 63.3206 107.81 61.0806 107.81 58.3206V52.3906C107.81 49.6306 105.57 47.3906 102.81 47.3906H95.9102Z" fill="#C9C2B6" stroke="#8A8378" stroke-width="0.6" stroke-linejoin="round"/>
+<mask id="mA3" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="90" y="47" width="18" height="17">
+<path d="M95.9102 47.3906C93.1502 47.3906 90.9102 49.6306 90.9102 52.3906V58.3206C90.9102 61.0806 93.1502 63.3206 95.9102 63.3206H102.81C105.57 63.3206 107.81 61.0806 107.81 58.3206V52.3906C107.81 49.6306 105.57 47.3906 102.81 47.3906H95.9102Z" fill="#C9C2B6"/>
+</mask>
+<g mask="url(#mA3)">
+<rect x="99" y="47.3926" width="0.6" height="15.928" fill="white"/>
+<rect x="90.9121" y="55" width="16.896" height="0.6" fill="white"/>
+</g>
+<path d="M182.08 7V30.6C182.08 33.36 184.32 35.6 187.08 35.6H223V7H182.08Z" fill="#B7C2CC" stroke="#8A8378" stroke-width="0.6" stroke-linejoin="round"/>
+<mask id="mA4" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="182" y="7" width="41" height="29">
+<path d="M182.08 7V30.6C182.08 33.36 184.32 35.6 187.08 35.6H223V7H182.08Z" fill="#B7C2CC"/>
+</mask>
+<g mask="url(#mA4)">
+<rect x="187.5" y="7" width="0.6" height="28.6" fill="white"/>
+<rect x="196.301" y="7" width="0.6" height="28.6" fill="white"/>
+<rect x="205.1" y="7" width="0.6" height="28.6" fill="white"/>
+<rect x="213.9" y="7" width="0.6" height="28.6" fill="white"/>
+<rect x="182.08" y="15.5" width="40.92" height="0.6" fill="white"/>
+<rect x="182.08" y="24.3008" width="40.92" height="0.6" fill="white"/>
+<rect x="182.08" y="33.0996" width="40.92" height="0.6" fill="white"/>
+</g>
+<path d="M203.82 73.7891V114.199C203.82 116.959 206.05 119.199 208.82 119.199H222.38V73.7891H203.82Z" fill="#B7C2CC" stroke="#8A8378" stroke-width="0.6" stroke-linejoin="round"/>
+<mask id="mA5" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="203" y="73" width="20" height="47">
+<path d="M203.82 73.7891V114.199C203.82 116.959 206.05 119.199 208.82 119.199H222.38V73.7891H203.82Z" fill="#B7C2CC"/>
+</mask>
+<g mask="url(#mA5)">
+<rect x="205.1" y="73.791" width="0.6" height="45.408" fill="white"/>
+<rect x="213.9" y="73.791" width="0.6" height="45.408" fill="white"/>
+<rect x="203.816" y="77.0977" width="18.568" height="0.6" fill="white"/>
+<rect x="203.816" y="85.8984" width="18.568" height="0.6" fill="white"/>
+<rect x="203.816" y="94.6992" width="18.568" height="0.6" fill="white"/>
+<rect x="203.816" y="103.5" width="18.568" height="0.6" fill="white"/>
+<rect x="203.816" y="112.299" width="18.568" height="0.6" fill="white"/>
+</g>
+<path d="M187.01 76.2991C187.01 74.9091 188.13 73.7891 189.52 73.7891H202.85V114.549C202.85 117.309 205.09 119.549 207.85 119.549H222.38V197.779H218.23C215.47 197.779 213.23 195.549 213.23 192.779V161.419C213.23 158.659 210.99 156.419 208.23 156.419H204.33C201.57 156.419 199.33 154.189 199.33 151.419V83.8091C199.33 81.0491 197.09 78.8091 194.33 78.8091H189.52C188.13 78.8091 187.01 77.6891 187.01 76.2991Z" fill="#A9B49A" stroke="#8A8378" stroke-width="0.6" stroke-linejoin="round"/>
+<mask id="mA6" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="187" y="73" width="36" height="125">
+<path d="M187.01 76.2991C187.01 74.9091 188.13 73.7891 189.52 73.7891H202.85V114.549C202.85 117.309 205.09 119.549 207.85 119.549H222.38V197.779H218.23C215.47 197.779 213.23 195.549 213.23 192.779V161.419C213.23 158.659 210.99 156.419 208.23 156.419H204.33C201.57 156.419 199.33 154.189 199.33 151.419V83.8091C199.33 81.0491 197.09 78.8091 194.33 78.8091H189.52C188.13 78.8091 187.01 77.6891 187.01 76.2991Z" fill="#A9B49A"/>
+</mask>
+<g mask="url(#mA6)">
+<rect x="187.5" y="73.791" width="0.6" height="123.992" fill="white"/>
+<rect x="196.301" y="73.791" width="0.6" height="123.992" fill="white"/>
+<rect x="205.1" y="73.791" width="0.6" height="123.992" fill="white"/>
+<rect x="213.9" y="73.791" width="0.6" height="123.992" fill="white"/>
+<rect x="187.008" y="77.0977" width="35.376" height="0.6" fill="white"/>
+<rect x="187.008" y="85.8984" width="35.376" height="0.6" fill="white"/>
+<rect x="187.008" y="94.6992" width="35.376" height="0.6" fill="white"/>
+<rect x="187.008" y="103.5" width="35.376" height="0.6" fill="white"/>
+<rect x="187.008" y="112.299" width="35.376" height="0.6" fill="white"/>
+<rect x="187.008" y="121.098" width="35.376" height="0.6" fill="white"/>
+<rect x="187.008" y="129.898" width="35.376" height="0.6" fill="white"/>
+<rect x="187.008" y="138.699" width="35.376" height="0.6" fill="white"/>
+<rect x="187.008" y="147.5" width="35.376" height="0.6" fill="white"/>
+<rect x="187.008" y="156.299" width="35.376" height="0.6" fill="white"/>
+<rect x="187.008" y="165.098" width="35.376" height="0.6" fill="white"/>
+<rect x="187.008" y="173.898" width="35.376" height="0.6" fill="white"/>
+<rect x="187.008" y="182.699" width="35.376" height="0.6" fill="white"/>
+<rect x="187.008" y="191.5" width="35.376" height="0.6" fill="white"/>
+</g>
+<path d="M131.199 135.48C128.439 135.48 126.199 137.72 126.199 140.48V194.88H184.209C186.969 194.88 189.209 192.64 189.209 189.88V163.36C189.209 160.6 186.969 158.36 184.209 158.36H145.279C142.519 158.36 140.279 156.12 140.279 153.36V140.48C140.279 137.72 138.039 135.48 135.279 135.48H131.199Z" fill="#D9D3C7" stroke="#8A8378" stroke-width="0.6" stroke-linejoin="round"/>
+<mask id="mA7" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="126" y="135" width="64" height="60">
+<path d="M131.199 135.48C128.439 135.48 126.199 137.72 126.199 140.48V194.88H184.209C186.969 194.88 189.209 192.64 189.209 189.88V163.36C189.209 160.6 186.969 158.36 184.209 158.36H145.279C142.519 158.36 140.279 156.12 140.279 153.36V140.48C140.279 137.72 138.039 135.48 135.279 135.48H131.199Z" fill="#D9D3C7"/>
+</mask>
+<g mask="url(#mA7)">
+<rect x="134.699" y="135.48" width="0.6" height="59.4" fill="white"/>
+<rect x="143.5" y="135.48" width="0.6" height="59.4" fill="white"/>
+<rect x="152.301" y="135.48" width="0.6" height="59.4" fill="white"/>
+<rect x="161.1" y="135.48" width="0.6" height="59.4" fill="white"/>
+<rect x="169.9" y="135.48" width="0.6" height="59.4" fill="white"/>
+<rect x="178.699" y="135.48" width="0.6" height="59.4" fill="white"/>
+<rect x="187.5" y="135.48" width="0.6" height="59.4" fill="white"/>
+<rect x="126.199" y="138.699" width="63.008" height="0.6" fill="white"/>
+<rect x="126.199" y="147.5" width="63.008" height="0.6" fill="white"/>
+<rect x="126.199" y="156.301" width="63.008" height="0.6" fill="white"/>
+<rect x="126.199" y="165.1" width="63.008" height="0.6" fill="white"/>
+<rect x="126.199" y="173.9" width="63.008" height="0.6" fill="white"/>
+<rect x="126.199" y="182.699" width="63.008" height="0.6" fill="white"/>
+<rect x="126.199" y="191.5" width="63.008" height="0.6" fill="white"/>
+</g>
+<path d="M155.238 7V72.12" stroke="#4A443C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M3 139V7H223V227H152.6V200.6H126.2V139H3Z" stroke="#2E2A25" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="110.535" y="4.5" width="93.632" height="5" fill="#F9F6F1"/>
+<rect x="110.535" y="3" width="93.632" height="1.63" fill="#292624"/>
+<rect x="110.535" y="8.90039" width="93.632" height="1.63" fill="#292624"/>
+<rect x="220.5" y="21.2559" width="5" height="65.736" fill="#F9F6F1"/>
+<rect x="219" y="21.2559" width="1.63" height="65.736" fill="#292624"/>
+<rect x="224.898" y="21.2559" width="1.63" height="65.736" fill="#292624"/>
+<rect x="220.5" y="186.344" width="5" height="27.984" fill="#F9F6F1"/>
+<rect x="219" y="186.344" width="1.63" height="27.984" fill="#292624"/>
+<rect x="224.898" y="186.344" width="1.63" height="27.984" fill="#292624"/>
+<path d="M79.8242 138H106.664L106.664 141H79.8244L79.8242 138Z" fill="#F9F6F1"/>
+<text fill="#8C4D1A" font-family="SpaceMonoLocal, Space Mono, monospace" font-size="8" font-weight="700" letter-spacing="0.8"><tspan x="70" y="130">ENTRANCE</tspan></text>
+<path d="M226 73H183" stroke="#4A443C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M160.3 23.5L160.3 11.2998L168.7 11.2998L168.7 23.5C168.7 25.8196 166.82 27.7002 164.5 27.7002C162.18 27.7002 160.3 25.8196 160.3 23.5Z" fill="#B7C2CC" stroke="#8A8378" stroke-width="0.6"/>
+<rect x="160" y="20" width="0.6" height="8.8" transform="rotate(-90 160 20)" fill="white"/>
+<path d="M207 68.1006C204.404 68.1006 202.3 65.9961 202.3 63.4004L202.3 47C202.3 44.4044 204.404 42.3008 207 42.3008L219.3 42.3008L219.3 68.1006L207 68.1006Z" fill="#B7C2CC" stroke="#8A8378" stroke-width="0.6"/>
+<rect x="211.1" y="68.4004" width="0.6" height="26.4" transform="rotate(-180 211.1 68.4004)" fill="white"/>
+<rect x="219.6" y="59.9004" width="17.6" height="0.6" transform="rotate(-180 219.6 59.9004)" fill="white"/>
+<rect x="219.6" y="51.1016" width="17.6" height="0.6" transform="rotate(-180 219.6 51.1016)" fill="white"/>
+</svg></template>
+<template id="hf-lay-A-B"><svg viewBox="0 0 232 231" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Option B layout: daylight-first bedroom">
+<path d="M5 7V139H128.2V200.6H154.6V227H225V7H5Z" fill="white"/>
+<path d="M66.2998 7.2998V24.2998H5.2998V7.2998H66.2998Z" fill="#A9B49A" stroke="#8A8378" stroke-width="0.6"/>
+<rect x="13.5" y="7" width="0.6" height="17.6" fill="white"/>
+<rect x="22.3008" y="7" width="0.6" height="17.6" fill="white"/>
+<rect x="31.0996" y="7" width="0.6" height="17.6" fill="white"/>
+<rect x="39.9004" y="7" width="0.6" height="17.6" fill="white"/>
+<rect x="48.6992" y="7" width="0.6" height="17.6" fill="white"/>
+<rect x="57.5" y="7" width="0.6" height="17.6" fill="white"/>
+<rect x="5" y="15.5" width="61.6" height="0.6" fill="white"/>
+<path d="M92.6992 7.2998V68C92.6992 70.5956 90.5956 72.7 88 72.7002H71.5996C69.0039 72.7002 66.8994 70.5957 66.8994 68V7.2998H92.6992Z" fill="#A9B49A" stroke="#8A8378" stroke-width="0.6"/>
+<rect x="75.0996" y="7" width="0.6" height="66" fill="white"/>
+<rect x="83.9004" y="7" width="0.6" height="66" fill="white"/>
+<rect x="66.5996" y="15.5" width="26.4" height="0.6" fill="white"/>
+<rect x="66.5996" y="24.3008" width="26.4" height="0.6" fill="white"/>
+<rect x="66.5996" y="33.0996" width="26.4" height="0.6" fill="white"/>
+<rect x="66.5996" y="41.9004" width="26.4" height="0.6" fill="white"/>
+<rect x="66.5996" y="50.6992" width="26.4" height="0.6" fill="white"/>
+<rect x="66.5996" y="59.5" width="26.4" height="0.6" fill="white"/>
+<rect x="66.5996" y="68.3008" width="26.4" height="0.6" fill="white"/>
+<path d="M154.3 7.2998V28.4004C154.3 30.996 152.195 33.0996 149.6 33.0996H93.2998V7.2998H154.3Z" fill="#A9B49A" stroke="#8A8378" stroke-width="0.6"/>
+<rect x="101.5" y="7" width="0.6" height="26.4" fill="white"/>
+<rect x="110.301" y="7" width="0.6" height="26.4" fill="white"/>
+<rect x="119.1" y="7" width="0.6" height="26.4" fill="white"/>
+<rect x="127.9" y="7" width="0.6" height="26.4" fill="white"/>
+<rect x="136.699" y="7" width="0.6" height="26.4" fill="white"/>
+<rect x="145.5" y="7" width="0.6" height="26.4" fill="white"/>
+<rect x="93" y="15.5" width="61.6" height="0.6" fill="white"/>
+<rect x="93" y="24.3008" width="61.6" height="0.6" fill="white"/>
+<path d="M107 38.2998H136.6C139.195 38.2998 141.3 40.4043 141.3 43V50.5996C141.3 53.1953 139.195 55.2998 136.6 55.2998H107C104.404 55.2998 102.3 53.1953 102.3 50.5996V43C102.3 40.4043 104.404 38.2998 107 38.2998Z" fill="#C9C2B6" stroke="#8A8378" stroke-width="0.6"/>
+<rect x="110.5" y="38" width="0.6" height="17.6" fill="white"/>
+<rect x="119.301" y="38" width="0.6" height="17.6" fill="white"/>
+<rect x="128.1" y="38" width="0.6" height="17.6" fill="white"/>
+<rect x="136.9" y="38" width="0.6" height="17.6" fill="white"/>
+<rect x="102" y="46.5" width="39.6" height="0.6" fill="white"/>
+<path d="M123.2 121.7C125.796 121.7 127.9 123.805 127.9 126.4V138.7H5.2998V121.7H123.2Z" fill="#C9C2B6" stroke="#8A8378" stroke-width="0.6"/>
+<rect x="13.5" y="121.4" width="0.6" height="17.6" fill="white"/>
+<rect x="22.3008" y="121.4" width="0.6" height="17.6" fill="white"/>
+<rect x="31.0996" y="121.4" width="0.6" height="17.6" fill="white"/>
+<rect x="39.9004" y="121.4" width="0.6" height="17.6" fill="white"/>
+<rect x="48.6992" y="121.4" width="0.6" height="17.6" fill="white"/>
+<rect x="57.5" y="121.4" width="0.6" height="17.6" fill="white"/>
+<rect x="66.3008" y="121.4" width="0.6" height="17.6" fill="white"/>
+<rect x="75.0996" y="121.4" width="0.6" height="17.6" fill="white"/>
+<rect x="83.9004" y="121.4" width="0.6" height="17.6" fill="white"/>
+<rect x="92.6992" y="121.4" width="0.6" height="17.6" fill="white"/>
+<rect x="101.5" y="121.4" width="0.6" height="17.6" fill="white"/>
+<rect x="110.301" y="121.4" width="0.6" height="17.6" fill="white"/>
+<rect x="119.1" y="121.4" width="0.6" height="17.6" fill="white"/>
+<rect x="5" y="129.9" width="123.2" height="0.6" fill="white"/>
+<path d="M224.7 7.2998V37.5H190.4C187.805 37.5 185.7 35.3955 185.7 32.7998V7.2998H224.7Z" fill="#B7C2CC" stroke="#8A8378" stroke-width="0.6"/>
+<rect x="189.5" y="7" width="0.6" height="30.8" fill="white"/>
+<rect x="198.301" y="7" width="0.6" height="30.8" fill="white"/>
+<rect x="207.1" y="7" width="0.6" height="30.8" fill="white"/>
+<rect x="215.9" y="7" width="0.6" height="30.8" fill="white"/>
+<rect x="185.4" y="15.5" width="39.6" height="0.6" fill="white"/>
+<rect x="185.4" y="24.3008" width="39.6" height="0.6" fill="white"/>
+<rect x="185.4" y="33.0996" width="39.6" height="0.6" fill="white"/>
+<path d="M212.4 73.2998H224.7V226.7H207.7V78C207.7 75.4043 209.805 73.2998 212.4 73.2998Z" fill="#D9D3C7" stroke="#8A8378" stroke-width="0.6"/>
+<rect x="215.9" y="73" width="0.6" height="154" fill="white"/>
+<rect x="207.4" y="77.0996" width="17.6" height="0.6" fill="white"/>
+<rect x="207.4" y="85.9004" width="17.6" height="0.6" fill="white"/>
+<rect x="207.4" y="94.6992" width="17.6" height="0.6" fill="white"/>
+<rect x="207.4" y="103.5" width="17.6" height="0.6" fill="white"/>
+<rect x="207.4" y="112.301" width="17.6" height="0.6" fill="white"/>
+<rect x="207.4" y="121.1" width="17.6" height="0.6" fill="white"/>
+<rect x="207.4" y="129.9" width="17.6" height="0.6" fill="white"/>
+<rect x="207.4" y="138.699" width="17.6" height="0.6" fill="white"/>
+<rect x="207.4" y="147.5" width="17.6" height="0.6" fill="white"/>
+<rect x="207.4" y="156.301" width="17.6" height="0.6" fill="white"/>
+<rect x="207.4" y="165.1" width="17.6" height="0.6" fill="white"/>
+<rect x="207.4" y="173.9" width="17.6" height="0.6" fill="white"/>
+<rect x="207.4" y="182.699" width="17.6" height="0.6" fill="white"/>
+<rect x="207.4" y="191.5" width="17.6" height="0.6" fill="white"/>
+<rect x="207.4" y="200.301" width="17.6" height="0.6" fill="white"/>
+<rect x="207.4" y="209.1" width="17.6" height="0.6" fill="white"/>
+<rect x="207.4" y="217.9" width="17.6" height="0.6" fill="white"/>
+<path d="M168.4 130.499H207.101V165.1H168.4C165.805 165.1 163.7 162.995 163.7 160.399V135.199C163.7 132.603 165.805 130.499 168.4 130.499Z" fill="#D9D3C7" stroke="#8A8378" stroke-width="0.6"/>
+<rect x="171.9" y="130.199" width="0.6" height="35.2" fill="white"/>
+<rect x="180.699" y="130.199" width="0.6" height="35.2" fill="white"/>
+<rect x="189.5" y="130.199" width="0.6" height="35.2" fill="white"/>
+<rect x="198.301" y="130.199" width="0.6" height="35.2" fill="white"/>
+<rect x="163.4" y="138.699" width="44" height="0.6" fill="white"/>
+<rect x="163.4" y="147.5" width="44" height="0.6" fill="white"/>
+<rect x="163.4" y="156.301" width="44" height="0.6" fill="white"/>
+<path d="M160.5 209.7H207.101V226.7H155.8V214.4C155.8 211.805 157.904 209.7 160.5 209.7Z" fill="#D9D3C7" stroke="#8A8378" stroke-width="0.6"/>
+<rect x="171.9" y="209.4" width="0.6" height="17.6" fill="white"/>
+<rect x="163" y="209.4" width="0.6" height="17.6" fill="white"/>
+<rect x="180.699" y="209.4" width="0.6" height="17.6" fill="white"/>
+<rect x="189.5" y="209.4" width="0.6" height="17.6" fill="white"/>
+<rect x="198.301" y="209.4" width="0.6" height="17.6" fill="white"/>
+<path d="M156 217.9H207.401V218.5H156V217.9Z" fill="white"/>
+<path d="M155 7V73" stroke="#4A443C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M225 73H182" stroke="#4A443C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M5 139V7H225V227H154.6V200.6H128.2V139H5Z" stroke="#2E2A25" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="113.416" y="4.5" width="93.984" height="5" fill="#F9F6F1"/>
+<rect x="113.416" y="3" width="93.984" height="1.63" fill="#292624"/>
+<rect x="113.416" y="8.90039" width="93.984" height="1.63" fill="#292624"/>
+<rect x="222.5" y="21.5195" width="5" height="65.472" fill="#F9F6F1"/>
+<rect x="221" y="21.5195" width="1.63" height="65.472" fill="#292624"/>
+<rect x="226.9" y="21.5195" width="1.63" height="65.472" fill="#292624"/>
+<rect x="222.5" y="186.256" width="5" height="27.808" fill="#F9F6F1"/>
+<rect x="221" y="186.256" width="1.63" height="27.808" fill="#292624"/>
+<rect x="226.9" y="186.256" width="1.63" height="27.808" fill="#292624"/>
+<path d="M3 77.5762H6V108.992H3V77.5762Z" fill="#F9F6F1"/>
+<text fill="#8C4D1A" font-family="SpaceMonoLocal, Space Mono, monospace" font-size="8" font-weight="700" letter-spacing="0.8"><tspan x="10" y="96.3">ENTRANCE</tspan></text>
+<path d="M161.3 23.5L161.3 11.2998L169.7 11.2998L169.7 23.5C169.7 25.8196 167.82 27.7002 165.5 27.7002C163.18 27.7002 161.3 25.8196 161.3 23.5Z" fill="#B7C2CC" stroke="#8A8378" stroke-width="0.6"/>
+<rect x="161" y="20" width="0.6" height="8.8" transform="rotate(-90 161 20)" fill="white"/>
+<path d="M208 68.1006C205.404 68.1006 203.3 65.9961 203.3 63.4004L203.3 47C203.3 44.4044 205.404 42.3008 208 42.3008L220.3 42.3008L220.3 68.1006L208 68.1006Z" fill="#B7C2CC" stroke="#8A8378" stroke-width="0.6"/>
+<rect x="212.1" y="68.4004" width="0.6" height="26.4" transform="rotate(-180 212.1 68.4004)" fill="white"/>
+<rect x="220.6" y="59.9004" width="17.6" height="0.6" transform="rotate(-180 220.6 59.9004)" fill="white"/>
+<rect x="220.6" y="51.1016" width="17.6" height="0.6" transform="rotate(-180 220.6 51.1016)" fill="white"/>
+<path d="M67.0928 30.5C66.9895 27.0694 64.229 24.3088 60.7988 24.2041L60.7988 24.1992L67.0977 24.1992L67.0977 30.5L67.0928 30.5Z" fill="#A9B49A" stroke="#8A8378" stroke-width="0.6"/>
+<path d="M99.3008 33.0049C95.8702 33.1082 93.1096 35.8686 93.0049 39.2988H93V33H99.3008V33.0049Z" fill="#A9B49A" stroke="#8A8378" stroke-width="0.6"/>
+<path d="M201.32 130.293C204.75 130.189 207.51 127.43 207.615 124L207.621 124L207.621 130.299L201.32 130.299L201.32 130.293Z" fill="#D9D3C7" stroke="#8A8378" stroke-width="0.6"/>
+<path d="M201.32 209.594C204.751 209.49 207.511 206.731 207.616 203.301L207.621 203.301L207.621 209.6L201.32 209.6L201.32 209.594Z" fill="#D9D3C7" stroke="#8A8378" stroke-width="0.6"/>
+<path d="M207.615 171.301C207.511 167.871 204.752 165.111 201.322 165.006L201.322 165L207.621 165L207.621 171.301L207.615 171.301Z" fill="#D9D3C7" stroke="#8A8378" stroke-width="0.6"/>
+</svg></template>
+<template id="hf-lay-A-C"><svg viewBox="0 0 233 231" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Option C layout: one loop with wide corridors">
+<path d="M6 7H226V139H129.2H6V7Z" fill="white"/>
+<path d="M129.199 139H225.999V227H155.599V200.6H129.199V139Z" fill="white"/>
+<rect x="7.3" y="8.3" width="217.4" height="17.4" rx="0.9" fill="#A9B49A" stroke="#8A8378" stroke-width="0.6"/>
+<path d="M24 8H24.6V25.6H24V8Z" fill="white"/>
+<path d="M15.5 8H16.1V25.6H15.5V8Z" fill="white"/>
+<rect x="32.0996" y="8" width="0.6" height="17.6" fill="white"/>
+<rect x="40.9004" y="8" width="0.6" height="17.6" fill="white"/>
+<rect x="49.6992" y="8" width="0.6" height="17.6" fill="white"/>
+<rect x="58.5" y="8" width="0.6" height="17.6" fill="white"/>
+<rect x="67.3008" y="8" width="0.6" height="17.6" fill="white"/>
+<rect x="76.1016" y="8" width="0.6" height="17.6" fill="white"/>
+<rect x="84.8984" y="8" width="0.6" height="17.6" fill="white"/>
+<rect x="93.6992" y="8" width="0.6" height="17.6" fill="white"/>
+<rect x="102.5" y="8" width="0.6" height="17.6" fill="white"/>
+<rect x="111.301" y="8" width="0.6" height="17.6" fill="white"/>
+<rect x="120.102" y="8" width="0.6" height="17.6" fill="white"/>
+<rect x="128.898" y="8" width="0.6" height="17.6" fill="white"/>
+<rect x="137.699" y="8" width="0.6" height="17.6" fill="white"/>
+<rect x="146.5" y="8" width="0.6" height="17.6" fill="white"/>
+<rect x="155.301" y="8" width="0.6" height="17.6" fill="white"/>
+<rect x="164.102" y="8" width="0.6" height="17.6" fill="white"/>
+<rect x="172.898" y="8" width="0.6" height="17.6" fill="white"/>
+<rect x="181.699" y="8" width="0.6" height="17.6" fill="white"/>
+<path d="M190 8H190.6V25.6H190V8Z" fill="white"/>
+<path d="M198 8H198.6V25.6H198V8Z" fill="white"/>
+<path d="M206.5 8H207.1V25.6H206.5V8Z" fill="white"/>
+<path d="M215.305 8H215.905V25.6H215.305V8Z" fill="white"/>
+<path d="M7.5 16.5H224.5V17.1H7.5V16.5Z" fill="white"/>
+<rect x="7.3" y="25.9016" width="17" height="43.4" rx="0.9" fill="#A9B49A" stroke="#8A8378" stroke-width="0.6"/>
+<rect x="15.5" y="25.6016" width="0.6" height="44" fill="white"/>
+<rect x="7" y="34.1016" width="17.6" height="0.6" fill="white"/>
+<rect x="7" y="42.9004" width="17.6" height="0.6" fill="white"/>
+<rect x="7" y="51.7012" width="17.6" height="0.6" fill="white"/>
+<rect x="7" y="60.5" width="17.6" height="0.6" fill="white"/>
+<path d="M111.299 25.9014V64.6016C111.299 67.1972 109.195 69.3015 106.6 69.3018H90.1992C87.6035 69.3018 85.499 67.1973 85.499 64.6016V25.9014H111.299Z" fill="#A9B49A" stroke="#8A8378" stroke-width="0.6"/>
+<rect x="93.6992" y="25.6016" width="0.6" height="44" fill="white"/>
+<rect x="102.5" y="25.6016" width="0.6" height="44" fill="white"/>
+<rect x="85.1992" y="34.1016" width="26.4" height="0.6" fill="white"/>
+<path d="M215.147 114.6C215.147 113.164 216.41 111.9 217.847 111.9H221.573C223.01 111.9 224.173 113.064 224.173 114.5V135.3C224.173 136.737 223.01 137.9 221.573 137.9L200.6 138C199.163 138 198 136.837 198 135.4V130.85C198 129.414 199.163 128.25 200.6 128.25H208.647C212.237 128.25 215.147 125.34 215.147 121.75V114.6Z" fill="#D9D3C7" stroke="#8A8378" stroke-width="0.6" stroke-linejoin="round"/>
+<path d="M200.7 148.027C199.263 148.027 198 146.764 198 145.327L198 141.601C198 140.164 199.163 139.001 200.6 139.001L221.4 139.001C222.836 139.001 224 140.164 224 141.601L224.1 162.574C224.1 164.01 222.936 165.174 221.5 165.174L216.95 165.174C215.513 165.174 215.5 164.01 215.5 162.574L215.5 154.527C215.5 150.937 211.44 148.027 207.85 148.027L200.7 148.027Z" fill="#B7C2CC" stroke="#8A8378" stroke-width="0.6" stroke-linejoin="round"/>
+<rect x="85.1992" y="42.9004" width="26.4" height="0.6" fill="white"/>
+<rect x="85.1992" y="51.7012" width="26.4" height="0.6" fill="white"/>
+<rect x="85.1992" y="60.5" width="26.4" height="0.6" fill="white"/>
+<path d="M190.502 25.9014V65.6016C190.502 67.645 188.845 69.3017 186.802 69.3018H160.602C158.006 69.3018 155.901 67.1973 155.901 64.6016V25.9014H190.502Z" fill="#A9B49A" stroke="#8A8378" stroke-width="0.6"/>
+<rect x="164.102" y="25.6016" width="0.6" height="44" fill="white"/>
+<rect x="172.898" y="25.6016" width="0.6" height="44" fill="white"/>
+<rect x="181.699" y="25.6016" width="0.6" height="44" fill="white"/>
+<rect x="155.602" y="34.1016" width="35.2" height="0.6" fill="white"/>
+<rect x="155.602" y="42.9004" width="35.2" height="0.6" fill="white"/>
+<rect x="155.602" y="51.7012" width="35.2" height="0.6" fill="white"/>
+<rect x="155.602" y="60.5" width="35.2" height="0.6" fill="white"/>
+<path d="M224.7 25.7998V111.7H219.3V25.7998H224.7Z" fill="#D9D3C7" stroke="#8A8378" stroke-width="0.6"/>
+<rect x="206.5" y="25.6016" width="0.6" height="61.6" fill="white"/>
+<rect x="215.301" y="25.6016" width="0.6" height="61.6" fill="white"/>
+<path d="M216 34.1016L224.401 34.102V34.702L216 34.7016V34.1016Z" fill="white"/>
+<path d="M216 42.9004H224.401V43.5004H216V42.9004Z" fill="white"/>
+<path d="M216 51.7012L224.401 51.7014V52.3014L216 52.3012V51.7012Z" fill="white"/>
+<path d="M216 60.5H224.4V61.1H216V60.5Z" fill="white"/>
+<path d="M216 69.3008H224.401V69.9008H216V69.3008Z" fill="white"/>
+<path d="M216 78.1016H224.4V78.7016H216V78.1016Z" fill="white"/>
+<path d="M216 86.4004H224.4V87.0004H216V86.4004Z" fill="white"/>
+<path d="M216 95H224.4V95.6H216V95Z" fill="white"/>
+<path d="M216 104H224.4V104.6H216V104Z" fill="white"/>
+<path d="M206.501 112H207.101L207.1 137.5H206.5L206.501 112Z" fill="white"/>
+<path d="M215.301 120.5H215.901V146H215.301V120.5Z" fill="white"/>
+<path d="M207 128.5H224.399V129.1H207V128.5Z" fill="white"/>
+<rect x="198" y="120" width="26.4" height="0.6" fill="white"/>
+<path d="M142.8 120.3C145.396 120.3 147.5 122.404 147.5 125V137.3H7.2998V120.3H142.8Z" fill="#C9C2B6" stroke="#8A8378" stroke-width="0.6"/>
+<rect x="15.5" y="120" width="0.6" height="17.6" fill="white"/>
+<rect x="24.2988" y="120" width="0.6" height="17.6" fill="white"/>
+<rect x="33.0996" y="120" width="0.6" height="17.6" fill="white"/>
+<rect x="41.8984" y="120" width="0.6" height="17.6" fill="white"/>
+<rect x="50.6992" y="120" width="0.6" height="17.6" fill="white"/>
+<rect x="59.5" y="120" width="0.6" height="17.6" fill="white"/>
+<rect x="68.3008" y="120" width="0.6" height="17.6" fill="white"/>
+<rect x="77.0977" y="120" width="0.6" height="17.6" fill="white"/>
+<rect x="85.8984" y="120" width="0.6" height="17.6" fill="white"/>
+<rect x="94.6992" y="120" width="0.6" height="17.6" fill="white"/>
+<rect x="103.5" y="120" width="0.6" height="17.6" fill="white"/>
+<rect x="112.301" y="120" width="0.6" height="17.6" fill="white"/>
+<rect x="121.098" y="120" width="0.6" height="17.6" fill="white"/>
+<rect x="129.898" y="120" width="0.6" height="17.6" fill="white"/>
+<rect x="138.699" y="120" width="0.6" height="17.6" fill="white"/>
+<rect x="7" y="128.5" width="140.8" height="0.6" fill="white"/>
+<rect x="206.5" y="139" width="0.6" height="26.4" fill="white"/>
+<path d="M215.301 139H215.901V152.5H215.301V139Z" fill="white"/>
+<path d="M207 147.5H224.402V148.1H207V147.5Z" fill="white"/>
+<rect x="198" y="156.301" width="26.4" height="0.6" fill="white"/>
+<path d="M142 139.3C144.596 139.3 146.7 141.404 146.7 144V195C146.7 197.596 144.596 199.7 142 199.7H129.3V139.3H142Z" fill="#B7C2CC" stroke="#8A8378" stroke-width="0.6"/>
+<path d="M137.699 139.6H138.299V199H137.699V139.6Z" fill="white"/>
+<rect x="129.199" y="165.5" width="17.6" height="0.6" fill="white"/>
+<rect x="129.199" y="156" width="17.6" height="0.6" fill="white"/>
+<rect x="129.199" y="147" width="17.6" height="0.6" fill="white"/>
+<rect x="129.199" y="174.301" width="17.6" height="0.6" fill="white"/>
+<rect x="129.199" y="183" width="17.6" height="0.6" fill="white"/>
+<rect x="129.199" y="191" width="17.6" height="0.6" fill="white"/>
+<path d="M212.5 181.3H224.7V189.7H212.5C210.18 189.7 208.3 187.82 208.3 185.5C208.3 183.18 210.18 181.3 212.5 181.3Z" fill="#B7C2CC" stroke="#8A8378" stroke-width="0.6"/>
+<path d="M181 209.3H206C208.596 209.3 210.7 211.404 210.7 214V225.7H176.3V214C176.3 211.404 178.404 209.3 181 209.3Z" fill="#B7C2CC" stroke="#8A8378" stroke-width="0.6"/>
+<rect x="184.5" y="217" width="0.6" height="8.8" fill="white"/>
+<rect x="184.5" y="209" width="0.6" height="8.8" fill="white"/>
+<path d="M210.5 217.4L210.5 218L175.999 217.6L175.999 217L210.5 217.4Z" fill="white"/>
+<rect x="193.301" y="217" width="0.6" height="8.8" fill="white"/>
+<rect x="193.301" y="209" width="0.6" height="8.8" fill="white"/>
+<rect x="202.102" y="217" width="0.6" height="8.8" fill="white"/>
+<rect x="202.102" y="209" width="0.6" height="8.8" fill="white"/>
+<rect x="216" y="181" width="0.6" height="8.8" fill="white"/>
+<path d="M198 138.5H225" stroke="#4A443C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M130 138.5H147" stroke="#4A443C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M6 7H111.6H226V227H155.6V200.6H129.2V139H6V7Z" stroke="#2E2A25" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M3 70H7V117H3V70Z" fill="#F9F6F1"/>
+<path d="M205 4L205 9L121 9L121 4L205 4Z" fill="#F9F6F1"/>
+<path d="M228.5 110.002L223.5 110.002L223.5 26.002L228.5 26.002L228.5 110.002Z" fill="#F9F6F1"/>
+<path d="M205 3.13201L205 4.63201L121.002 4.5L121.002 3L205 3.13201Z" fill="#292624"/>
+<path d="M229.368 110.002L227.868 110.002L228 26.0039L229.5 26.0039L229.368 110.002Z" fill="#292624"/>
+<path d="M205 8.86895L205 10.3689L120.998 10.501L120.998 9.00098L205 8.86895Z" fill="#292624"/>
+<path d="M223.633 110.002L222.133 110.002L222.001 26.0004L223.501 26.0004L223.633 110.002Z" fill="#292624"/>
+<text fill="#8C4D1A" font-family="SpaceMonoLocal, Space Mono, monospace" font-size="8" font-weight="700" letter-spacing="0.8"><tspan x="11" y="96">ENTRANCE</tspan></text>
+<path d="M30.3008 26.0039C26.8696 26.1073 24.1086 28.8687 24.0049 32.2998H24V26H30.3008V26.0039Z" fill="#A9B49A" stroke="#8A8378" stroke-width="0.6"/>
+<path d="M117.301 26.0039C113.87 26.1073 111.109 28.8687 111.005 32.2998H111V26H117.301V26.0039Z" fill="#A9B49A" stroke="#8A8378" stroke-width="0.6"/>
+<path d="M150 26.0039C153.431 26.1073 156.192 28.8687 156.296 32.2998H156.301V26H150V26.0039Z" fill="#A9B49A" stroke="#8A8378" stroke-width="0.6"/>
+<path d="M196.301 26.0039C192.87 26.1073 190.109 28.8687 190.005 32.2998H190V26H196.301V26.0039Z" fill="#A9B49A" stroke="#8A8378" stroke-width="0.6"/>
+</svg></template>
+<template id="hf-lay-B-A"><svg viewBox="0 0 226 300" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Option A layout: compact services"><path d="M64.6 40H161.4V260H64.6V40Z" fill="white"/><path d="M117.22 40.3H122.7V102.9C122.7 103.89 121.89 104.7 120.9 104.7H115.3V42.22C115.3 41.16 116.16 40.3 117.22 40.3Z" fill="#A9B49A" stroke="#8A8378" stroke-width="0.6"/><rect x="117.1" y="40.49" width="0.6" height="64.28" fill="white"/><path d="M114.75 48.5H122.5V49.1H114.75V48.5Z" fill="white"/><path d="M114.75 57.3H122.39V57.9H114.75V57.3Z" fill="white"/><path d="M114.75 66.1H122.39V66.7H114.75V66.1Z" fill="white"/><path d="M114.75 74.9H122.4V75.5H114.75V74.9Z" fill="white"/><path d="M114.75 83.7H122.39V84.3H114.75V83.7Z" fill="white"/><path d="M114.75 92.5H122.4V93.1H114.75V92.5Z" fill="white"/><path d="M114.75 101.3H122.4V101.9H114.75V101.3Z" fill="white"/><path d="M67.27 109.27H67.8V126.21H65.37V111.17C65.37 110.12 66.22 109.27 67.27 109.27Z" fill="#C9C2B6" stroke="#8A8378" stroke-width="0.6"/><mask id="mask0-lbA" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="65" y="108" width="4" height="19"><path d="M65.07 111.17C65.07 109.95 66.05 108.97 67.27 108.97H68.1V126.51H65.07V111.17Z" fill="#C9C2B6"/></mask><g mask="url(#mask0-lbA)"><rect x="65.07" y="110.1" width="3.04" height="0.6" fill="white"/><rect x="65.07" y="118.9" width="3.04" height="0.6" fill="white"/></g><path d="M160.86 133.74V257.65C160.86 258.65 160.05 259.45 159.06 259.45H148.4V133.74H160.86Z" fill="#A9B49A" stroke="#8A8378" stroke-width="0.6"/><mask id="mask1-lbA" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="148" y="133" width="14" height="127"><path d="M148.1 133.44H161.16V257.65C161.16 258.81 160.22 259.75 159.06 259.75H148.1V133.44Z" fill="#A9B49A"/></mask><g mask="url(#mask1-lbA)"><rect x="152.3" y="133.44" width="0.6" height="126.31" fill="white"/><rect x="148.1" y="136.5" width="13.06" height="0.6" fill="white"/><rect x="148.1" y="145.3" width="13.06" height="0.6" fill="white"/><rect x="148.1" y="154.1" width="13.06" height="0.6" fill="white"/><rect x="148.1" y="162.9" width="13.06" height="0.6" fill="white"/><rect x="148.1" y="171.7" width="13.06" height="0.6" fill="white"/><rect x="148.1" y="180.5" width="13.06" height="0.6" fill="white"/><rect x="148.1" y="189.3" width="13.06" height="0.6" fill="white"/><rect x="148.1" y="198.1" width="13.06" height="0.6" fill="white"/><rect x="148.1" y="206.9" width="13.06" height="0.6" fill="white"/><rect x="148.1" y="215.7" width="13.06" height="0.6" fill="white"/><rect x="148.1" y="224.5" width="13.06" height="0.6" fill="white"/><rect x="148.1" y="233.3" width="13.06" height="0.6" fill="white"/><rect x="148.1" y="242.1" width="13.06" height="0.6" fill="white"/><rect x="148.1" y="250.9" width="13.06" height="0.6" fill="white"/></g><path d="M112.7 181.31V187.67C112.7 188.79 111.79 189.7 110.67 189.7L67.3 189.69V181.3L112.7 181.31Z" fill="#C9C2B6" stroke="#8A8378" stroke-width="0.6"/><path d="M73.1 181.38H73.7V192H73.1V181.38Z" fill="white"/><path d="M81.9 181.38H82.5V192H81.9V181.38Z" fill="white"/><path d="M90.7 181.38H91.3V192H90.7V181.38Z" fill="white"/><path d="M99.5 181.38H100.1V192H99.5V181.38Z" fill="white"/><path d="M108.3 181.38H108.9V192H108.3V181.38Z" fill="white"/><path d="M67.8 181.64V259.45H67.27C66.22 259.45 65.37 258.6 65.37 257.55V181.64H67.8Z" fill="#B7C2CC" stroke="#8A8378" stroke-width="0.6"/><rect x="65.07" y="189.3" width="3.04" height="0.6" fill="white"/><rect x="65.07" y="198.1" width="3.04" height="0.6" fill="white"/><rect x="65.07" y="206.9" width="3.04" height="0.6" fill="white"/><rect x="65.07" y="215.7" width="3.04" height="0.6" fill="white"/><rect x="65.07" y="224.5" width="3.04" height="0.6" fill="white"/><rect x="65.07" y="233.3" width="3.04" height="0.6" fill="white"/><rect x="65.07" y="242.1" width="3.04" height="0.6" fill="white"/><rect x="65.07" y="250.9" width="3.04" height="0.6" fill="white"/><path d="M122.68 40.49H159.06C160.22 40.49 161.16 41.43 161.16 42.6V97.35H153.7C152.41 97.35 151.37 96.31 151.37 95.02V53.45C151.37 52.03 150.22 50.88 148.8 50.88H122.68V40.49Z" fill="#A9B49A" stroke="#8A8378" stroke-width="0.6" stroke-linejoin="round"/><mask id="mask2-lbA" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="122" y="40" width="40" height="58"><path d="M122.68 40.49H159.06C160.22 40.49 161.16 41.43 161.16 42.6V97.35H153.7C152.41 97.35 151.37 96.31 151.37 95.02V53.45C151.37 52.03 150.22 50.88 148.8 50.88H122.68V40.49Z" fill="#A9B49A"/></mask><g mask="url(#mask2-lbA)"><rect x="125.9" y="40.49" width="0.6" height="56.86" fill="white"/><rect x="134.7" y="40.49" width="0.6" height="56.86" fill="white"/><rect x="143.5" y="40.49" width="0.6" height="56.86" fill="white"/><rect x="152.3" y="40.49" width="0.6" height="56.86" fill="white"/><rect x="122.68" y="48.5" width="38.48" height="0.6" fill="white"/><rect x="122.68" y="57.3" width="38.48" height="0.6" fill="white"/><rect x="122.68" y="66.1" width="38.48" height="0.6" fill="white"/><rect x="122.68" y="74.9" width="38.48" height="0.6" fill="white"/><rect x="122.68" y="83.7" width="38.48" height="0.6" fill="white"/><rect x="122.68" y="92.5" width="38.48" height="0.6" fill="white"/></g><path d="M65.07 127.01H81.63V157.59C81.63 159.13 82.88 160.38 84.43 160.38H110.55C111.84 160.38 112.89 161.43 112.89 162.72V181.64H65.07V127.01Z" fill="#D9D3C7" stroke="#8A8378" stroke-width="0.6" stroke-linejoin="round"/><rect x="73.1" y="127.02" width="0.6" height="54.63" fill="white"/><path d="M81.9 160H82.5V181.65H81.9V160Z" fill="white"/><path d="M90.7 160.5H91.3V181.5H90.7V160.5Z" fill="white"/><path d="M99.5 160.5H100.1V181.5H99.5V160.5Z" fill="white"/><path d="M108.3 160.5H108.9V181.5H108.3V160.5Z" fill="white"/><rect x="65.07" y="136" width="47.82" height="0.6" fill="white"/><rect x="65.07" y="145.3" width="47.82" height="0.6" fill="white"/><rect x="65.07" y="154.1" width="47.82" height="0.6" fill="white"/><rect x="65.07" y="164" width="47.82" height="0.6" fill="white"/><rect x="65.07" y="172.8" width="47.82" height="0.6" fill="white"/><path d="M68.1 249.09H81.23C83.52 249.09 85.37 247.24 85.37 244.95V215.74C85.37 213.31 87.34 211.34 89.77 211.34H108.95C111.38 211.34 113.35 213.31 113.35 215.74V244.95C113.35 247.24 115.2 249.09 117.49 249.09H148.1V260.26H68.1V249.09Z" fill="#C9C2B6" stroke="#8A8378" stroke-width="0.6" stroke-linejoin="round"/><mask id="mask3-lbA" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="68" y="211" width="81" height="50"><path d="M68.1 249.09H81.23C83.52 249.09 85.37 247.24 85.37 244.95V215.74C85.37 213.31 87.34 211.34 89.77 211.34H108.95C111.38 211.34 113.35 213.31 113.35 215.74V244.95C113.35 247.24 115.2 249.09 117.49 249.09H148.1V260.26H68.1V249.09Z" fill="#C9C2B6"/></mask><g mask="url(#mask3-lbA)"><rect x="73.1" y="211.34" width="0.6" height="48.93" fill="white"/><rect x="81.9" y="211.34" width="0.6" height="48.93" fill="white"/><rect x="90.7" y="211.34" width="0.6" height="48.93" fill="white"/><rect x="99.5" y="211.34" width="0.6" height="48.93" fill="white"/><rect x="108.31" y="211.34" width="0.6" height="48.93" fill="white"/><rect x="117.1" y="211.34" width="0.6" height="48.93" fill="white"/><rect x="125.9" y="211.34" width="0.6" height="48.93" fill="white"/><rect x="134.7" y="211.34" width="0.6" height="48.93" fill="white"/><rect x="143.5" y="211.34" width="0.6" height="48.93" fill="white"/><rect x="68.1" y="215.7" width="80" height="0.6" fill="white"/><rect x="68.1" y="224.5" width="80" height="0.6" fill="white"/><rect x="68.1" y="233.3" width="80" height="0.6" fill="white"/><rect x="68.1" y="242.1" width="80" height="0.6" fill="white"/><rect x="68.1" y="250.9" width="80" height="0.6" fill="white"/><rect x="68.1" y="259.7" width="80" height="0.6" fill="white"/></g><path d="M114.52 40V106.53H111" stroke="#4A443C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M86.51 106.53H64.6" stroke="#4A443C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M161.4 40H64.6V260H161.4V40Z" stroke="#2E2A25" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M165 133L161 133L161 100L165 100L165 133Z" fill="#F9F6F1"/><path d="M67.5 163L62.5 163L62.5 110L67.5 110L67.5 163Z" fill="#F9F6F1"/><path d="M164.5 244L159.5 244L159.5 191L164.5 191L164.5 244Z" fill="#F9F6F1"/><path d="M127.5 42.5L127.5 37.5L152 37.5L152 42.5L127.5 42.5Z" fill="#F9F6F1"/><path d="M68.37 163L66.87 163L67 110L68.5 110L68.37 163Z" fill="#292624"/><path d="M165.37 244L163.87 244L164 191L165.5 191L165.37 244Z" fill="#292624"/><path d="M127.5 43.37L127.5 41.87L152 42L152 43.5L127.5 43.37Z" fill="#292624"/><path d="M62.63 163L61.13 163L61 110L62.5 110L62.63 163Z" fill="#292624"/><path d="M159.63 244L158.13 244L158 191L159.5 191L159.63 244Z" fill="#292624"/><path d="M127.5 37.63L127.5 36.13L152 36L152 37.5L127.5 37.63Z" fill="#292624"/><mask id="path-100-inside-1-lbA" fill="white"><path d="M68 242.8C68.11 246.23 70.87 248.99 74.3 249.1L74.3 249.1L68 249.1L68 242.8L68 242.8Z"/></mask><path d="M68 242.8C68.11 246.23 70.87 248.99 74.3 249.1L74.3 249.1L68 249.1L68 242.8L68 242.8Z" fill="#C9C2B6"/><path d="M68 242.8L68.6 242.78L68.59 242.2L68 242.2L68 242.8ZM74.3 249.1L74.9 249.1L74.9 248.51L74.32 248.5L74.3 249.1ZM74.3 249.1L74.3 249.7L74.9 249.7L74.9 249.1L74.3 249.1ZM68 249.1L67.4 249.1L67.4 249.7L68 249.7L68 249.1ZM68 242.8L68 242.2L67.4 242.2L67.4 242.8L68 242.8ZM68 242.8L67.4 242.82C67.52 246.57 70.53 249.58 74.28 249.69L74.3 249.1L74.32 248.5C71.2 248.4 68.7 245.9 68.6 242.78L68 242.8ZM74.3 249.1L73.7 249.1L73.7 249.1L74.3 249.1L74.9 249.1L74.9 249.1L74.3 249.1ZM74.3 249.1L74.3 248.5L68 248.5L68 249.1L68 249.7L74.3 249.7L74.3 249.1ZM68 249.1L68.6 249.1L68.6 242.8L68 242.8L67.4 242.8L67.4 249.1L68 249.1ZM68 242.8L68 243.4L68 243.4L68 242.8L68 242.2L68 242.2L68 242.8Z" fill="#8A8378" mask="url(#path-100-inside-1-lbA)"/><path d="M78.6 79.3C81.2 79.3 83.3 81.4 83.3 84L83.3 100.4C83.3 103 81.2 105.1 78.6 105.1L66.3 105.1L66.3 79.3L78.6 79.3Z" fill="#B7C2CC" stroke="#8A8378" stroke-width="0.6"/><rect x="74.5" y="79" width="0.6" height="26.4" fill="white"/><rect x="66" y="87.5" width="17.6" height="0.6" fill="white"/><rect x="66" y="96.3" width="17.6" height="0.6" fill="white"/><path d="M108 58.7L83 58.7C80.4 58.7 78.3 56.6 78.3 54L78.3 42.3L112.7 42.3L112.7 54C112.7 56.6 110.6 58.7 108 58.7Z" fill="#B7C2CC" stroke="#8A8378" stroke-width="0.6"/><rect x="104.5" y="51" width="0.6" height="8.8" transform="rotate(-180 104.5 51)" fill="white"/><rect x="104.5" y="59" width="0.6" height="8.8" transform="rotate(-180 104.5 59)" fill="white"/><path d="M78.5 50.6L78.5 50L113 50.4L113 51L78.5 50.6Z" fill="white"/><rect x="95.7" y="51" width="0.6" height="8.8" transform="rotate(-180 95.7 51)" fill="white"/><rect x="95.7" y="59" width="0.6" height="8.8" transform="rotate(-180 95.7 59)" fill="white"/><rect x="86.9" y="51" width="0.6" height="8.8" transform="rotate(-180 86.9 51)" fill="white"/><rect x="86.9" y="59" width="0.6" height="8.8" transform="rotate(-180 86.9 59)" fill="white"/><path d="M78.5 72.7L66.3 72.7L66.3 64.3L78.5 64.3C80.82 64.3 82.7 66.18 82.7 68.5C82.7 70.82 80.82 72.7 78.5 72.7Z" fill="#B7C2CC" stroke="#8A8378" stroke-width="0.6"/><rect x="75" y="73" width="0.6" height="8.8" transform="rotate(180 75 73)" fill="white"/><text fill="#8C4D1A" font-family="SpaceMonoLocal, Space Mono, monospace" font-size="8" font-weight="700" letter-spacing="0.8"><tspan x="110" y="120.04">ENTRANCE</tspan></text></svg></template>
+<template id="hf-lay-B-B"><svg viewBox="0 0 226 300" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Option B layout: daylight-first bedroom"><path d="M64.6 40H161.4V260H64.6V40Z" fill="white"/><path d="M112.7 160.3V169C112.7 171.6 110.6 173.7 108 173.7H66.3V160.3H112.7Z" fill="#D9D3C7" stroke="#8A8378" stroke-width="0.6"/><rect x="73.1" y="157.65" width="0.6" height="15.54" fill="white"/><rect x="81.9" y="157.65" width="0.6" height="15.54" fill="white"/><rect x="90.7" y="157.65" width="0.6" height="15.54" fill="white"/><rect x="99.5" y="157.65" width="0.6" height="15.54" fill="white"/><rect x="108.3" y="157.65" width="0.6" height="15.54" fill="white"/><path d="M65.07 166H112.5V166.6H65.07V166Z" fill="white"/><path d="M133.42 215.9H144.84C145.7 215.9 146.4 216.6 146.4 217.47V242.11C146.4 243.1 145.6 243.91 144.6 243.91H133.65C132.52 243.91 131.61 243 131.61 241.88V217.71C131.61 216.71 132.42 215.9 133.42 215.9Z" fill="#B7C2CC" stroke="#8A8378" stroke-width="0.6"/><mask id="mask0-lbB" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="131" y="215" width="16" height="30"><path d="M131.31 217.71C131.31 216.54 132.25 215.6 133.42 215.6H144.84C145.87 215.6 146.7 216.44 146.7 217.47V242.11C146.7 243.27 145.76 244.21 144.6 244.21H133.64C132.36 244.21 131.31 243.17 131.31 241.88V217.71Z" fill="#B7C2CC"/></mask><g mask="url(#mask0-lbB)"><rect x="134.7" y="215.6" width="0.6" height="28.61" fill="white"/><rect x="143.5" y="215.6" width="0.6" height="28.61" fill="white"/><rect x="131.31" y="224.5" width="15.39" height="0.6" fill="white"/><rect x="131.31" y="233.3" width="15.39" height="0.6" fill="white"/><rect x="131.31" y="242.1" width="15.39" height="0.6" fill="white"/></g><path d="M113.2 245.01V259.21H67.4C66.28 259.21 65.37 258.3 65.37 257.18V245.01H113.2Z" fill="#C9C2B6" stroke="#8A8378" stroke-width="0.6"/><mask id="mask1-lbB" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="65" y="245" width="48" height="15"><path d="M65.07 245.44H113V259.51H67.4C66.11 259.51 65.07 258.46 65.07 257.18V245.44Z" fill="#C9C2B6"/></mask><g mask="url(#mask1-lbB)"><rect x="73.12" y="245.44" width="0.6" height="14.06" fill="white"/><rect x="81.94" y="245.44" width="0.6" height="14.06" fill="white"/><rect x="90.76" y="245.44" width="0.6" height="14.06" fill="white"/><rect x="99.58" y="245.44" width="0.6" height="14.06" fill="white"/><rect x="108.4" y="245.44" width="0.6" height="14.06" fill="white"/><rect x="65.07" y="250.9" width="47.93" height="0.6" fill="white"/></g><path d="M65.07 98.59C65.07 99.88 66.11 100.92 67.4 100.92H75.79C77.08 100.92 78.13 99.88 78.13 98.59V57.35C78.13 55.81 79.38 54.56 80.92 54.56H103.79C105.33 54.56 106.58 55.81 106.58 57.35V69.23C106.58 70.52 107.63 71.57 108.92 71.57H117.54C118.7 71.57 119.64 70.62 119.64 69.46V42.6C119.64 41.43 118.7 40.49 117.54 40.49H67.51C66.16 40.49 65.07 41.59 65.07 42.94V98.59Z" fill="#A9B49A" stroke="#8A8378" stroke-width="0.6" stroke-linejoin="round"/><mask id="mask2-lbB" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="65" y="40" width="55" height="61"><path d="M65.07 98.59C65.07 99.88 66.11 100.92 67.4 100.92H75.79C77.08 100.92 78.13 99.88 78.13 98.59V57.35C78.13 55.81 79.38 54.56 80.92 54.56H103.79C105.33 54.56 106.58 55.81 106.58 57.35V69.23C106.58 70.52 107.63 71.57 108.92 71.57H117.54C118.7 71.57 119.64 70.62 119.64 69.46V42.6C119.64 41.43 118.7 40.49 117.54 40.49H67.51C66.16 40.49 65.07 41.59 65.07 42.94V98.59Z" fill="#A9B49A"/></mask><g mask="url(#mask2-lbB)"><rect x="73.1" y="40.49" width="0.6" height="60.43" fill="white"/><rect x="81.9" y="40.49" width="0.6" height="60.43" fill="white"/><rect x="90.7" y="40.49" width="0.6" height="60.43" fill="white"/><rect x="99.5" y="40.49" width="0.6" height="60.43" fill="white"/><rect x="108.3" y="40.49" width="0.6" height="60.43" fill="white"/><rect x="117.1" y="40.49" width="0.6" height="60.43" fill="white"/><rect x="65.07" y="48.5" width="54.58" height="0.6" fill="white"/><rect x="65.07" y="57.3" width="54.58" height="0.6" fill="white"/><rect x="65.07" y="66.1" width="54.58" height="0.6" fill="white"/><rect x="65.07" y="74.9" width="54.58" height="0.6" fill="white"/><rect x="65.07" y="83.7" width="54.58" height="0.6" fill="white"/><rect x="65.07" y="92.5" width="54.58" height="0.6" fill="white"/></g><path d="M155.33 103.77C155.33 102.61 156.27 101.66 157.44 101.66H161.16V257.4C161.16 258.56 160.22 259.51 159.05 259.51H113.58V245.04H144.68C146.14 245.04 147.32 243.86 147.32 242.4V195.76C147.32 194.59 148.27 193.65 149.43 193.65H152.69C154.15 193.65 155.33 192.47 155.33 191.01V103.77Z" fill="#A9B49A" stroke="#8A8378" stroke-width="0.6" stroke-linejoin="round"/><mask id="mask3-lbB" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="113" y="101" width="49" height="159"><path d="M155.33 103.77C155.33 102.61 156.27 101.66 157.44 101.66H161.16V257.4C161.16 258.56 160.22 259.51 159.05 259.51H113.58V245.04H144.68C146.14 245.04 147.32 243.86 147.32 242.4V195.76C147.32 194.59 148.27 193.65 149.43 193.65H152.69C154.15 193.65 155.33 192.47 155.33 191.01V103.77Z" fill="#A9B49A"/></mask><g mask="url(#mask3-lbB)"><rect x="117.1" y="101.66" width="0.6" height="157.85" fill="white"/><rect x="125.9" y="101.66" width="0.6" height="157.85" fill="white"/><rect x="134.69" y="101.66" width="0.6" height="157.85" fill="white"/><rect x="143.5" y="101.66" width="0.6" height="157.85" fill="white"/><rect x="152.3" y="101.66" width="0.6" height="157.85" fill="white"/><rect x="113.58" y="110.1" width="47.58" height="0.6" fill="white"/><rect x="113.58" y="118.9" width="47.58" height="0.6" fill="white"/><rect x="113.58" y="127.7" width="47.58" height="0.6" fill="white"/><rect x="113.58" y="136.5" width="47.58" height="0.6" fill="white"/><rect x="113.58" y="145.3" width="47.58" height="0.6" fill="white"/><rect x="113.58" y="154.1" width="47.58" height="0.6" fill="white"/><rect x="113.58" y="162.9" width="47.58" height="0.6" fill="white"/><rect x="113.58" y="171.7" width="47.58" height="0.6" fill="white"/><rect x="113.58" y="180.5" width="47.58" height="0.6" fill="white"/><rect x="113.58" y="189.3" width="47.58" height="0.6" fill="white"/><rect x="113.58" y="198.1" width="47.58" height="0.6" fill="white"/><rect x="113.58" y="206.9" width="47.58" height="0.6" fill="white"/><path d="M147.5 215.7H195.08V216.3H147.5V215.7Z" fill="white"/><rect x="113.58" y="224.5" width="47.58" height="0.6" fill="white"/><rect x="113.58" y="233.3" width="47.58" height="0.6" fill="white"/><rect x="113.58" y="242.1" width="47.58" height="0.6" fill="white"/><rect x="113.58" y="250.9" width="47.58" height="0.6" fill="white"/></g><path d="M65.07 244.71H72.53C73.69 244.71 74.63 243.76 74.63 242.6V225.79C74.63 224.12 75.99 222.76 77.67 222.76H110.78C111.94 222.76 112.89 221.82 112.89 220.66V196.5C112.89 195.34 111.94 194.4 110.78 194.4H77.67C75.99 194.4 74.63 193.04 74.63 191.36V173.93H65.07V244.71Z" fill="#D9D3C7" stroke="#8A8378" stroke-width="0.6" stroke-linejoin="round"/><mask id="mask4-lbB" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="65" y="173" width="48" height="72"><path d="M65.07 244.71H72.53C73.69 244.71 74.63 243.76 74.63 242.6V225.79C74.63 224.12 75.99 222.76 77.67 222.76H110.78C111.94 222.76 112.89 221.82 112.89 220.66V196.5C112.89 195.34 111.94 194.4 110.78 194.4H77.67C75.99 194.4 74.63 193.04 74.63 191.36V173.93H65.07V244.71Z" fill="#D9D3C7"/></mask><g mask="url(#mask4-lbB)"><rect x="73.1" y="173.93" width="0.6" height="70.78" fill="white"/><rect x="81.9" y="173.93" width="0.6" height="70.78" fill="white"/><rect x="90.7" y="173.93" width="0.6" height="70.78" fill="white"/><rect x="99.5" y="173.93" width="0.6" height="70.78" fill="white"/><rect x="108.3" y="173.93" width="0.6" height="70.78" fill="white"/><rect x="65.07" y="180.5" width="47.82" height="0.6" fill="white"/><rect x="65.07" y="189.3" width="47.82" height="0.6" fill="white"/><rect x="65.07" y="198.1" width="47.82" height="0.6" fill="white"/><rect x="65.07" y="206.9" width="47.82" height="0.6" fill="white"/><rect x="65.07" y="215.7" width="47.82" height="0.6" fill="white"/><rect x="65.07" y="224.5" width="47.82" height="0.6" fill="white"/><rect x="65.07" y="233.3" width="47.82" height="0.6" fill="white"/><rect x="65.07" y="242.1" width="47.82" height="0.6" fill="white"/></g><path d="M64.6 103.62H118.02V128.09" stroke="#4A443C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M118.02 154V159.19H64.6" stroke="#4A443C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M161.4 40H64.6V260H161.4V40Z" stroke="#2E2A25" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M115.1 117.6C115.1 120.19 112.99 122.3 110.4 122.3L94 122.3C91.4 122.3 89.3 120.19 89.3 117.6L89.3 105.3L115.1 105.3L115.1 117.6Z" fill="#B7C2CC" stroke="#8A8378" stroke-width="0.6"/><rect x="115.4" y="113.5" width="0.6" height="26.4" transform="rotate(90 115.4 113.5)" fill="white"/><rect x="106.9" y="105" width="17.6" height="0.6" transform="rotate(90 106.9 105)" fill="white"/><rect x="98.1" y="105" width="17.6" height="0.6" transform="rotate(90 98.1 105)" fill="white"/><path d="M71 141.3L96 141.3C98.6 141.3 100.7 143.4 100.7 146L100.7 157.7L66.3 157.7L66.3 146C66.3 143.4 68.4 141.3 71 141.3Z" fill="#B7C2CC" stroke="#8A8378" stroke-width="0.6"/><rect x="74.5" y="149" width="0.6" height="8.8" fill="white"/><rect x="74.5" y="141" width="0.6" height="8.8" fill="white"/><path d="M100.5 149.4L100.5 150L66 149.6L66 149L100.5 149.4Z" fill="white"/><rect x="83.3" y="149" width="0.6" height="8.8" fill="white"/><rect x="83.3" y="141" width="0.6" height="8.8" fill="white"/><rect x="92.1" y="149" width="0.6" height="8.8" fill="white"/><rect x="92.1" y="141" width="0.6" height="8.8" fill="white"/><path d="M66.3 117.5L66.3 105.3L74.7 105.3L74.7 117.5C74.7 119.82 72.82 121.7 70.5 121.7C68.18 121.7 66.3 119.82 66.3 117.5Z" fill="#B7C2CC" stroke="#8A8378" stroke-width="0.6"/><rect x="66" y="114" width="0.6" height="8.8" transform="rotate(-90 66 114)" fill="white"/><path d="M165 102L161 102L161 69L165 69L165 102Z" fill="#F9F6F1"/><path d="M67.5 163L62.5 163L62.5 110L67.5 110L67.5 163Z" fill="#F9F6F1"/><path d="M164.5 244L159.5 244L159.5 191L164.5 191L164.5 244Z" fill="#F9F6F1"/><path d="M127.5 42.5L127.5 37.5L152 37.5L152 42.5L127.5 42.5Z" fill="#F9F6F1"/><path d="M68.37 163L66.87 163L67 110L68.5 110L68.37 163Z" fill="#292624"/><path d="M165.37 244L163.87 244L164 191L165.5 191L165.37 244Z" fill="#292624"/><path d="M127.5 43.37L127.5 41.87L152 42L152 43.5L127.5 43.37Z" fill="#292624"/><path d="M62.63 163L61.13 163L61 110L62.5 110L62.63 163Z" fill="#292624"/><path d="M159.63 244L158.13 244L158 191L159.5 191L159.63 244Z" fill="#292624"/><path d="M127.5 37.63L127.5 36.13L152 36L152 37.5L127.5 37.63Z" fill="#292624"/><text fill="#8C4D1A" font-family="SpaceMonoLocal, Space Mono, monospace" font-size="8" font-weight="700" letter-spacing="0.8"><tspan x="111" y="88.04">ENTRANCE</tspan></text></svg></template>
+<template id="hf-lay-B-C"><svg viewBox="0 0 226 300" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Option C layout: one loop with wide corridors"><path d="M0 103H4V150H0V103Z" fill="#F9F6F1"/><path d="M64.6 40H161.4V260H64.6V40Z" fill="white"/><path d="M78.7 181.59V219.7H66.3L66.3 181.59H78.7Z" fill="#A9B49A" stroke="#8A8378" stroke-width="0.6"/><path d="M65.09 181.77H78.78V222.07C78.78 220.76 77.71 219.7 76.4 219.7H65.09V181.77Z" fill="#A9B49A" stroke="#8A8378" stroke-width="0.6" stroke-linejoin="round"/><mask id="mask0-lbC" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="65" y="181" width="14" height="42"><path d="M65.09 181.77H78.78V222.07C78.78 220.76 77.71 219.7 76.4 219.7H65.09V181.77Z" fill="#A9B49A"/></mask><g mask="url(#mask0-lbC)"><rect x="73.1" y="181.77" width="0.6" height="40.3" fill="white"/><rect x="65.09" y="189.3" width="13.68" height="0.6" fill="white"/><rect x="65.09" y="198.1" width="13.68" height="0.6" fill="white"/><rect x="65.09" y="206.9" width="13.68" height="0.6" fill="white"/><rect x="65.09" y="215.7" width="13.68" height="0.6" fill="white"/></g><path d="M65.09 219.7H76.4C77.71 219.7 78.78 220.76 78.78 222.07V242.51C78.78 244.27 80.2 245.69 81.95 245.69H120.09C121.31 245.69 122.29 246.68 122.29 247.89V259.51H67.29C66.08 259.51 65.09 258.52 65.09 257.31V219.7Z" fill="#A9B49A" stroke="#8A8378" stroke-width="0.6" stroke-linejoin="round"/><mask id="mask1-lbC" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="65" y="219" width="58" height="41"><path d="M65.09 219.7H76.4C77.71 219.7 78.78 220.76 78.78 222.07V242.51C78.78 244.27 80.2 245.69 81.95 245.69H120.09C121.31 245.69 122.29 246.68 122.29 247.89V259.51H67.29C66.08 259.51 65.09 258.52 65.09 257.31V219.7Z" fill="#A9B49A"/></mask><g mask="url(#mask1-lbC)"><rect x="73.1" y="219.7" width="0.6" height="39.81" fill="white"/><rect x="81.9" y="219.7" width="0.6" height="39.81" fill="white"/><rect x="90.7" y="219.7" width="0.6" height="39.81" fill="white"/><rect x="99.5" y="219.7" width="0.6" height="39.81" fill="white"/><rect x="108.3" y="219.7" width="0.6" height="39.81" fill="white"/><rect x="117.1" y="219.7" width="0.6" height="39.81" fill="white"/><rect x="65.09" y="224.5" width="57.2" height="0.6" fill="white"/><rect x="65.09" y="233.3" width="57.2" height="0.6" fill="white"/><rect x="65.09" y="242.1" width="57.2" height="0.6" fill="white"/><rect x="65.09" y="250.9" width="57.2" height="0.6" fill="white"/></g><path d="M117.77 167.46C120.1 167.46 121.99 169.35 121.99 171.68V177.25C121.99 179.58 120.1 181.47 117.77 181.47H65.39V167.46H117.77Z" fill="#C9C2B6" stroke="#8A8378" stroke-width="0.6"/><mask id="mask2-lbC" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="65" y="167" width="58" height="15"><path d="M65.09 167.16H117.77C120.27 167.16 122.29 169.19 122.29 171.68V177.25C122.29 179.74 120.27 181.77 117.77 181.77H65.09V167.16Z" fill="#C9C2B6"/></mask><g mask="url(#mask2-lbC)"><rect x="73.1" y="167.16" width="0.6" height="14.61" fill="white"/><rect x="81.9" y="167.16" width="0.6" height="14.61" fill="white"/><rect x="90.7" y="167.16" width="0.6" height="14.61" fill="white"/><rect x="99.5" y="167.16" width="0.6" height="14.61" fill="white"/><rect x="108.3" y="167.16" width="0.6" height="14.61" fill="white"/><rect x="117.1" y="167.16" width="0.6" height="14.61" fill="white"/><rect x="65.09" y="174" width="57.2" height="0.6" fill="white"/></g><path d="M158.96 101.96C160 101.96 160.85 102.81 160.85 103.86V257.06C160.85 258.25 159.89 259.21 158.71 259.21H154.85V101.96H158.96Z" fill="#B7C2CC" stroke="#8A8378" stroke-width="0.6"/><mask id="mask3-lbC" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="154" y="101" width="8" height="159"><path d="M154.56 101.66H158.96C160.17 101.66 161.16 102.65 161.16 103.86V257.06C161.16 258.41 160.06 259.51 158.71 259.51H154.56V101.66Z" fill="#B7C2CC"/></mask><g mask="url(#mask3-lbC)"><rect x="154.56" y="110.1" width="6.6" height="0.6" fill="white"/><rect x="154.56" y="118.9" width="6.6" height="0.6" fill="white"/><rect x="154.56" y="127.7" width="6.6" height="0.6" fill="white"/><rect x="154.56" y="136.5" width="6.6" height="0.6" fill="white"/><rect x="154.56" y="145.3" width="6.6" height="0.6" fill="white"/><rect x="154.56" y="154.1" width="6.6" height="0.6" fill="white"/><rect x="154.56" y="162.9" width="6.6" height="0.6" fill="white"/><rect x="154.56" y="171.7" width="6.6" height="0.6" fill="white"/><rect x="154.56" y="180.5" width="6.6" height="0.6" fill="white"/><rect x="154.56" y="189.3" width="6.6" height="0.6" fill="white"/><rect x="154.56" y="198.1" width="6.6" height="0.6" fill="white"/><rect x="154.56" y="206.9" width="6.6" height="0.6" fill="white"/><rect x="154.56" y="215.7" width="6.6" height="0.6" fill="white"/><rect x="154.56" y="224.5" width="6.6" height="0.6" fill="white"/><rect x="154.56" y="233.3" width="6.6" height="0.6" fill="white"/><rect x="154.56" y="242.1" width="6.6" height="0.6" fill="white"/><rect x="154.56" y="250.9" width="6.6" height="0.6" fill="white"/></g><path d="M65.09 103.86C65.09 102.65 66.08 101.66 67.29 101.66H122.29V128.07C122.29 129.29 121.31 130.27 120.09 130.27H82.67C81.05 130.27 79.74 131.58 79.74 133.2V150.97C79.74 152.33 80.84 153.43 82.2 153.43H83.87C85.23 153.43 86.34 154.54 86.34 155.9V167.16H65.09V103.86Z" fill="#D9D3C7" stroke="#8A8378" stroke-width="0.6" stroke-linejoin="round"/><mask id="mask4-lbC" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="65" y="101" width="58" height="67"><path d="M65.09 103.86C65.09 102.65 66.08 101.66 67.29 101.66H122.29V128.07C122.29 129.29 121.31 130.27 120.09 130.27H82.67C81.05 130.27 79.74 131.58 79.74 133.2V150.97C79.74 152.33 80.84 153.43 82.2 153.43H83.87C85.23 153.43 86.34 154.54 86.34 155.9V167.16H65.09V103.86Z" fill="#D9D3C7"/></mask><g mask="url(#mask4-lbC)"><rect x="73.1" y="101.66" width="0.6" height="65.5" fill="white"/><rect x="81.9" y="101.66" width="0.6" height="65.5" fill="white"/><rect x="90.7" y="101.66" width="0.6" height="65.5" fill="white"/><rect x="99.5" y="101.66" width="0.6" height="65.5" fill="white"/><rect x="108.3" y="101.66" width="0.6" height="65.5" fill="white"/><rect x="117.1" y="101.66" width="0.6" height="65.5" fill="white"/><rect x="65.09" y="110.1" width="57.2" height="0.6" fill="white"/><rect x="65.09" y="118.9" width="57.2" height="0.6" fill="white"/><rect x="65.09" y="127.7" width="57.2" height="0.6" fill="white"/><rect x="65.09" y="136.5" width="57.2" height="0.6" fill="white"/><rect x="65.09" y="145.3" width="57.2" height="0.6" fill="white"/><rect x="65.09" y="154.1" width="57.2" height="0.6" fill="white"/><rect x="65.09" y="162.9" width="57.2" height="0.6" fill="white"/></g><path d="M64.6 101H122.77" stroke="#4A443C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M151.63 101H161.4" stroke="#4A443C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M161.4 40H64.6V260H161.4V40Z" stroke="#2E2A25" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M155 259L155 263L122 263L122 259L155 259Z" fill="#F9F6F1"/><path d="M67.5 163L62.5 163L62.5 110L67.5 110L67.5 163Z" fill="#F9F6F1"/><path d="M164.5 244L159.5 244L159.5 191L164.5 191L164.5 244Z" fill="#F9F6F1"/><path d="M127.5 42.5L127.5 37.5L152 37.5L152 42.5L127.5 42.5Z" fill="#F9F6F1"/><path d="M68.37 163L66.87 163L67 110L68.5 110L68.37 163Z" fill="#292624"/><path d="M165.37 244L163.87 244L164 191L165.5 191L165.37 244Z" fill="#292624"/><path d="M127.5 43.37L127.5 41.87L152 42L152 43.5L127.5 43.37Z" fill="#292624"/><path d="M62.63 163L61.13 163L61 110L62.5 110L62.63 163Z" fill="#292624"/><path d="M159.63 244L158.13 244L158 191L159.5 191L159.63 244Z" fill="#292624"/><path d="M127.5 37.63L127.5 36.13L152 36L152 37.5L127.5 37.63Z" fill="#292624"/><path d="M147 85.1C144.41 85.1 142.3 83 142.3 80.4L142.3 64C142.3 61.4 144.41 59.3 147 59.3L159.3 59.3L159.3 85.1L147 85.1Z" fill="#B7C2CC" stroke="#8A8378" stroke-width="0.6"/><rect x="151.1" y="85.4" width="0.6" height="26.4" transform="rotate(-180 151.1 85.4)" fill="white"/><rect x="159.6" y="76.9" width="17.6" height="0.6" transform="rotate(-180 159.6 76.9)" fill="white"/><rect x="159.6" y="68.1" width="17.6" height="0.6" transform="rotate(-180 159.6 68.1)" fill="white"/><path d="M82.7 62L82.7 87C82.7 89.6 80.6 91.7 78 91.7L66.3 91.7L66.3 57.3L78 57.3C80.6 57.3 82.7 59.41 82.7 62Z" fill="#B7C2CC" stroke="#8A8378" stroke-width="0.6"/><rect x="75" y="65.5" width="0.6" height="8.8" transform="rotate(90 75 65.5)" fill="white"/><rect x="83" y="65.5" width="0.6" height="8.8" transform="rotate(90 83 65.5)" fill="white"/><path d="M74.6 91.5L74 91.5L74 57.71L74.6 57.71L74.6 91.5Z" fill="white"/><rect x="75" y="74.3" width="0.6" height="8.8" transform="rotate(90 75 74.3)" fill="white"/><rect x="83" y="74.3" width="0.6" height="8.8" transform="rotate(90 83 74.3)" fill="white"/><rect x="75" y="83.1" width="0.6" height="8.8" transform="rotate(90 75 83.1)" fill="white"/><rect x="83" y="83.1" width="0.6" height="8.8" transform="rotate(90 83 83.1)" fill="white"/><path d="M107.3 54.5L107.3 42.3L115.7 42.3L115.7 54.5C115.7 56.82 113.82 58.7 111.5 58.7C109.18 58.7 107.3 56.82 107.3 54.5Z" fill="#B7C2CC" stroke="#8A8378" stroke-width="0.6"/><rect x="107" y="51" width="0.6" height="8.8" transform="rotate(-90 107 51)" fill="white"/><text fill="#8C4D1A" font-family="SpaceMonoLocal, Space Mono, monospace" font-size="8" font-weight="700" letter-spacing="0.8"><tspan x="115" y="273.04">ENTRANCE</tspan></text></svg></template>
+<template id="hf-lay-C-A"><svg viewBox="0 0 226 300" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Option A layout: compact services"><path d="M22.36 32.7C22.36 30.65 24.01 29 26.06 29H200.38C202.09 29 203.46 30.38 203.46 32.08V266.6C203.46 268.93 201.57 270.82 199.24 270.82H116.43C114.39 270.82 112.74 269.17 112.74 267.13V182.12C112.74 180.9 112.04 179.22 111.18 178.36L54.01 121.2C53.15 120.34 51.47 119.64 50.26 119.64H25.62C23.82 119.64 22.36 118.18 22.36 116.38V32.7Z" fill="white"/><path d="M25.59 29.45H40.7V118.42H25.59C24.05 118.42 22.81 117.18 22.81 115.64V32.23C22.81 30.69 24.05 29.45 25.59 29.45Z" fill="#A9B49A" stroke="#8A8378" stroke-width="0.6"/><rect x="31.35" y="29" width="0.6" height="89.58" fill="white"/><rect x="23" y="37.35" width="17.37" height="0.6" fill="white"/><rect x="23" y="46.15" width="17.37" height="0.6" fill="white"/><rect x="23" y="54.95" width="17.37" height="0.6" fill="white"/><rect x="23" y="63.75" width="17.37" height="0.6" fill="white"/><rect x="23" y="72.55" width="17.37" height="0.6" fill="white"/><rect x="23" y="81.35" width="17.37" height="0.6" fill="white"/><rect x="23" y="90.15" width="17.37" height="0.6" fill="white"/><rect x="23" y="98.95" width="17.37" height="0.6" fill="white"/><rect x="23" y="107.75" width="17.37" height="0.6" fill="white"/><rect x="23" y="116.55" width="17.37" height="0.6" fill="white"/><path d="M40.8 29V46.52H73.4C75.25 46.52 76.74 48.02 76.74 49.86V88.66C76.74 90.12 77.93 91.3 79.38 91.3H110.32C111.3 91.3 112.08 90.52 112.08 89.54V29H108.43V80C108.43 81.37 107.33 82.47 105.97 82.47H96.57C95.21 82.47 94.11 81.37 94.11 80V29H40.8Z" fill="#D9D3C7" stroke="#8A8378" stroke-width="0.6" stroke-linejoin="round"/><mask id="mask0-lcA" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="40" y="29" width="73" height="63"><path d="M40.8 29V46.52H73.4C75.25 46.52 76.74 48.02 76.74 49.86V88.66C76.74 90.12 77.93 91.3 79.38 91.3H110.32C111.3 91.3 112.08 90.52 112.08 89.54V29H108.43V80C108.43 81.37 107.33 82.47 105.97 82.47H96.57C95.21 82.47 94.11 81.37 94.11 80V29H40.8Z" fill="#D9D3C7"/></mask><g mask="url(#mask0-lcA)"><rect x="48.46" y="29" width="0.6" height="62.3" fill="white"/><rect x="57.26" y="29" width="0.6" height="62.3" fill="white"/><rect x="66.06" y="29" width="0.6" height="62.3" fill="white"/><rect x="74.86" y="29" width="0.6" height="62.3" fill="white"/><rect x="83.66" y="29" width="0.6" height="62.3" fill="white"/><rect x="92.46" y="29" width="0.6" height="62.3" fill="white"/><rect x="101.26" y="29" width="0.6" height="62.3" fill="white"/><rect x="110.06" y="29" width="0.6" height="62.3" fill="white"/><rect x="40.8" y="37.5" width="71.29" height="0.6" fill="white"/><path d="M74.5 46.3H145.79V46.9H74.5V46.3Z" fill="white"/><rect x="40.8" y="55.1" width="71.29" height="0.6" fill="white"/><rect x="40.8" y="63.9" width="71.29" height="0.6" fill="white"/><rect x="40.8" y="72.7" width="71.29" height="0.6" fill="white"/><path d="M40.8 81.5H94.5V82.1H40.8V81.5Z" fill="white"/></g><path d="M108.39 29.29V80.36C108.39 81.55 107.42 82.52 106.22 82.52H96.28C95.08 82.52 94.11 81.55 94.11 80.36V28.99L108.39 29.29Z" fill="#C9C2B6" stroke="#8A8378" stroke-width="0.6"/><rect x="101.26" y="29.15" width="0.6" height="53.32" fill="white"/><rect x="94.72" y="37.5" width="12.8" height="0.6" fill="white"/><rect x="94.72" y="46.3" width="12.8" height="0.6" fill="white"/><rect x="94.72" y="55.1" width="12.8" height="0.6" fill="white"/><rect x="94.72" y="63.9" width="12.8" height="0.6" fill="white"/><rect x="94.72" y="72.7" width="12.8" height="0.6" fill="white"/><rect x="108" y="81.5" width="12.8" height="0.6" fill="white"/><path d="M140.11 32.08C140.11 30.38 141.49 29 143.19 29H200.38C201.59 29 202.58 29.98 202.58 31.2V95.57H189.78V68.8C189.78 66.76 188.13 65.11 186.08 65.11H142.75C141.29 65.11 140.11 63.92 140.11 62.47V32.08Z" fill="#A9B49A" stroke="#8A8378" stroke-width="0.6" stroke-linejoin="round"/><mask id="mask1-lcA" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="140" y="29" width="63" height="67"><path d="M140.11 32.08C140.11 30.38 141.49 29 143.19 29H200.38C201.59 29 202.58 29.98 202.58 31.2V95.57H189.78V68.8C189.78 66.76 188.13 65.11 186.08 65.11H142.75C141.29 65.11 140.11 63.92 140.11 62.47V32.08Z" fill="#A9B49A"/></mask><g mask="url(#mask1-lcA)"><rect x="145.26" y="29" width="0.6" height="66.57" fill="white"/><rect x="154.06" y="29" width="0.6" height="66.57" fill="white"/><rect x="162.86" y="29" width="0.6" height="66.57" fill="white"/><rect x="171.66" y="29" width="0.6" height="66.57" fill="white"/><rect x="180.46" y="29" width="0.6" height="66.57" fill="white"/><path d="M189.26 29H189.86L189.86 67.2H189.26L189.26 29Z" fill="white"/><rect x="198.06" y="29" width="0.6" height="66.57" fill="white"/><rect x="140.11" y="37.5" width="62.46" height="0.6" fill="white"/><rect x="140.11" y="46.3" width="62.46" height="0.6" fill="white"/><rect x="140.11" y="55.1" width="62.46" height="0.6" fill="white"/><path d="M187.5 65H249.96V65.6H187.5V65Z" fill="white"/><rect x="140.11" y="72.7" width="62.46" height="0.6" fill="white"/><rect x="140.11" y="81.5" width="62.46" height="0.6" fill="white"/><rect x="140.11" y="90.3" width="62.46" height="0.6" fill="white"/></g><path d="M202.28 95.58V114.44H140.41V95.58H202.28Z" fill="#B7C2CC" stroke="#8A8378" stroke-width="0.6"/><path d="M189.26 95.88H189.86V114.15H189.26V95.88Z" fill="white"/><path d="M180.4 95.88H181V114.15H180.4V95.88Z" fill="white"/><path d="M171.5 95.88H172.1V114.15H171.5V95.88Z" fill="white"/><path d="M162.9 95.88H163.5V114.15H162.9V95.88Z" fill="white"/><path d="M154 95.88H154.6V114.15H154V95.88Z" fill="white"/><path d="M145.22 95.88H145.82V114.15H145.22V95.88Z" fill="white"/><path d="M198.06 96H198.66V114.16H198.06V96Z" fill="white"/><rect x="140.11" y="99.1" width="62.46" height="0.6" fill="white"/><rect x="140.11" y="107.9" width="62.46" height="0.6" fill="white"/><path d="M140.11 114.46H202.58V200.68H183.58C182.13 200.68 180.94 199.5 180.94 198.04V149.74C180.94 147.69 179.29 146.04 177.25 146.04H142.75C141.29 146.04 140.11 144.86 140.11 143.4V114.46Z" fill="#D9D3C7" stroke="#8A8378" stroke-width="0.6" stroke-linejoin="round"/><mask id="mask2-lcA" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="140" y="114" width="63" height="87"><path d="M140.11 114.46H202.58V200.68H183.58C182.13 200.68 180.94 199.5 180.94 198.04V149.74C180.94 147.69 179.29 146.04 177.25 146.04H142.75C141.29 146.04 140.11 144.86 140.11 143.4V114.46Z" fill="#D9D3C7"/></mask><g mask="url(#mask2-lcA)"><rect x="145.26" y="114.46" width="0.6" height="86.22" fill="white"/><rect x="154.06" y="114.46" width="0.6" height="86.22" fill="white"/><rect x="162.86" y="114.46" width="0.6" height="86.22" fill="white"/><rect x="171.66" y="114.46" width="0.6" height="86.22" fill="white"/><rect x="180.46" y="114.46" width="0.6" height="86.22" fill="white"/><rect x="189.26" y="114.46" width="0.6" height="86.22" fill="white"/><rect x="198.06" y="114.46" width="0.6" height="86.22" fill="white"/><rect x="140.11" y="116.7" width="62.46" height="0.6" fill="white"/><rect x="140.11" y="125.5" width="62.46" height="0.6" fill="white"/><rect x="140.11" y="134.3" width="62.46" height="0.6" fill="white"/><rect x="140.11" y="143.1" width="62.46" height="0.6" fill="white"/><rect x="140.11" y="151.9" width="62.46" height="0.6" fill="white"/><rect x="140.11" y="160.7" width="62.46" height="0.6" fill="white"/><rect x="140.11" y="169.5" width="62.46" height="0.6" fill="white"/><rect x="140.11" y="178.3" width="62.46" height="0.6" fill="white"/><rect x="140.11" y="187.1" width="62.46" height="0.6" fill="white"/><rect x="140.11" y="195.9" width="62.46" height="0.6" fill="white"/></g><path d="M113 222.6H130.95" stroke="#4A443C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M157.18 222.6H202.58" stroke="#4A443C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M26.06 29C24.01 29 22.36 30.65 22.36 32.7V116.38C22.36 118.18 23.82 119.64 25.62 119.64H50.26C51.47 119.64 53.15 120.34 54.01 121.2L111.18 178.36C112.04 179.22 112.74 180.9 112.74 182.12V267.13C112.74 269.17 114.39 270.82 116.43 270.82H199.24C201.57 270.82 203.46 268.93 203.46 266.6V32.08C203.46 30.38 202.09 29 200.38 29H26.06Z" stroke="#2E2A25" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M137 273.5L137 268.5L190 268.5L190 273.5L137 273.5Z" fill="#F9F6F1"/><path d="M81.5 31.5L81.5 26.5L105 26.5L105 31.5L81.5 31.5Z" fill="#F9F6F1"/><path d="M200 104.5L205 104.5L205 189L200 189L200 104.5Z" fill="#F9F6F1"/><path d="M137 274.37L137 272.87L190 273L190 274.5L137 274.37Z" fill="#292624"/><path d="M81.5 32.37L81.5 30.87L105 31L105 32.5L81.5 32.37Z" fill="#292624"/><path d="M199.13 104.5L200.63 104.5L200.5 189L199 189L199.13 104.5Z" fill="#292624"/><path d="M137 268.63L137 267.13L190 267L190 268.5L137 268.63Z" fill="#292624"/><path d="M81.5 26.63L81.5 25.13L105 25L105 26.5L81.5 26.63Z" fill="#292624"/><path d="M204.87 104.5L206.37 104.5L206.5 189L205 189L204.87 104.5Z" fill="#292624"/><path d="M94.27 160.22L91.45 163.06L68 139.84L70.82 137L94.27 160.22Z" fill="#F9F6F1"/><path d="M185.3 260L185.3 235C185.3 232.4 187.4 230.3 190 230.3L201.7 230.3L201.7 264.7L190 264.7C187.4 264.7 185.3 262.6 185.3 260Z" fill="#B7C2CC" stroke="#8A8378" stroke-width="0.6"/><rect x="193" y="256.5" width="0.6" height="8.8" transform="rotate(-90 193 256.5)" fill="white"/><rect x="185" y="256.5" width="0.6" height="8.8" transform="rotate(-90 185 256.5)" fill="white"/><path d="M193.4 230.5L194 230.5L194 264.3L193.4 264.3L193.4 230.5Z" fill="white"/><rect x="193" y="247.7" width="0.6" height="8.8" transform="rotate(-90 193 247.7)" fill="white"/><rect x="185" y="247.7" width="0.6" height="8.8" transform="rotate(-90 185 247.7)" fill="white"/><rect x="193" y="238.9" width="0.6" height="8.8" transform="rotate(-90 193 238.9)" fill="white"/><rect x="185" y="238.9" width="0.6" height="8.8" transform="rotate(-90 185 238.9)" fill="white"/><path d="M126.6 224.3C129.19 224.3 131.3 226.41 131.3 229L131.3 245.4C131.3 248 129.19 250.1 126.6 250.1L114.3 250.1L114.3 224.3L126.6 224.3Z" fill="#B7C2CC" stroke="#8A8378" stroke-width="0.6"/><rect x="122.5" y="224" width="0.6" height="26.4" fill="white"/><rect x="114" y="232.5" width="17.6" height="0.6" fill="white"/><rect x="114" y="241.3" width="17.6" height="0.6" fill="white"/><path d="M126.5 264.7L114.3 264.7L114.3 256.3L126.5 256.3C128.82 256.3 130.7 258.18 130.7 260.5C130.7 262.82 128.82 264.7 126.5 264.7Z" fill="#B7C2CC" stroke="#8A8378" stroke-width="0.6"/><rect x="123" y="265" width="0.6" height="8.8" transform="rotate(180 123 265)" fill="white"/><text fill="#8C4D1A" font-family="SpaceMonoLocal, Space Mono, monospace" font-size="8" font-weight="700" letter-spacing="0.8"><tspan x="87" y="143.04">ENTRANCE</tspan></text></svg></template>
+<template id="hf-lay-C-B"><svg viewBox="0 0 226 300" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Option B layout: daylight-first bedroom"><path d="M22.36 32.7C22.36 30.65 24.01 29 26.06 29H200.38C202.09 29 203.46 30.38 203.46 32.08V266.6C203.46 268.93 201.57 270.82 199.24 270.82H116.43C114.39 270.82 112.74 269.17 112.74 267.13V182.12C112.74 180.9 112.04 179.22 111.18 178.36L54.01 121.2C53.15 120.34 51.47 119.64 50.26 119.64H25.62C23.82 119.64 22.36 118.18 22.36 116.38V32.7Z" fill="white"/><path d="M115.5 29H200.82C201.79 29 202.58 29.79 202.58 30.76V101.72H167.23V48.85C167.23 47.39 166.05 46.21 164.59 46.21H152.2C150.75 46.21 149.56 47.39 149.56 48.85V52.72C149.56 54.17 148.38 55.36 146.92 55.36H115.5V29Z" fill="#B7C2CC" stroke="#8A8378" stroke-width="0.6" stroke-linejoin="round"/><rect x="118.86" y="29" width="0.6" height="71.75" fill="white"/><rect x="127.66" y="29" width="0.6" height="71.75" fill="white"/><rect x="136.46" y="29" width="0.6" height="71.75" fill="white"/><rect x="145.26" y="29" width="0.6" height="71.75" fill="white"/><rect x="154.06" y="29" width="0.6" height="71.75" fill="white"/><rect x="162.86" y="29" width="0.6" height="71.75" fill="white"/><path d="M171.66 29H172.26V101.5H171.66V29Z" fill="white"/><path d="M180.46 29H181.06V101.5H180.46V29Z" fill="white"/><path d="M189.26 29H189.86V101.35H189.26V29Z" fill="white"/><path d="M198.06 29H198.66V101.35H198.06V29Z" fill="white"/><path d="M115.64 37.5H202.57V38.1H115.64V37.5Z" fill="white"/><path d="M115.5 46.3H202.57V46.9H115.5V46.3Z" fill="white"/><rect x="117.57" y="63.9" width="85.01" height="0.6" fill="white"/><rect x="117.57" y="72.7" width="85.01" height="0.6" fill="white"/><rect x="117.57" y="81.5" width="85.01" height="0.6" fill="white"/><rect x="117.57" y="90.3" width="85.01" height="0.6" fill="white"/><rect x="117.57" y="99.1" width="85.01" height="0.6" fill="white"/><path d="M151.9 101.96H202.28V118.42H151.9C150.6 118.42 149.56 117.38 149.56 116.08V104.3C149.56 103.01 150.6 101.96 151.9 101.96Z" fill="#C9C2B6" stroke="#8A8378" stroke-width="0.6"/><mask id="mask0-lcB" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="149" y="101" width="54" height="18"><path d="M149.26 104.3C149.26 102.84 150.44 101.66 151.9 101.66H202.58V118.72H151.9C150.44 118.72 149.26 117.54 149.26 116.08V104.3Z" fill="#C9C2B6"/></mask><g mask="url(#mask0-lcB)"><rect x="154.06" y="101.66" width="0.6" height="17.06" fill="white"/><rect x="162.86" y="101.66" width="0.6" height="17.06" fill="white"/><path d="M171.66 102.25H172.26V118.72H171.66V102.25Z" fill="white"/><path d="M180.46 102.27H181.06V118.72H180.46V102.27Z" fill="white"/><path d="M189.26 102.29H189.86V118.72H189.26V102.29Z" fill="white"/><path d="M198.06 102.24H198.66V118.72H198.06V102.24Z" fill="white"/><rect x="149.26" y="110" width="53.32" height="0.6" fill="white"/></g><path d="M185.2 118.5H202.58V200.38H159.82C158.36 200.38 157.18 199.2 157.18 197.74V188.72C157.18 186.53 158.95 184.76 161.14 184.76H183C184.22 184.76 185.2 183.78 185.2 182.56V118.5Z" fill="#D9D3C7" stroke="#8A8378" stroke-width="0.6" stroke-linejoin="round"/><rect x="162.86" y="119.64" width="0.6" height="80.74" fill="white"/><rect x="171.66" y="119.64" width="0.6" height="80.74" fill="white"/><rect x="180.46" y="119.64" width="0.6" height="80.74" fill="white"/><path d="M189.26 118.81H189.86V200.38H189.26V118.81Z" fill="white"/><path d="M198.06 118.81H198.66V200.38H198.06V118.81Z" fill="white"/><rect x="157.18" y="125.5" width="45.4" height="0.6" fill="white"/><rect x="157.18" y="134.3" width="45.4" height="0.6" fill="white"/><rect x="157.18" y="143.1" width="45.4" height="0.6" fill="white"/><rect x="157.18" y="151.9" width="45.4" height="0.6" fill="white"/><rect x="157.18" y="160.7" width="45.4" height="0.6" fill="white"/><rect x="157.18" y="169.5" width="45.4" height="0.6" fill="white"/><rect x="157.18" y="178.3" width="45.4" height="0.6" fill="white"/><rect x="157.18" y="187.1" width="45.4" height="0.6" fill="white"/><rect x="157.18" y="195.9" width="45.4" height="0.6" fill="white"/><path d="M157.48 204.07C157.48 202.37 158.86 200.99 160.56 200.99H202.58V267.34C202.58 268.55 201.59 269.54 200.38 269.54H116.08C114.38 269.54 113 268.16 113 266.46V255.26C113 253.56 114.38 252.18 116.08 252.18H181.51C183.55 252.18 185.2 250.52 185.2 248.48V221.75C185.2 219.71 183.55 218.05 181.51 218.05H160.12C158.67 218.05 157.48 216.87 157.48 215.41V204.07Z" fill="#A9B49A" stroke="#8A8378" stroke-width="0.6" stroke-linejoin="round"/><mask id="mask1-lcB" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="113" y="200" width="90" height="70"><path d="M157.48 204.07C157.48 202.37 158.86 200.99 160.56 200.99H202.58V267.34C202.58 268.55 201.59 269.54 200.38 269.54H116.08C114.38 269.54 113 268.16 113 266.46V255.26C113 253.56 114.38 252.18 116.08 252.18H181.51C183.55 252.18 185.2 250.52 185.2 248.48V221.75C185.2 219.71 183.55 218.05 181.51 218.05H160.12C158.67 218.05 157.48 216.87 157.48 215.41V204.07Z" fill="#A9B49A"/></mask><g mask="url(#mask1-lcB)"><rect x="118.86" y="200.99" width="0.6" height="68.55" fill="white"/><rect x="127.66" y="200.99" width="0.6" height="68.55" fill="white"/><rect x="136.46" y="200.99" width="0.6" height="68.55" fill="white"/><rect x="145.26" y="200.99" width="0.6" height="68.55" fill="white"/><rect x="154.06" y="200.99" width="0.6" height="68.55" fill="white"/><rect x="162.86" y="200.99" width="0.6" height="68.55" fill="white"/><rect x="171.66" y="200.99" width="0.6" height="68.55" fill="white"/><rect x="180.46" y="200.99" width="0.6" height="68.55" fill="white"/><rect x="189.26" y="200.99" width="0.6" height="68.55" fill="white"/><rect x="198.06" y="200.99" width="0.6" height="68.55" fill="white"/><rect x="113" y="204.7" width="89.58" height="0.6" fill="white"/><rect x="113" y="213.5" width="89.58" height="0.6" fill="white"/><rect x="113" y="222.3" width="89.58" height="0.6" fill="white"/><rect x="113" y="231.1" width="89.58" height="0.6" fill="white"/><rect x="113" y="239.9" width="89.58" height="0.6" fill="white"/><rect x="113" y="248.7" width="89.58" height="0.6" fill="white"/><rect x="113" y="257.5" width="89.58" height="0.6" fill="white"/><rect x="113" y="266.3" width="89.58" height="0.6" fill="white"/></g><path d="M102.17 161.48C101.45 160.84 101.09 160.46 100.34 161.08L97.43 163.51C96.69 164.13 96.64 165.19 97.32 165.88L111.68 180.24C112.2 180.76 112.61 181.77 112.61 182.5L112.46 252.5H117.46C119.7 252.5 119.5 250.15 119.5 247.91V181.12C119.5 178.79 119.25 176.54 117.5 175L102.17 161.48Z" fill="#C9C2B6" stroke="#8A8378" stroke-width="0.6" stroke-linejoin="round"/><path d="M114 231.1H121.71V231.7H114V231.1Z" fill="white"/><path d="M114 222H121.71V222.6H114V222Z" fill="white"/><path d="M114 213H121.71V213.6H114V213Z" fill="white"/><path d="M114 204H121.71V204.6H114V204Z" fill="white"/><path d="M114 195H121.71V195.6H114V195Z" fill="white"/><path d="M114 186H121.71V186.6H114V186Z" fill="white"/><path d="M101 169.44L106.46 164L106.89 164.43L101.42 169.87L101 169.44Z" fill="white"/><path d="M108 176.44L113.46 171L113.89 171.43L108.42 176.87L108 176.44Z" fill="white"/><path d="M97 29H114.6V58.74L98.24 75.1C97.56 75.79 97 75.56 97 74.58V29Z" fill="#B7C2CC" stroke="#8A8378" stroke-width="0.6" stroke-linejoin="round"/><rect x="103.14" y="29" width="0.6" height="47.34" fill="white"/><rect x="111.94" y="29" width="0.6" height="47.34" fill="white"/><rect x="97" y="37.5" width="17.6" height="0.6" fill="white"/><rect x="97" y="46.3" width="17.6" height="0.6" fill="white"/><rect x="97" y="55.1" width="17.6" height="0.6" fill="white"/><rect x="97" y="63.9" width="17.6" height="0.6" fill="white"/><rect x="97" y="72.7" width="17.6" height="0.6" fill="white"/><path d="M114 239.9L121.71 239.9V240.5L114 240.5V239.9Z" fill="white"/><path d="M114.34 248.7H121.71V249.3H114.34V248.7Z" fill="white"/><path d="M114.51 60L97 77.51" stroke="#4A443C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M72.08 102.74L54.13 120.96" stroke="#4A443C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M26.06 29C24.01 29 22.36 30.65 22.36 32.7V116.38C22.36 118.18 23.82 119.64 25.62 119.64H50.26C51.47 119.64 53.15 120.34 54.01 121.2L111.18 178.36C112.04 179.22 112.74 180.9 112.74 182.12V267.13C112.74 269.17 114.39 270.82 116.43 270.82H199.24C201.57 270.82 203.46 268.93 203.46 266.6V32.08C203.46 30.38 202.09 29 200.38 29H26.06Z" stroke="#2E2A25" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M115 31L115 59" stroke="#4A443C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M72.75 118.27C74.59 120.1 74.6 123.08 72.77 124.92L66.63 131.08L56.42 120.92L65.88 111.42L72.75 118.27Z" fill="#B7C2CC" stroke="#8A8378" stroke-width="0.6"/><rect x="61.42" y="116" width="17.34" height="0.6" transform="rotate(44.63 61.42 116)" fill="white"/><rect x="73.69" y="114.42" width="17.34" height="0.6" transform="rotate(135 73.69 114.42)" fill="white"/><path d="M137 273.5L137 268.5L190 268.5L190 273.5L137 273.5Z" fill="#F9F6F1"/><path d="M81.5 31.5L81.5 26.5L105 26.5L105 31.5L81.5 31.5Z" fill="#F9F6F1"/><path d="M200 104.5L205 104.5L205 189L200 189L200 104.5Z" fill="#F9F6F1"/><path d="M137 274.37L137 272.87L190 273L190 274.5L137 274.37Z" fill="#292624"/><path d="M81.5 32.37L81.5 30.87L105 31L105 32.5L81.5 32.37Z" fill="#292624"/><path d="M199.13 104.5L200.63 104.5L200.5 189L199 189L199.13 104.5Z" fill="#292624"/><path d="M137 268.63L137 267.13L190 267L190 268.5L137 268.63Z" fill="#292624"/><path d="M81.5 26.63L81.5 25.13L105 25L105 26.5L81.5 26.63Z" fill="#292624"/><path d="M204.87 104.5L206.37 104.5L206.5 189L205 189L204.87 104.5Z" fill="#292624"/><path d="M94.27 160.22L91.45 163.06L68 139.84L70.82 137L94.27 160.22Z" fill="#F9F6F1"/><path d="M40.7 37L40.7 62C40.7 64.6 38.6 66.7 36 66.7L24.3 66.7L24.3 32.3L36 32.3C38.6 32.3 40.7 34.4 40.7 37Z" fill="#B7C2CC" stroke="#8A8378" stroke-width="0.6"/><rect x="33" y="40.5" width="0.6" height="8.8" transform="rotate(90 33 40.5)" fill="white"/><rect x="41" y="40.5" width="0.6" height="8.8" transform="rotate(90 41 40.5)" fill="white"/><path d="M32.6 66.5L32 66.5L32 32.7L32.6 32.7L32.6 66.5Z" fill="white"/><rect x="33" y="49.3" width="0.6" height="8.8" transform="rotate(90 33 49.3)" fill="white"/><rect x="41" y="49.3" width="0.6" height="8.8" transform="rotate(90 41 49.3)" fill="white"/><rect x="33" y="58.1" width="0.6" height="8.8" transform="rotate(90 33 58.1)" fill="white"/><rect x="41" y="58.1" width="0.6" height="8.8" transform="rotate(90 41 58.1)" fill="white"/><path d="M36.5 85.7L24.3 85.7L24.3 77.3L36.5 77.3C38.82 77.3 40.7 79.18 40.7 81.5C40.7 83.82 38.82 85.7 36.5 85.7Z" fill="#B7C2CC" stroke="#8A8378" stroke-width="0.6"/><rect x="33" y="86" width="0.6" height="8.8" transform="rotate(180 33 86)" fill="white"/><path d="M25.3 105C25.3 102.41 27.41 100.3 30 100.3L46.4 100.3C49 100.3 51.1 102.41 51.1 105L51.1 117.3L25.3 117.3L25.3 105Z" fill="#B7C2CC" stroke="#8A8378" stroke-width="0.6"/><rect x="25" y="109.1" width="0.6" height="26.4" transform="rotate(-90 25 109.1)" fill="white"/><rect x="33.5" y="117.6" width="17.6" height="0.6" transform="rotate(-90 33.5 117.6)" fill="white"/><rect x="42.3" y="117.6" width="17.6" height="0.6" transform="rotate(-90 42.3 117.6)" fill="white"/><text fill="#8C4D1A" font-family="SpaceMonoLocal, Space Mono, monospace" font-size="8" font-weight="700" letter-spacing="0.8"><tspan x="85" y="143.04">ENTRANCE</tspan></text></svg></template>
+<template id="hf-lay-C-C"><svg viewBox="0 0 226 300" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Option C layout: one loop with wide corridors"><path d="M0 103H4V150H0V103Z" fill="#F9F6F1"/><path d="M22.36 32.7C22.36 30.65 24.01 29 26.06 29H200.38C202.09 29 203.46 30.38 203.46 32.08V266.6C203.46 268.93 201.57 270.82 199.24 270.82H116.43C114.39 270.82 112.74 269.17 112.74 267.13V182.12C112.74 180.9 112.04 179.22 111.18 178.36L54.01 121.2C53.15 120.34 51.47 119.64 50.26 119.64H25.62C23.82 119.64 22.36 118.18 22.36 116.38V32.7Z" fill="white"/><path d="M200.46 29.3C201.94 29.3 203.14 30.5 203.14 31.97V46.05H115.3V29.3H200.46Z" fill="#A9B49A" stroke="#8A8378" stroke-width="0.6"/><rect x="118.86" y="29" width="0.6" height="17.35" fill="white"/><rect x="127.66" y="29" width="0.6" height="17.35" fill="white"/><rect x="136.46" y="29" width="0.6" height="17.35" fill="white"/><rect x="145.26" y="29" width="0.6" height="17.35" fill="white"/><rect x="154.06" y="29" width="0.6" height="17.35" fill="white"/><rect x="162.86" y="29" width="0.6" height="17.35" fill="white"/><rect x="171.66" y="29" width="0.6" height="17.35" fill="white"/><rect x="180.46" y="29" width="0.6" height="17.35" fill="white"/><rect x="189.26" y="29" width="0.6" height="17.35" fill="white"/><rect x="198.06" y="29" width="0.6" height="17.35" fill="white"/><path d="M115.5 37.5H203.44V38.1H115.5V37.5Z" fill="white"/><path d="M203.14 46.05V109.76H186.39V46.05H203.14Z" fill="#D9D3C7" stroke="#8A8378" stroke-width="0.6"/><path d="M189.26 46.3H189.86V110.06H189.26V46.3Z" fill="white"/><path d="M198.06 46.35H198.66V110.06H198.06V46.35Z" fill="white"/><rect x="186.09" y="52.1" width="17.34" height="0.6" fill="white"/><rect x="186.09" y="60.9" width="17.34" height="0.6" fill="white"/><rect x="186.09" y="69.7" width="17.34" height="0.6" fill="white"/><rect x="186.09" y="78.5" width="17.34" height="0.6" fill="white"/><rect x="186.09" y="87.3" width="17.34" height="0.6" fill="white"/><rect x="186.09" y="96.1" width="17.34" height="0.6" fill="white"/><rect x="186.09" y="104.9" width="17.34" height="0.6" fill="white"/><path d="M203.14 109.8V170.25H186.39V109.8H203.14Z" fill="#B7C2CC" stroke="#8A8378" stroke-width="0.6"/><path d="M189.26 110H189.86V170.55H189.26V110Z" fill="white"/><path d="M198.06 110.14H198.66V170.55H198.06V110.14Z" fill="white"/><rect x="186.09" y="116.7" width="17.34" height="0.6" fill="white"/><rect x="186.09" y="125.5" width="17.34" height="0.6" fill="white"/><rect x="186.09" y="134.3" width="17.34" height="0.6" fill="white"/><rect x="186.09" y="143.1" width="17.34" height="0.6" fill="white"/><rect x="186.09" y="151.9" width="17.34" height="0.6" fill="white"/><rect x="186.09" y="160.7" width="17.34" height="0.6" fill="white"/><path d="M161.04 110.6H182.88C184.07 110.6 185.04 111.57 185.04 112.77V143.79C185.04 144.98 184.07 145.95 182.88 145.95H161.04C159.84 145.95 158.87 144.98 158.87 143.79V112.77C158.87 111.57 159.84 110.6 161.04 110.6Z" fill="#C9C2B6" stroke="#8A8378" stroke-width="0.6"/><mask id="mask0-lcC" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="158" y="110" width="28" height="37"><path d="M158.57 112.77C158.57 111.41 159.68 110.3 161.04 110.3H182.88C184.24 110.3 185.34 111.41 185.34 112.77V143.79C185.34 145.15 184.24 146.25 182.88 146.25H161.04C159.68 146.25 158.57 145.15 158.57 143.79V112.77Z" fill="#C9C2B6"/></mask><g mask="url(#mask0-lcC)"><rect x="162.86" y="110.3" width="0.6" height="35.95" fill="white"/><rect x="171.66" y="110.3" width="0.6" height="35.95" fill="white"/><rect x="180.46" y="110.3" width="0.6" height="35.95" fill="white"/><rect x="158.57" y="116.7" width="26.77" height="0.6" fill="white"/><rect x="158.57" y="125.5" width="26.77" height="0.6" fill="white"/><rect x="158.57" y="134.3" width="26.77" height="0.6" fill="white"/><rect x="158.57" y="143.1" width="26.77" height="0.6" fill="white"/></g><path d="M164 170.46H202.7V189.2H164C161.4 189.2 159.3 187.1 159.3 184.5V175.16C159.3 172.57 161.4 170.46 164 170.46Z" fill="#C9C2B6" stroke="#8A8378" stroke-width="0.6"/><rect x="162.86" y="171.29" width="0.6" height="17.35" fill="white"/><rect x="171.66" y="171.29" width="0.6" height="17.35" fill="white"/><rect x="180.46" y="171.29" width="0.6" height="17.35" fill="white"/><rect x="189.26" y="171.29" width="0.6" height="17.35" fill="white"/><rect x="198.06" y="171.29" width="0.6" height="17.35" fill="white"/><path d="M158.82 179.9H203.44V180.5H158.82V179.9Z" fill="white"/><path d="M95.12 29H112.72V58.74L96.36 75.1C95.68 75.79 95.12 75.56 95.12 74.58V29Z" fill="#B7C2CC" stroke="#8A8378" stroke-width="0.6" stroke-linejoin="round"/><rect x="101.26" y="29" width="0.6" height="47.34" fill="white"/><rect x="110.06" y="29" width="0.6" height="47.34" fill="white"/><rect x="95.12" y="37.5" width="17.6" height="0.6" fill="white"/><rect x="95.12" y="46.3" width="17.6" height="0.6" fill="white"/><rect x="95.12" y="55.1" width="17.6" height="0.6" fill="white"/><rect x="95.12" y="63.9" width="17.6" height="0.6" fill="white"/><rect x="95.12" y="72.7" width="17.6" height="0.6" fill="white"/><path d="M176.91 189.38H203.44V268.25C203.44 269.46 202.45 270.45 201.24 270.45H133.75C132.54 270.45 131.55 269.46 131.55 268.25V237.63C131.55 236.17 132.73 234.99 134.19 234.99H181.69C184.12 234.99 186.09 233.02 186.09 230.59V221.02C186.09 218.59 184.12 216.62 181.69 216.62H181.31C178.88 216.62 176.91 214.65 176.91 212.22V189.38Z" fill="#A9B49A" stroke="#8A8378" stroke-width="0.6" stroke-linejoin="round"/><mask id="mask1-lcC" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="131" y="189" width="73" height="82"><path d="M176.91 189.38H203.44V268.25C203.44 269.46 202.45 270.45 201.24 270.45H133.75C132.54 270.45 131.55 269.46 131.55 268.25V237.63C131.55 236.17 132.73 234.99 134.19 234.99H181.69C184.12 234.99 186.09 233.02 186.09 230.59V221.02C186.09 218.59 184.12 216.62 181.69 216.62H181.31C178.88 216.62 176.91 214.65 176.91 212.22V189.38Z" fill="#A9B49A"/></mask><g mask="url(#mask1-lcC)"><rect x="136.46" y="189.38" width="0.6" height="81.07" fill="white"/><rect x="145.26" y="189.38" width="0.6" height="81.07" fill="white"/><rect x="154.06" y="189.38" width="0.6" height="81.07" fill="white"/><rect x="162.86" y="189.38" width="0.6" height="81.07" fill="white"/><rect x="171.66" y="189.38" width="0.6" height="81.07" fill="white"/><rect x="180.46" y="189.38" width="0.6" height="81.07" fill="white"/><rect x="189.26" y="189.38" width="0.6" height="81.07" fill="white"/><rect x="198.06" y="189.38" width="0.6" height="81.07" fill="white"/><rect x="131.55" y="195.9" width="71.89" height="0.6" fill="white"/><rect x="131.55" y="204.7" width="71.89" height="0.6" fill="white"/><rect x="131.55" y="213.5" width="71.89" height="0.6" fill="white"/><rect x="131.55" y="222.3" width="71.89" height="0.6" fill="white"/><rect x="131.55" y="231.1" width="71.89" height="0.6" fill="white"/><rect x="131.55" y="239.9" width="71.89" height="0.6" fill="white"/><rect x="131.55" y="248.7" width="71.89" height="0.6" fill="white"/><rect x="131.55" y="257.5" width="71.89" height="0.6" fill="white"/><rect x="131.55" y="266.3" width="71.89" height="0.6" fill="white"/></g><path d="M114.51 59L97 76.51" stroke="#4A443C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M114.38 31L114.38 59" stroke="#4A443C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M72.08 102.74L54.13 120.96" stroke="#4A443C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M26.06 29C24.01 29 22.36 30.65 22.36 32.7V116.38C22.36 118.18 23.82 119.64 25.62 119.64H50.26C51.47 119.64 53.15 120.34 54.01 121.2L111.18 178.36C112.04 179.22 112.74 180.9 112.74 182.12V267.13C112.74 269.17 114.39 270.82 116.43 270.82H199.24C201.57 270.82 203.46 268.93 203.46 266.6V32.08C203.46 30.38 202.09 29 200.38 29H26.06Z" stroke="#2E2A25" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M72.75 118.27C74.59 120.1 74.6 123.08 72.77 124.92L66.63 131.08L56.42 120.92L65.88 111.42L72.75 118.27Z" fill="#B7C2CC" stroke="#8A8378" stroke-width="0.6"/><rect x="61.42" y="116" width="17.34" height="0.6" transform="rotate(44.63 61.42 116)" fill="white"/><rect x="73.69" y="114.42" width="17.34" height="0.6" transform="rotate(135 73.69 114.42)" fill="white"/><path d="M137 273.5L137 268.5L190 268.5L190 273.5L137 273.5Z" fill="#F9F6F1"/><path d="M81.5 31.5L81.5 26.5L105 26.5L105 31.5L81.5 31.5Z" fill="#F9F6F1"/><path d="M200 104.5L205 104.5L205 189L200 189L200 104.5Z" fill="#F9F6F1"/><path d="M137 274.37L137 272.87L190 273L190 274.5L137 274.37Z" fill="#292624"/><path d="M81.5 32.37L81.5 30.87L105 31L105 32.5L81.5 32.37Z" fill="#292624"/><path d="M199.13 104.5L200.63 104.5L200.5 189L199 189L199.13 104.5Z" fill="#292624"/><path d="M137 268.63L137 267.13L190 267L190 268.5L137 268.63Z" fill="#292624"/><path d="M81.5 26.63L81.5 25.13L105 25L105 26.5L81.5 26.63Z" fill="#292624"/><path d="M204.87 104.5L206.37 104.5L206.5 189L205 189L204.87 104.5Z" fill="#292624"/><path d="M94.27 160.22L91.45 163.06L68 139.84L70.82 137L94.27 160.22Z" fill="#F9F6F1"/><path d="M41.7 37L41.7 62C41.7 64.6 39.6 66.7 37 66.7L25.3 66.7L25.3 32.3L37 32.3C39.6 32.3 41.7 34.4 41.7 37Z" fill="#B7C2CC" stroke="#8A8378" stroke-width="0.6"/><rect x="34" y="40.5" width="0.6" height="8.8" transform="rotate(90 34 40.5)" fill="white"/><rect x="42" y="40.5" width="0.6" height="8.8" transform="rotate(90 42 40.5)" fill="white"/><path d="M33.6 66.5L33 66.5L33 32.7L33.6 32.7L33.6 66.5Z" fill="white"/><rect x="34" y="49.3" width="0.6" height="8.8" transform="rotate(90 34 49.3)" fill="white"/><rect x="42" y="49.3" width="0.6" height="8.8" transform="rotate(90 42 49.3)" fill="white"/><rect x="34" y="58.1" width="0.6" height="8.8" transform="rotate(90 34 58.1)" fill="white"/><rect x="42" y="58.1" width="0.6" height="8.8" transform="rotate(90 42 58.1)" fill="white"/><path d="M37.5 85.7L25.3 85.7L25.3 77.3L37.5 77.3C39.82 77.3 41.7 79.18 41.7 81.5C41.7 83.82 39.82 85.7 37.5 85.7Z" fill="#B7C2CC" stroke="#8A8378" stroke-width="0.6"/><rect x="34" y="86" width="0.6" height="8.8" transform="rotate(180 34 86)" fill="white"/><path d="M26.3 105C26.3 102.41 28.41 100.3 31 100.3L47.4 100.3C50 100.3 52.1 102.41 52.1 105L52.1 117.3L26.3 117.3L26.3 105Z" fill="#B7C2CC" stroke="#8A8378" stroke-width="0.6"/><rect x="26" y="109.1" width="0.6" height="26.4" transform="rotate(-90 26 109.1)" fill="white"/><rect x="34.5" y="117.6" width="17.6" height="0.6" transform="rotate(-90 34.5 117.6)" fill="white"/><rect x="43.3" y="117.6" width="17.6" height="0.6" transform="rotate(-90 43.3 117.6)" fill="white"/><text fill="#8C4D1A" font-family="SpaceMonoLocal, Space Mono, monospace" font-size="8" font-weight="700" letter-spacing="0.8"><tspan x="88" y="143.04">ENTRANCE</tspan></text></svg></template>
+
+<script src="assets/rooms.js"></script>
+<script src="assets/toast.js"></script>
+<script>
+(function(){
+  'use strict';
+  var $ = function(id){ return document.getElementById(id); };
+  var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ── 读取流程页交接过来的数据 ─────────────────── */
+  var d = {};
+  try{ d = JSON.parse(sessionStorage.getItem('mnemo:file') || '{}'); }catch(e){ d = {}; }
+
+  /* ── 示例档案（2026-09-17）─────────────────────────
+     ?demo=1 时把整份数据换成一个固定的示例人，而不是拿当前
+     这个人的名字去编她的起居 —— 一个视力分流的人档案里冒出
+     「她的助行器」，老师一眼就看出是拼的。
+     Ying Zhang 是 persona 表（assets/personas.js）里行动那一档，
+     下面的观察和改造都对得上她的需求。
+     它只活在内存里：不写 sessionStorage，不碰真档案。 */
+  var DEMO = false;
+  try{ DEMO = /[?&]demo=1\b/.test(location.search); }catch(e){}
+  if (DEMO){
+    /* 注意这里「没写什么」比「写了什么」重要：
+       mobility / vision / memory / score 都不设 —— setCond 遇到空值会直接 return，
+       标签里 Figma 写死的那三行（Wheelchair indoors / good in daylight /
+       colour cues help）和 score 的默认值 8.2 就原样留着。
+       这正是 Figma 满状态 635:85 里的值，我一个字都不用编。
+       who 必须是 family：本人版会把称呼改成 you。 */
+    d = {
+      who:'family',
+      pron:{ they:'she', their:'her', them:'her' },
+      layout:'C', planTrack:'mobility', planType:'A', homeLabel:'Bedroom'
+    };
+  }
+  /* 本次会话空着（新开的标签页 / 中途回过首页）就退回上一次走完
+     流程留下的长期底稿，最后才是页面自带的示例数据。
+
+     ⚠️ !DEMO 这个条件是 2026-09-17 补的，别删。
+     示例态那份 d 里**没有 planSVG**（它用的是本页内嵌的平面模板），
+     所以会正好落进下面这个判断，被 localStorage 里用户上一次走完
+     流程的真档案顶掉 —— 结果就是：右边「What MNEMO noticed」是示例的
+     Day 232，左边「Her condition」却是用户自己的 wheelchair indoors / 8.2，
+     一页里两个人。
+     我第一版没发现，是因为测试只种了 sessionStorage，没种 localStorage，
+     _last 是空的，这条路根本没走到。 */
+  if (!DEMO && (!d || !d.planSVG)){
+    try{
+      var _last = JSON.parse(localStorage.getItem('mnemo:file:last') || '{}');
+      if (_last && _last.planSVG) d = _last;
+    }catch(e){}
+  }
+
+  var name   = d.name   || 'Ying Zhang';
+  var first  = name.split(' ')[0];
+  var who    = d.who    || 'family';
+  var they   = d.pron   || { they:'she', their:'her', them:'her' };
+  var picked = d.layout || 'C';
+
+  /* ── 这份档案讲的是哪一套房子（2026-09-16）────────────────
+     ?plan= 现在有两种写法，两种都认：
+       vision-B-C   带分流，流程页 2026-09-16 起发的就是这个
+       B-C          旧的两段式，当成 mobility
+     分流取不到就顺着交接过来的 planTrack，再取不到才落回 mobility。
+     本人版档案页（home-file-resident.html）用的是同一套规则。 */
+  var _q = '';
+  try{ _q = (new URLSearchParams(location.search).get('plan') || '').trim(); }catch(e){}
+  /* 示例态固定用 mobility-B-C。不是"没写才给"，是**一律覆盖** ——
+     示例讲的是 Ying Zhang，她是行动那一档；要是把用户自己那份
+     vision-B-C 带进来，The Room 会退回那张四色占位图（内嵌的九张
+     平面模板只有 mobility 那一批），一份「用了八个月」的档案里
+     出现占位图很奇怪。
+     用户原本那份 plan 存在 ?back= 里，退出示例时原样还回去。 */
+  var _back = '';
+  try{ _back = (new URLSearchParams(location.search).get('back') || '').trim(); }catch(e){}
+  if (DEMO) _q = 'mobility-B-C';
+  var _m = /^(?:([a-z]+)-)?([A-C])-([A-C])$/i.exec(_q);
+  var hfTrack = ((_m && _m[1]) || d.planTrack || 'mobility').toLowerCase();
+  var hfType  = (_m ? _m[2].toUpperCase() : (d.planType || 'A'));
+  var hfOpt   = (_m ? _m[3].toUpperCase() : picked);
+
+  /* ── 「Open in 3D →」（2026-09-16 修）──────────────────────
+     这个按钮原来是个**裸 button，没绑任何事件** —— 点了什么都不发生。
+     现在直接开那间房自己的页面，也就是流程第 4 步嵌在 iframe 里的
+     同一个文件；浏览器「后退」正好回到这份档案。
+     地址表在 assets/rooms.js。查不到就把按钮藏起来 ——
+     有个按钮点了 404，比没有那个按钮糟得多。 */
+  (function(){
+    var btn = $('open3d');
+    if (!btn) return;
+    /* 这一间有没有 3D，先问 assets/rooms.js 那张表 —— 没有就把按钮藏起来，
+       不要让人点进一个空房间。 */
+    var page = (window.MNEMO_ROOMS && window.MNEMO_ROOMS.page(hfTrack, hfType, hfOpt)) || '';
+    if (!page){ btn.hidden = true; return; }
+    /* 2026-09-17 改：原来是直接开房间页（preview-3d-…），那一页只能转着看，
+       **换不了材质和颜色**。能换的地方是流程的第 4 步 —— 材质、颜色、
+       整间的配色方案、夜间模式都在那儿。所以跳回第 4 步。
+       第 4 步会把上次存下的那份档案接回来，右卡不会是空白的；
+       在里面改完再交接一次，档案也不会被覆盖。 */
+    btn.addEventListener('click', function(){
+      location.href = './flow.html?step=4&track=' + encodeURIComponent(hfTrack)
+                    + '&type=' + hfType + '&opt=' + hfOpt;
+    });
+  })();
+
+  /* ── The Room 的缩略图：用流程里真正选中的那张平面 ──
+     交接不过来（直接打开本页、或者 sessionStorage 被清了）就退回
+     原来那个四色示意图，不留空白。 */
+  (function(){
+    var mini = document.querySelector('.miniplan');
+    if (!mini) return;
+
+    /* 三条来路，按可靠程度从高到低：
+       ① 地址栏 ?plan=A-C  → 用本页内嵌的同一批模板画（最稳，不依赖任何存储）
+       ② 流程页交接过来的整段 SVG（sessionStorage / localStorage）
+       ③ 两条都没有 → 保留原来那张四色示意图，不留空白 */
+    /* 2026-09-16 修：本页内嵌的 hf-lay-<户型>-<方案> 只有 **mobility** 那九张。
+       原来不管分流一律拿它们画，于是 vision / memory 的用户在流程里看了
+       一路的房子，一进档案页就换成了别人家。
+       现在：mobility 才用内嵌模板；另外两档优先用流程页交接过来的那张
+       （fileData.planSVG 是按 layTpl() 取的，分流是对的）。
+       判断里的 `_m` 是保留原来的行为：地址栏没写 ?plan= 就不画内嵌模板，
+       让它退回那张四色示意图 —— 没有数据的时候不假装有。 */
+    var key = (_m && hfTrack === 'mobility') ? (hfType + '-' + hfOpt) : '';
+
+    var svg = '', label = '';
+    var tpl = key ? document.getElementById('hf-lay-' + key) : null;
+    if (tpl){
+      svg   = tpl.innerHTML;
+      label = 'Type ' + hfType + ' \u00b7 option ' + hfOpt;
+    } else if (d.planSVG){
+      svg   = d.planSVG;
+      label = d.planLabel || ('option ' + picked);
+    }
+    if (!svg) return;
+
+    mini.innerHTML = svg;
+    mini.classList.add('is-real');
+    mini.removeAttribute('aria-hidden');
+    mini.setAttribute('role','img');
+    mini.setAttribute('aria-label', 'Chosen layout \u2014 ' + label);
+  })();
+  var score  = d.score  || 8.2;
+
+  function cap(s){ return s.charAt(0).toUpperCase() + s.slice(1); }
+
+  /* 顶部问候 */
+  $('hi').textContent = who === 'resident' ? ('Hi, ' + first + '.') : 'Hi.';
+  $('hi-sub').textContent = who === 'resident'
+    ? 'Here is how your home is doing today.'
+    : 'Here is how ' + they.their + ' home is doing today.';
+
+  /* 状态卡 */
+  $('room-score').textContent = Number(score).toFixed(1);
+  /* d.* 是「最严重的一项」（短标签）；d.*All 是完整多选清单。
+     色斑标签和图例都是窄位，只放短的；完整清单挂 title，悬停可看。 */
+  function setCond(key, labId, legId, word){
+    var one = d[key], all = d[key + 'All'] || one;
+    if (!one) return;
+    $(labId).textContent = cap(one);
+    $(legId).textContent = word + ' — ' + one;
+    if (all !== one){
+      $(legId).title = word + ' — ' + all;
+      $(labId).title = cap(all);
+    }
+  }
+  setCond('mobility', 'lab-mob', 'leg-mob', 'Mobility');
+  setCond('vision',   'lab-vis', 'leg-vis', 'Vision');
+  setCond('memory',   'lab-mem', 'leg-mem', 'Memory');
+
+  /* 房间卡 / 履历卡 */
+
+  /* 30 天条：档案今天才建，所以前 29 格是**空的**（只有描边），
+     最后一格是今天。实心格代表"这一天 MNEMO 看过、没事"，
+     现在一天都还没看过，不能画成实心。 */
+  var days = $('days');
+  for (var i=0;i<30;i++){
+    var b = document.createElement('i');
+    b.className = (i === 29) ? 'today' : 'void';
+    days.appendChild(b);
+  }
+
+  /* 空态里的人称跟着流程走：家属版说 she/her，本人版说 you */
+  var oe = $('oe-they');
+  if (oe) oe.textContent = (who === 'resident') ? 'you' : they.they;
+
+  /* 房间卡副标题：刚选完布局，还没建 */
+  var rs = $('room-sub');
+  if (rs) rs.textContent = (d.homeLabel || 'Whole home') + ' \u00b7 chosen today, not built yet';
+
+  /* 履历卡那一行写成真的日期 */
+  var hw = $('hist-when');
+  if (hw){
+    var _t = new Date();
+    hw.textContent = 'File opened \u00b7 ' + _t.getDate() + ' ' +
+      ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][_t.getMonth()] +
+      ' ' + _t.getFullYear();
+  }
+
+  /* Circle */
+  /* 与 Figma 一致：头 18×18 圆 + 肩 30×18 椭圆，色 #999185 */
+  var SILHOUETTE =
+    '<svg viewBox="0 0 44 44" fill="currentColor" aria-hidden="true">' +
+    '<circle cx="22" cy="15" r="9"/>' +
+    '<ellipse cx="22" cy="35" rx="15" ry="9"/></svg>';
+
+  var people = [
+    { n: who === 'resident' ? name : 'User',
+      r: who === 'resident' ? 'Resident · you' : (they.their === 'her' ? 'Granddaughter · you' : 'Family · you'),
+      s:'Approved',   c:'ok',   v:10, bg:'#CDC4B3', fg:'#999185' },
+    { n:'Alice McCain', r:'Care worker · helps with transfers',
+      s:'Reviewing…', c:'wait', v:7,  bg:'#DBCCBD', fg:'#999185' },
+    { n:'Dr. J. Lubin', r:'GP · Elmfield Surgery',
+      s:'Invited',    c:'new',  v:2,  bg:'#C7C9D1', fg:'#999185' }
+  ];
+  var wrap = $('people');
+  people.forEach(function(p){
+    var row = document.createElement('div');
+    row.className = 'person';
+    var dots = '';
+    for (var k=0;k<10;k++) dots += '<i class="' + (k < p.v ? 'on' : '') + '"></i>';
+    row.innerHTML =
+      '<span class="av" style="--av-bg:' + p.bg + ';--av-fg:' + p.fg + '">' + SILHOUETTE + '</span>' +
+      '<span><span class="nm"></span><span class="rl"></span></span>' +
+      '<span class="status ' + p.c + '"><i></i>' + p.s + '</span>' +
+      '<span class="dots">' + dots + '<span class="mono">' + p.v + '/10</span></span>' +
+      '<button class="more" type="button" aria-label="More" data-act="say" ' + 'data-say="Every change keeps who asked for it, who did it, and the day it was signed off.">' + '<i></i><i></i><i></i></button>';
+    row.querySelector('.nm').textContent = p.n;
+    row.querySelector('.rl').textContent = p.r;
+    wrap.appendChild(row);
+  });
+
+  /* ── 卡片依次填满 ─────────────────────────────── */
+  requestAnimationFrame(function(){
+    requestAnimationFrame(function(){ document.body.classList.add('is-ready'); });
+  });
+
+  /* ── 首次从流程页过来时的提示 ─────────────────── */
+  if (d.justFinished){
+    setTimeout(function(){ $('toast').classList.add('is-on'); }, reduce ? 0 : 1600);
+    try{
+      d.justFinished = false;
+      var _snap = JSON.stringify(d);
+      sessionStorage.setItem('mnemo:file', _snap);
+      localStorage.setItem('mnemo:file:last', _snap);
+    }catch(e){}
+  }
+  $('toast-x').addEventListener('click', function(){ $('toast').classList.remove('is-on'); });
+
+  /* ── 长得像按钮的，点了都要有反应（2026-09-16）──────────────
+     通知 / 设置 / 卡片右上角的 ⋯ / 时间线每行的 ⋯ / Her Circle 的 + ，
+     原来都是裸 <button>，一个事件都没绑。现在统一走 [data-act="say"]，
+     复用本页这条提示条（见上面 data-mnemo-toast）。
+     ⚠️ 提示写的是**这一下会发生什么**，不写"已发送""已添加" ——
+     这些功能背后确实还没有东西，一句假的回执比没反应更糟。 */
+
+  /* ── 示例态把「空」的那几块填上（2026-09-17）────────────
+     上面所有渲染都跑完了才轮到这里，所以这里只管两件事：
+       ① 把写死在标签里的空态文案换掉
+       ② 把天条、观察、时间线这三个原本用 JS 画成空的块重画
+     样式一行没新写 —— .obs / .days i.flag / .calm 绿点 / .suggest 带箭头
+     这些满状态的 CSS Figma 里本来就有，只是从来没被填过数据。 */
+  if (DEMO) (function(){
+    /* ── 这一段里的文案全部来自项目自己的设计文档 ─────────────
+       网页（视频用）/ 02-Home-File-与流程改版.md 里写着 Figma 满状态
+       635:85 到底长什么样，下面是原文：
+
+         What MNEMO noticed │ 636:91 │ 30 格横条 + **两条**大白话观察
+           28 CALM DAYS
+           22 JUL — Paused twice at the bedroom doorway.
+                    The frame is 760 mm — her chair needs 850.
+           14 JUL — Three trips to the bathroom after midnight.
+                    More than her usual one.
+
+         Changed twice since 2019
+           ● JUL 2026  Bathroom → level-access wet room
+                       after she moved to a wheelchair indoors
+           ● MAR 2026  Bedroom → threshold removed
+                       after she started using a walking frame
+           ○ MOVED IN · 2019
+           ──────────────────────────
+           84 CUBES OWNED · 12 SPARE      Nothing new bought
+
+       我第一版写了**三条**观察，这张卡被顶到 600 多像素；
+       它和「Her condition」同一行，row 高度取高者，左边那张就被拉长、
+       光斑和图例之间空出一大片。回到两条就回到 Figma 的 468×360。
+
+       日期没照抄 22 JUL / 14 JUL：那两个日子是画 Figma 那天的「最近」，
+       放到今天已经掉出「LAST 30 DAYS」了。改成从今天往回算，
+       而且**黄格的位置跟着这两条观察走** —— 文档里批评过旧版
+       「右下写 all normal，格子里却有异常点」，那个错不能再犯。 */
+    var MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    function ago(n){
+      var t = new Date(); t.setDate(t.getDate() - n);
+      return t.getDate() + ' ' + MON[t.getMonth()];
+    }
+    var A = 8, B = 16;                    /* 两条观察分别发生在几天前 */
+
+    document.body.classList.add('is-demo');
+    $('demobar').hidden = false;
+    $('demobar-t').textContent =
+      'The same page after two rebuilds, seven years on. Nothing here is real data — '
+      + 'it is what the file looks like once MNEMO has been watching for a while.';
+    $('demobar-x').setAttribute('href',
+      location.pathname + (_back ? ('?plan=' + encodeURIComponent(_back)) : ''));
+
+    $('cond-upd').textContent = 'Recorded at the last visit, Jul 2026';
+    $('watch-since').textContent = 'Watching since 2019';
+
+    /* 30 格横条：灰=正常，黄=值得看一眼，最后一格是今天。
+       两个黄格的下标正好是下面两条观察的那两天。 */
+    var ds = $('days'); ds.innerHTML = '';
+    var flags = {}; flags[29 - A] = 1; flags[29 - B] = 1;
+    for (var i = 0; i < 30; i++){
+      var c = document.createElement('i');
+      c.className = (i === 29) ? 'today' : (flags[i] ? 'flag' : '');
+      ds.appendChild(c);
+    }
+    var ends = document.querySelectorAll('.days-ends span');
+    if (ends[0]) ends[0].textContent = '30 days ago';
+
+    /* 「28 CALM DAYS」—— 30 格减掉 2 个黄格。数字必须和图对得上，
+       这是文档里写明的要求。所以用算的，不写死。 */
+    var calm = document.querySelector('.calm');
+    calm.classList.remove('is-new');
+    calm.innerHTML = '<i></i>' + (30 - 2) + ' CALM DAYS';
+    calm.classList.add('mono');
+
+    var OBS = [
+      { d:ago(A), t:'Paused twice at the bedroom doorway.',
+        n:'The frame is 760 mm \u2014 her chair needs 850.' },
+      { d:ago(B), t:'Three trips to the bathroom after midnight.',
+        n:'More than her usual one.' }
+    ];
+    var box = document.querySelector('.obs');
+    box.className = 'obs';
+    box.innerHTML = '';
+    OBS.forEach(function(o){
+      var row = document.createElement('div');
+      row.innerHTML = '<i></i><p class="d mono"></p><p class="t"></p><p class="n"></p>';
+      row.querySelector('.d').textContent = o.d.toUpperCase();
+      row.querySelector('.t').textContent = o.t;
+      row.querySelector('.n').textContent = o.n;
+      box.appendChild(row);
+    });
+
+    /* 底下那条链接：空态是死的，示例态放开。
+       文档说它要「让这张卡成为新一轮改造的入口」，
+       提示就按这个写，不假装现在已经能点开。 */
+    var sg = document.querySelector('.suggest');
+    sg.classList.remove('is-off');
+    sg.removeAttribute('aria-disabled');
+    sg.setAttribute('data-act', 'say');
+    sg.setAttribute('data-say',
+      'In the full system this starts the next rebuild from what MNEMO noticed — '
+      + 'the doorway above becomes the first thing on the list.');
+    sg.innerHTML = 'See what MNEMO suggests'
+      + '<svg width="13" height="9" viewBox="0 0 13 9" fill="none" aria-hidden="true">'
+      + '<path d="M1 4.5h10M7.6 1l3.6 3.5-3.6 3.5" stroke="currentColor" stroke-width="1.5"'
+      + ' stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+    $('room-sub').textContent = 'Bedroom \u00b7 last changed Mar 2026';
+
+    /* 改造履历。文档里三个设计判断都要照办：
+       ① 每条都写 "after she…" —— 记的不是改了什么，是因为她怎么了才改
+       ② 保留 2019 搬入这个空心起点（.start），竖线才是一段人生
+       ③ 底下的 cube 库存是整张卡的论点：两次改造都没买新的 */
+    var TL = [
+      { c:'now', d:'JUL 2026', t:'Bathroom \u2192 level-access wet room',
+        n:'after she moved to a wheelchair indoors' },
+      { c:'',    d:'MAR 2026', t:'Bedroom \u2192 threshold removed',
+        n:'after she started using a walking frame' },
+      { c:'start', d:'2019',   t:'Moved in.', n:'' }
+    ];
+    $('hist-h').textContent = 'Changed twice since 2019';
+    var tl = $('tl'); tl.innerHTML = '';
+    TL.forEach(function(r){
+      var row = document.createElement('div');
+      if (r.c) row.className = r.c;
+      row.innerHTML = '<i></i><span class="d mono"></span><p class="t"></p>'
+                    + (r.n ? '<p class="n"></p>' : '');
+      row.querySelector('.d').textContent = r.d;
+      row.querySelector('.t').textContent = r.t;
+      if (r.n) row.querySelector('.n').textContent = r.n;
+      tl.appendChild(row);
+    });
+    var he = document.querySelector('.hist-empty');
+    if (he) he.hidden = true;
+    var fs = document.querySelector('.hist-foot .s');
+    var fg = document.querySelector('.hist-foot .g');
+    if (fs) fs.textContent = '84 CUBES OWNED \u00b7 12 SPARE';
+    if (fg) fg.textContent = 'Nothing new bought';
+
+    /* 示例态不往 sessionStorage 里写任何东西，真档案不会被盖掉。 */
+  })();
+
+  /* 空态那条入口：把当前的 ?plan= 带上，退回来才还是同一套房子 */
+  (function(){
+    var a = $('seeex');
+    if (!a) return;
+    if (DEMO){ a.hidden = true; return; }
+    /* 不把用户的 ?plan= 直接带进示例（示例是另一个人、另一套房），
+       存进 ?back=，退出时原样还回来。 */
+    a.setAttribute('href', location.pathname + '?demo=1'
+      + (_q ? ('&back=' + encodeURIComponent(_q)) : ''));
+  })();
+
+  if (window.MNEMO_TOAST) window.MNEMO_TOAST.wire();
+
+  /* ═══ 搜这份档案（2026-09-17）═══════════════════════════════
+     搜的是**这份档案自己装着的东西**，一行一行地搜：
+       · 她现在的状况（行动 / 视力 / 记忆那三条）
+       · MNEMO 注意到了什么
+       · The Room
+       · 改造履历的每一条
+       · Her Circle 里的每个人
+     不去别处查，查不到就说查不到。
+     和医护版 home-file-carer.html 是同一套做法，只是卡不一样。 */
+  (function(){
+    var box = $('find'), note = $('findnote');
+    if (!box || !note) return;
+    var GROUPS = [
+      { sel:'.cond',   name:'Her condition',      rows:'.blab' },
+      /* .obs > div 只在示例态里才有；空态一行都没，会自动退回整卡描边 */
+      { sel:'.watch',  name:'What MNEMO noticed', rows:'.obs > div' },
+      { sel:'.room',   name:'The Room',           rows:'' },
+      { sel:'.hist',   name:'Changes',            rows:'#tl > *' },
+      { sel:'.circle', name:'Her Circle',         rows:'#people .person' }
+    ];
+    function clear(){
+      Array.prototype.forEach.call(document.querySelectorAll('.dim,.hit,.hitcard,.frow'), function(e){
+        e.classList.remove('dim','hit','hitcard','frow');
+      });
+      note.hidden = true; note.textContent = '';
+    }
+    function run(){
+      var q = box.value.trim().toLowerCase();
+      if (q.length < 2){ clear(); return; }
+      clear();
+      var lines = 0, cards = 0, where = [];
+      GROUPS.forEach(function(g){
+        var el = document.querySelector(g.sel);
+        if (!el) return;
+        if ((el.textContent || '').toLowerCase().indexOf(q) < 0){ el.classList.add('dim'); return; }
+        where.push(g.name);
+        var rows = g.rows ? Array.prototype.slice.call(el.querySelectorAll(g.rows)) : [];
+        if (!rows.length){ el.classList.add('hitcard'); cards++; return; }
+        var any = false;
+        rows.forEach(function(r){
+          var on = (r.textContent || '').toLowerCase().indexOf(q) > -1;
+          r.classList.add('frow');
+          r.classList.toggle('hit', on);
+          r.classList.toggle('dim', !on);
+          if (on){ any = true; lines++; }
+        });
+        if (!any){ el.classList.add('hitcard'); cards++; }   /* 词在卡的标题里，不在任何一行上 */
+      });
+      /* 行和整卡分开数：一整张卡对上，不能报成「1 LINE」 */
+      var bits = [];
+      if (lines) bits.push(lines + (lines === 1 ? ' LINE' : ' LINES'));
+      if (cards) bits.push(cards + (cards === 1 ? ' CARD' : ' CARDS'));
+      note.hidden = false;
+      note.textContent = bits.length
+        ? (bits.join(', ') + '  \u00b7  ' + where.join(', ').toUpperCase())
+        : 'NOT ON THIS FILE';
+    }
+    box.addEventListener('input', run);
+    box.addEventListener('keydown', function(e){ if (e.key === 'Escape'){ box.value = ''; clear(); } });
+  })();
+  /* ── 田字格 = 工具栏开关（2026-09-17）────────────────
+     这个按钮原来是死的：它标着 aria-current="page"，意思是「你就在这一页」，
+     所以点了也没地方可去。与其让它白占一个位置，不如把「收起工具栏」
+     交给它 —— 没有抢走任何原有行为，只是把一次空点击变成有用的。
+     aria-current 保留（它仍在说明你在哪一页），另加 aria-expanded 报告开合。
+     状态存 sessionStorage：去 flow 页再回来还是收着的，关掉浏览器就没了。 */
+  (function(){
+    var nav = document.querySelector('.rail-nav');
+    var btn = $('railtoggle');
+    if (!nav || !btn) return;
+    var KEY = 'mnemo:rail';
+    function paint(tucked, quiet){
+      if (quiet) nav.classList.add('no-anim');
+      nav.classList.toggle('is-tucked', tucked);
+      btn.setAttribute('aria-expanded', tucked ? 'false' : 'true');
+      btn.title = tucked ? 'Show tools' : 'Hide tools';
+      /* 收起来以后里面的控件不能再被 Tab 键选中 ——
+         看不见却能聚焦，是无障碍上很常见的一个坑。 */
+      Array.prototype.forEach.call(
+        nav.querySelectorAll('.tuck, .pill--more .nav-btn'), function(e){
+          if (tucked) e.setAttribute('tabindex', '-1'); else e.removeAttribute('tabindex');
+        });
+      if (quiet) requestAnimationFrame(function(){
+        requestAnimationFrame(function(){ nav.classList.remove('no-anim'); });
+      });
+    }
+    var saved = '0';
+    try { saved = sessionStorage.getItem(KEY) || '0'; } catch(e){}
+    paint(saved === '1', true);
+    btn.addEventListener('click', function(){
+      var tucked = !nav.classList.contains('is-tucked');
+      paint(tucked, false);
+      try { sessionStorage.setItem(KEY, tucked ? '1' : '0'); } catch(e){}
+    });
+  })();
+})();
+</script>
+
+
+</body>
+</html>

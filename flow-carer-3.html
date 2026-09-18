@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MNEMOSYNE — Three that pass the rules</title>
+
+<!-- ============================================================
+     MNEMO · 医护人员版 · 第 3 步（Layouts）
+     ------------------------------------------------------------
+     对应 Figma：2351:65「CARER · 3 Layouts」
+     外壳坐标照第 1 步：左面板 x=121 · 右卡 924,252 · 对话坞 y=633
+
+     这一屏的核心：右边那张「规则对账」不是静态文案。
+     每条规则都写成「她今天量到多少 → 这个方案给到多少」，
+     左边换一个方案，右边整张表跟着重算。
+     家属版只说「通过了」；医护要写进申请材料的是那两个数。
+
+     方案图放在 assets/carer-layouts.html（63 份模板，和家属版同一份文件），
+     运行时取，取不到就退回占位框。
+
+     2026-09-16：方案图接了**分流**。原来只按户型取 lay-<户型>-<方案>，
+     等于不管她是行动、视力还是记忆主导，第 3 步都给 mobility 那批房子 ——
+     第 2 步明明已经按分流给了不同的现状平面，到第 3 步又换回同一批，
+     两屏对不上。现在走三级回退，和家属版一样：
+        lay-<分流>-<户型>-<方案>  →  lay-<户型>-<方案>  →  lay-A-<方案>
+
+     同一轮加了**放大版**：每张卡的平面右上角有 ENLARGE，点开是带功能分区色、
+     橙色动线（含箭头和拐角圆角）、浅色家具、粗墙的那一版。
+     医护要把图写进申请材料，动线和分区正是说理的那张图。
+     ============================================================ -->
+
+<style>
+@font-face{ font-family:'InterLocal'; src:url('assets/fonts/inter-var.woff2') format('woff2-variations');
+  font-weight:100 900; font-style:normal; font-display:block; }
+@font-face{ font-family:'SpaceMonoLocal'; src:url('assets/fonts/space-mono-700.woff2') format('woff2');
+  font-weight:700; font-style:normal; font-display:block; }
+</style>
+
+<style>
+:root{
+  --cream-a:#F8ECDC; --cream-b:#F1ECE5;
+  --ink:#1A1917; --mut:#736E66; --faint:#948F87; --hint:#B0A99D; --mono-c:#8A8378;
+  --hair:#DEDAD2; --line:#CFC8BB; --hair-2:#ECE7DE;
+  --white:#FFFFFF; --soft:#F1EAE0; --chipbg:#E7DED1; --sel:#FAF3EA; --plan-bg:#F7F4EF;
+  --accent:#ED7119; --accent-d:#B0570F; --ok:#4F6A48;
+  --r-card:14px;
+}
+*,*::before,*::after{ box-sizing:border-box }
+/* 所有 <p> 都是绝对定位 + 明确 top，浏览器默认的 1em 上边距会把
+   mono 小标整体压低 9.5px，和 Figma 对不上。 */
+p{ margin:0 }
+html{ -webkit-text-size-adjust:100%; background:var(--cream-b) }
+body{
+  margin:0; font-family:'InterLocal','Inter',system-ui,-apple-system,'Segoe UI','PingFang SC',sans-serif;
+  color:var(--ink); background:
+    url('assets/bg/bg-family-carer.webp') center center / cover no-repeat fixed,
+    linear-gradient(160deg,var(--cream-a) 0%,var(--cream-b) 100%);
+  -webkit-font-smoothing:antialiased; min-height:100dvh; overflow-x:hidden;
+}
+.mono{ font-family:'SpaceMonoLocal','Space Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-weight:700; text-transform:uppercase; letter-spacing:.09em; }
+
+.stagewrap{ width:100%; display:flex; justify-content:center; overflow:hidden }
+.stage{ position:relative; width:1440px; height:960px; transform-origin:top center; transform:scale(var(--k,1)); flex:none }
+
+/* ── 外壳 ───────────────────────────────────────────────── */
+.logo{ position:absolute; left:34px; top:38px; width:68px; height:68px; object-fit:contain }
+.exit{ position:absolute; left:40px; top:847px; width:56px; height:56px; border-radius:50%;
+  background:var(--white); border:1px solid var(--hair); display:grid; place-items:center;
+  color:var(--mut); text-decoration:none; cursor:pointer;
+  transition:box-shadow .2s ease, color .18s ease, transform .14s ease; }
+.exit:hover{ box-shadow:0 6px 16px rgba(80,66,48,.14); color:var(--ink) }
+.exit:active{ transform:scale(.95) }
+.exit:focus-visible{ outline:2px solid var(--accent); outline-offset:3px }
+.exit-label{ position:absolute; left:43px; top:908px; margin:0; font-size:7.5px; color:var(--mut); letter-spacing:.06em }
+
+h1.title{ position:absolute; left:140px; top:44px; margin:0; width:900px;
+  font-size:34px; line-height:1.1; letter-spacing:-.022em; font-weight:700 }
+p.sub{ position:absolute; left:140px; top:94px; margin:0; width:760px; font-size:14.5px; line-height:21px; color:var(--mut) }
+
+.stepchip{ position:absolute; left:1218px; top:52px; width:174px; height:36px; border-radius:18px;
+  background:var(--white); border:1px solid var(--hair); display:flex; align-items:center; gap:10px; padding-left:20px }
+.stepchip i{ width:8px; height:8px; border-radius:50%; background:var(--accent); flex:none }
+.stepchip span{ font-size:11px; color:var(--mut) }
+
+.steps{ position:absolute; left:121px; top:152px; width:948px; height:30px }
+.steps > div{ position:absolute; top:0; width:150px; height:30px }
+.steps b{ position:absolute; top:0; left:0; width:150px; height:3px; border-radius:2px; background:var(--hair); display:block }
+.steps s{ position:absolute; top:14px; left:0; white-space:nowrap; text-decoration:none; font-size:9.5px; color:var(--faint);
+  font-family:'SpaceMonoLocal','Space Mono',monospace; font-weight:700; text-transform:uppercase; letter-spacing:.09em }
+.steps .on b{ background:var(--accent) }
+.steps .on s{ color:var(--ink) }
+.steps a{ text-decoration:none; cursor:pointer }
+.steps a:hover s{ color:var(--accent-d) }
+
+.visit{ position:absolute; left:121px; top:206px; height:26px; padding:0 18px; border-radius:13px;
+  background:var(--ink); display:flex; align-items:center; font-size:9.5px; color:#F6EFE5 }
+.when{ position:absolute; left:249px; top:212px; font-size:13.5px; line-height:16px; color:var(--mut) }
+.saved{ position:absolute; right:48px; top:213px; text-align:right; font-size:9.5px; color:var(--faint) }
+
+/* ── 左：三方案并排 ─────────────────────────────────────── */
+.panel{ position:absolute; left:121px; top:252px; width:760px; height:566px;
+  background:var(--white); border:1px solid var(--hair); border-radius:var(--r-card) }
+.gtitle{ position:absolute; font-size:9.5px; color:var(--mono-c) }
+
+/* ── 三个方案出现之前的「正在分析」过渡（2026-09-16）──────
+   这一屏一打开就是三张方案卡。老师提的：让系统先"想一会儿"。
+   不做转圈 —— 转圈只说明在等，说不出在等什么。这里把这套系统真正
+   在意的那几件事逐行写出来：净宽、回转、对比度、决策点。
+   ⚠️ 这是过渡动画，三个方案本来就是画好核过的；措辞只写过程不写结论。
+   文案在 assets/thinking.js，三个版本共用一份。
+   九行一开始就全建好、只是透明 —— 块高不变，垂直居中才不会一行一跳。 */
+/* ★ 2026-09-18：整块居中 + 转圈 + 一次只显示一行（和 flow.html 同一套）。
+   老师原话："I would have some sort of loading wheel..." ——
+   九行字说清楚了在算什么，但缺一个"它还在动"的信号。 */
+.think{
+  position:absolute; inset:0; z-index:6;
+  background:var(--white); border-radius:var(--r-card);
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center; text-align:center;
+  padding:0 40px;
+  transition:opacity .32s ease;
+}
+.think.is-out{ opacity:0 }
+.think-t{ position:static; margin:0 0 22px; font-size:9.5px; color:var(--mono-c) }
+
+/* 2πr = 2π×9 ≈ 56.5，画 15 留 42 —— 四分之一多一点的一段弧 */
+.think-spin{ width:26px; height:26px; display:block; transform-origin:50% 50%;
+  animation:think-spin 1s linear infinite }
+.think-spin circle{ fill:none; stroke:var(--accent); stroke-width:2.4;
+  stroke-linecap:round; stroke-dasharray:15 42 }
+@keyframes think-spin{ to{ transform:rotate(360deg) } }
+
+/* 九行叠在同一个格子里，只有 .is-now 看得见 —— 块高恒定，居中不会跳 */
+.think-list{ list-style:none; margin:20px 0 0; padding:0;
+  position:relative; width:100%; max-width:400px; min-height:42px }
+.think-list li{
+  position:absolute; left:0; right:0; top:0;
+  margin:0; font-size:14px; font-weight:600; line-height:1.35; color:var(--ink);
+  opacity:0; transform:translateY(7px);
+  transition:opacity .34s ease, transform .34s ease;
+}
+.think-list li.is-now{ opacity:1; transform:none }
+@media (prefers-reduced-motion:reduce){
+  .think-list li{ transition-duration:.01s }
+  /* 转圈是前庭敏感人群的典型触发源，改成整圈呼吸 */
+  .think-spin{ animation:none }
+  .think-spin circle{ stroke-dasharray:none; animation:think-pulse 1.6s ease-in-out infinite }
+  @keyframes think-pulse{ 0%,100%{ opacity:.25 } 50%{ opacity:1 } }
+}
+
+.opt{
+  position:absolute; top:56px; width:221px; height:480px;
+  border-radius:12px; border:1px solid var(--line); background:var(--white);
+  cursor:pointer; text-align:left; padding:0; font-family:inherit;
+  transition:border-color .18s ease, background .18s ease, box-shadow .2s ease;
+}
+.opt:hover{ border-color:var(--mut); box-shadow:0 8px 20px rgba(80,66,48,.10) }
+.opt[aria-pressed="true"]{ border:1.5px solid var(--accent); background:var(--sel) }
+.opt:focus-visible{ outline:2px solid var(--accent); outline-offset:2px }
+
+.opt .plan{ position:absolute; left:16px; top:16px; width:189px; height:189px;
+  background:var(--plan-bg); border:1px solid var(--hair-2); border-radius:8px; overflow:hidden;
+  display:grid; place-items:center }
+.opt .plan svg{ display:block; width:173px; height:173px }
+.opt .plan.miss::after{ content:'plan not loaded — open through the local server, not by double-clicking'; font-size:10px; color:var(--hint) }
+
+.opt .ok{ position:absolute; left:16px; top:222px; font-size:10px; color:var(--mono-c) }
+.opt[aria-pressed="true"] .ok{ color:var(--accent-d) }
+.opt .score{ position:absolute; left:16px; top:244px; font-size:34px; line-height:40px;
+  font-weight:700; letter-spacing:-.02em; color:var(--ink) }
+.opt[aria-pressed="true"] .score{ color:var(--accent) }
+.opt .desc{ position:absolute; left:16px; top:296px; width:189px; font-size:12.5px; line-height:17px; color:var(--mut) }
+
+.opt .m{ position:absolute; left:16px; width:189px; height:12px }
+.opt .m i{ position:absolute; left:0; top:1px; font-style:normal; font-size:9px; color:var(--faint);
+  font-family:'SpaceMonoLocal','Space Mono',monospace; font-weight:700; letter-spacing:.09em }
+.opt .m u{ position:absolute; left:34px; top:4px; width:155px; height:4px; border-radius:2px;
+  background:var(--hair-2); text-decoration:none; display:block }
+.opt .m u b{ display:block; height:4px; border-radius:2px; background:#BDB4A6 }
+.opt[aria-pressed="true"] .m u b{ background:var(--accent) }
+
+/* ── 右：规则对账 ───────────────────────────────────────── */
+.rules{ position:absolute; left:924px; top:252px; width:468px; height:380px;
+  background:var(--white); border:1px solid var(--hair); border-radius:var(--r-card) }
+.rules .lab{ position:absolute; left:26px; top:26px; font-size:9.5px; color:var(--mono-c) }
+.rules .sub2{ position:absolute; left:26px; top:46px; width:416px; margin:0; font-size:12.5px; line-height:15px; color:var(--mut) }
+.rules .hair{ position:absolute; left:26px; width:416px; height:1px; background:var(--hair) }
+.rules .rowhair{ position:absolute; left:26px; width:416px; height:1px; background:var(--hair-2) }
+
+.rrow{ position:absolute; left:26px; width:416px; height:46px }
+.rrow .rn{ position:absolute; left:0; top:0; font-size:13.5px; line-height:16px; font-weight:500; color:var(--ink) }
+.rrow .rq{ position:absolute; right:0; top:1px; font-size:12px; line-height:15px; color:var(--faint) }
+.rrow .rt{ position:absolute; left:0; top:26px; font-size:12.5px; line-height:15px; color:var(--hint) }
+.rrow .ra{ position:absolute; top:26px; font-size:12.5px; line-height:15px; color:var(--hint) }
+.rrow .rv{ position:absolute; top:26px; font-size:12.5px; line-height:15px; font-weight:500; color:var(--ink) }
+.rrow .rk{ position:absolute; right:0; top:26px; font-size:12.5px; line-height:15px; font-weight:500; color:var(--ok) }
+
+.rules .foot{ position:absolute; left:26px; top:340px; font-size:9.5px; color:var(--accent-d) }
+
+/* ── 右下：对话坞 ───────────────────────────────────────── */
+.dock{ position:absolute; left:924px; top:633px; width:468px; height:156px; background:var(--soft); border-radius:var(--r-card) }
+.dock .av{ position:absolute; left:26px; top:30px; width:34px; height:34px; border-radius:50% }
+.dock .msgs{ position:absolute; left:74px; top:26px; width:368px; height:60px; overflow-y:auto;
+  overscroll-behavior:contain; font-size:13.5px; line-height:20px; color:var(--mut); scrollbar-width:thin }
+.dock .msgs p{ margin:0 0 8px }
+.dock .msgs p:last-child{ margin-bottom:0 }
+.dock .msgs p.me{ color:var(--ink); font-weight:500 }
+.dock .msgs p.ok{ color:var(--accent-d) }
+.composer{ position:absolute; left:26px; top:96px; width:416px; height:44px; background:var(--white);
+  border:1px solid var(--hair); border-radius:22px; display:flex; align-items:center }
+.composer input{ flex:1; min-width:0; height:42px; border:0; background:transparent; outline:none;
+  padding:0 8px 0 22px; font-family:inherit; font-size:13.5px; color:var(--ink) }
+.composer input::placeholder{ color:var(--hint) }
+.send{ width:32px; height:32px; margin-right:6px; flex:none; border-radius:50%; border:0; background:var(--ink);
+  color:var(--accent); display:grid; place-items:center; cursor:pointer; font-size:14px; line-height:1;
+  font-family:inherit; transition:transform .14s ease, opacity .2s ease }
+.send:hover{ transform:scale(1.06) }
+.send:disabled{ opacity:.45; cursor:default; transform:none }
+.send:focus-visible{ outline:2px solid var(--accent); outline-offset:2px }
+.dots i{ display:inline-block; width:4px; height:4px; margin-right:3px; border-radius:50%;
+  background:var(--faint); animation:blip 1.05s infinite ease-in-out }
+.dots i:nth-child(2){ animation-delay:.14s }
+.dots i:nth-child(3){ animation-delay:.28s }
+@keyframes blip{ 0%,60%,100%{ opacity:.25 } 30%{ opacity:1 } }
+
+@keyframes flash{ 0%{ background:rgba(237,113,25,.18) } 100%{ background:transparent } }
+.justfilled{ animation:flash .9s ease-out }
+
+.next{ position:absolute; left:1112px; top:858px; width:286px; height:44px; border-radius:22px;
+  background:var(--ink); border:0; cursor:pointer; display:flex; align-items:center;
+  justify-content:space-between; padding:0 20px 0 22px; font-family:inherit;
+  transition:transform .14s ease, box-shadow .2s ease, opacity .2s ease }
+.next span{ font-size:13.5px; font-weight:600; color:#F6EFE5 }
+.next em{ font-style:normal; color:var(--accent); font-size:15px }
+.next:hover{ transform:translateY(-1px); box-shadow:0 8px 20px rgba(40,32,22,.22) }
+.next:disabled{ opacity:.4; cursor:default; transform:none; box-shadow:none }
+.next:focus-visible{ outline:2px solid var(--accent); outline-offset:3px }
+.nextnote{ position:absolute; left:1112px; top:910px; width:286px; margin:0; font-size:11.5px;
+  color:var(--mut); text-align:right; opacity:0; transition:opacity .25s ease }
+.nextnote.show{ opacity:1 }
+
+@media (prefers-reduced-motion:reduce){ *{ animation-duration:.001ms !important; transition-duration:.001ms !important } }
+
+/* ── 放大版：ENLARGE 按钮 + 浮层 ──────────────────────────
+   按钮不能放进 .opt 里 —— .opt 本身是 <button>，按钮不能嵌套按钮。
+   所以它是 .panel 的直接子元素，绝对定位压在平面框右上角。
+   left = 卡片 left + 16(平面内缩) + 189(平面宽) − 68(按钮宽) − 6(内边距) */
+.enl{ position:absolute; top:78px; width:68px; height:22px; border-radius:11px;
+  border:1px solid var(--line); background:rgba(255,255,255,.92); cursor:pointer;
+  font-family:'SpaceMonoLocal','Space Mono',monospace; font-weight:700;
+  font-size:8px; letter-spacing:.09em; color:var(--mut); padding:0;
+  display:grid; place-items:center; z-index:3;
+  transition:border-color .16s ease, color .16s ease }
+.enl:hover{ border-color:var(--accent); color:var(--accent-d) }
+.enl:focus-visible{ outline:2px solid var(--accent); outline-offset:2px }
+
+.czoom{ position:absolute; inset:0; z-index:60; display:none; place-items:center;
+  background:rgba(26,25,23,.22); backdrop-filter:blur(3px) }
+.czoom.on{ display:grid }
+.czoomcard{ position:relative; width:820px; height:856px; border-radius:16px;
+  background:var(--white); border:1px solid var(--hair);
+  box-shadow:0 24px 60px rgba(40,32,22,.18) }
+.czoomcard .zlab{ position:absolute; left:28px; top:26px; margin:0; font-size:10px;
+  color:var(--mono-c) }
+.czoomcard .zmeta{ position:absolute; right:76px; top:26px; margin:0; font-size:10px;
+  color:var(--hint); text-align:right }
+.czoomclose{ position:absolute; right:22px; top:18px; width:34px; height:34px; border-radius:50%;
+  border:1px solid var(--hair); background:transparent; cursor:pointer;
+  font-family:inherit; font-size:15px; line-height:1; color:var(--mut); padding:0 }
+.czoomclose:hover{ border-color:var(--mut); color:var(--ink) }
+.czoomclose:focus-visible{ outline:2px solid var(--accent); outline-offset:2px }
+/* 平面区。bleed 的那些 viewBox 里已经带了四周留白，再加 padding 会缩两次 */
+.czoomplan{ position:absolute; left:28px; top:60px; width:764px; height:768px;
+  background:var(--plan-bg); border-radius:10px; overflow:hidden;
+  display:grid; place-items:center; padding:40px }
+.czoomplan.bleed{ padding:0 }
+.czoomplan svg{ display:block; width:100%; height:100% }
+.czoomplan.miss::after{ content:'plan not loaded — open through the local server';
+  font-size:12px; color:var(--hint) }
+
+/* 签完字之后的横幅。位置在录入面板正上方，和「上下文带」同一行高度 */
+.lockbar{ position:absolute; left:121px; top:884px; width:900px;
+  font-size:9px; line-height:13px; color:#B0570F; letter-spacing:.06em;
+  text-transform:none; }
+</style>
+</head>
+
+<body>
+<div class="stagewrap" id="stagewrap">
+<div class="stage" id="stage">
+
+  <img class="logo" src="assets/logo.png" alt="MNEMOSYNE">
+  <a class="exit" href="./flow-carer-2.html" aria-label="Back to step 2">
+    <svg width="14" height="10" viewBox="0 0 14 10" fill="none" aria-hidden="true">
+      <path d="M5 1 1 5l4 4M1 5h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </a>
+  <p class="exit-label mono">SAVE&amp;EXIT</p>
+
+  <h1 class="title">Three that pass the rules.</h1>
+  <p class="sub">All three clear what you measured. The difference is what they cost her.</p>
+
+  <div class="stepchip"><i></i><span class="mono">STEP 3 OF 5</span></div>
+
+  <nav class="steps" aria-label="Progress">
+    <div class="on" style="left:0"><b></b><a href="./flow-carer.html"><s>PROFILE</s></a></div>
+    <div class="on" style="left:162px"><b></b><a href="./flow-carer-2.html"><s>THEIR HOME</s></a></div>
+    <div class="on" style="left:324px"><b></b><s>LAYOUTS</s></div>
+    <div style="left:486px"><b></b><s>PREVIEW</s></div>
+    <div style="left:648px"><b></b><s>HANDOVER</s></div>
+  </nav>
+
+  <div class="visit mono">FIRST FILE</div>
+  <p class="when" id="when">&nbsp;</p>
+  <p class="saved mono" id="saved">AUTOSAVED &nbsp;·&nbsp; NOTHING SIGNED YET</p>
+
+  <!-- ══ 左：三方案 ════════════════════════════════════════ -->
+  <section class="panel" aria-label="Layout options">
+    <p class="gtitle mono" id="gen" style="left:32px;top:30px">24 GENERATED &nbsp;·&nbsp; 3 PASSED EVERY RULE</p>
+
+    <button type="button" class="opt" id="o-A" style="left:32px"  aria-pressed="false">
+      <span class="plan" id="p-A"></span>
+      <span class="ok mono" id="k-A">OPTION A</span>
+      <span class="score">7.6</span>
+      <span class="desc">Compact services</span>
+      <span class="m" style="top:348px"><i>DAY</i><u><b style="width:68.8%"></b></u></span>
+      <span class="m" style="top:376px"><i>CON</i><u><b style="width:79.4%"></b></u></span>
+      <span class="m" style="top:404px"><i>VIS</i><u><b style="width:70%"></b></u></span>
+      <span class="m" style="top:432px"><i>AIR</i><u><b style="width:58.2%"></b></u></span>
+    </button>
+
+    <button type="button" class="opt" id="o-B" style="left:269px" aria-pressed="false">
+      <span class="plan" id="p-B"></span>
+      <span class="ok mono" id="k-B">OPTION B</span>
+      <span class="score">7.9</span>
+      <span class="desc">Daylight-first bedroom</span>
+      <span class="m" style="top:348px"><i>DAY</i><u><b style="width:75.3%"></b></u></span>
+      <span class="m" style="top:376px"><i>CON</i><u><b style="width:90%"></b></u></span>
+      <span class="m" style="top:404px"><i>VIS</i><u><b style="width:72%"></b></u></span>
+      <span class="m" style="top:432px"><i>AIR</i><u><b style="width:66%"></b></u></span>
+    </button>
+
+    <button type="button" class="opt" id="o-C" style="left:506px" aria-pressed="false">
+      <span class="plan" id="p-C"></span>
+      <span class="ok mono" id="k-C">OPTION C</span>
+      <span class="score">8.2</span>
+      <span class="desc">One loop · wide corridors</span>
+      <span class="m" style="top:348px"><i>DAY</i><u><b style="width:81.8%"></b></u></span>
+      <span class="m" style="top:376px"><i>CON</i><u><b style="width:90%"></b></u></span>
+      <span class="m" style="top:404px"><i>VIS</i><u><b style="width:86%"></b></u></span>
+      <span class="m" style="top:432px"><i>AIR</i><u><b style="width:74%"></b></u></span>
+    </button>
+
+    <button type="button" class="enl" data-k="A" style="left:163px" aria-label="Enlarge option A">&#8689; ENLARGE</button>
+    <button type="button" class="enl" data-k="B" style="left:400px" aria-label="Enlarge option B">&#8689; ENLARGE</button>
+    <button type="button" class="enl" data-k="C" style="left:637px" aria-label="Enlarge option C">&#8689; ENLARGE</button>
+  </section>
+
+  <!-- ══ 放大版浮层 ════════════════════════════════════════ -->
+  <div class="czoom" id="czoom" role="dialog" aria-modal="true" aria-label="Enlarged layout">
+    <div class="czoomcard">
+      <p class="zlab mono" id="zlab">OPTION A</p>
+      <p class="zmeta mono" id="zmeta">&nbsp;</p>
+      <button type="button" class="czoomclose" id="zclose" aria-label="Close">&times;</button>
+      <div class="czoomplan" id="zplan"></div>
+    </div>
+  </div>
+
+  <!-- ══ 右：规则对账（跟着实测值和所选方案重算） ═════════ -->
+  <aside class="rules" aria-label="Rules checked" aria-live="polite">
+    <p class="lab mono" id="rlab">RULES CHECKED &nbsp;·&nbsp; OPTION C</p>
+    <p class="sub2" id="rsub">Each rule is checked against what you measured today.</p>
+    <div class="hair" style="top:84px"></div>
+
+    <div class="rrow" id="r0" style="top:104px">
+      <span class="rn">Corridor width</span><span class="rq"></span>
+      <span class="rt"></span><span class="ra">→</span><span class="rv"></span><span class="rk">✓</span>
+    </div>
+    <div class="rowhair" style="top:162px"></div>
+    <div class="rrow" id="r1" style="top:178px">
+      <span class="rn">Turning circle</span><span class="rq"></span>
+      <span class="rt"></span><span class="ra">→</span><span class="rv"></span><span class="rk">✓</span>
+    </div>
+    <div class="rowhair" style="top:236px"></div>
+    <div class="rrow" id="r2" style="top:252px">
+      <span class="rn">Doorway · chair</span><span class="rq"></span>
+      <span class="rt"></span><span class="ra">→</span><span class="rv"></span><span class="rk">✓</span>
+    </div>
+
+    <div class="hair" style="top:326px"></div>
+    <p class="foot mono" id="rfoot">NOTHING HERE IS SIGNED OFF YET</p>
+  </aside>
+
+  <!-- ══ 右下：对话 ════════════════════════════════════════ -->
+  <div class="dock">
+    <img class="av" src="assets/logo.png" alt="">
+    <div class="msgs" id="msgs">
+      <p id="lead">Want to know why one scored higher? Ask me, and I will show which rule made the difference.</p>
+    </div>
+    <form class="composer" id="composer">
+      <input id="say" autocomplete="off" placeholder="Ask MNEMO about these scores…" aria-label="Ask MNEMO about these scores">
+      <button class="send" id="send" type="submit" aria-label="Send">→</button>
+    </form>
+  </div>
+
+  <button class="next" id="next" type="button"><span>Continue — preview</span><em>→</em></button>
+  <p class="nextnote" id="nextnote"></p>
+
+</div>
+</div>
+
+<script src="assets/llm.js?v=20260917"></script>
+<script src="assets/nlu-rules.js"></script>
+<script src="assets/thinking.js?v=20260917"></script>
+<script src="assets/carer-core.js?v=20260917"></script>
+<script>
+(function(){
+'use strict';
+var C = window.MNEMO_CARER, $ = C.$, data = C.data;
+
+/* 三个方案的硬数据。右边那张对账表就是拿这些数和实测值比出来的。
+   数值和家属版 flow.html 里的 S3_OPT 对齐，别单独改。 */
+var OPT = {
+  A:{ score:'7.6', desc:'Compact services',        corridor:1200, turning:'Ø1500 · 2 rooms',    door:850,
+      note:{ en:'Option A packs the services together. It walks shortest, but the bedroom loses the morning light.' } },
+  B:{ score:'7.9', desc:'Daylight-first bedroom',  corridor:1250, turning:'Ø1500 · 3 rooms',    door:850,
+      note:{ en:'Option B gives the bedroom the south wall. The trade is a longer trip to the bathroom at night.' } },
+  C:{ score:'8.2', desc:'One loop · wide corridors', corridor:1400, turning:'Ø1500 · every room', door:900,
+      note:{ en:'Option C keeps one continuous loop and the widest corridors — nothing to reverse out of.' } }
+};
+
+/* ── 方案图：27 套（3 分流 × 3 户型 × 3 方案）在共享资源里，运行时取 ──
+   取不到（比如直接双击打开文件、没走服务器）也不影响这一屏能用，
+   只是三个框显示 plan not loaded。 */
+function typeKey(){
+  var m = /^Type ([ABC])$/.exec(data.homeStd || '');
+  return m ? m[1] : 'A';           /* 没选或选了 Non-standard → 退回 A */
+}
+/* 2026-09-16：加了分流这一维。三级回退和家属版 flow.html 的 layTpl() 一字不差 ——
+   mobility 那九份是两段式的历史命名，正好落在第二级，所以它的行为完全没变。 */
+function layTpl(o){
+  var tr = C.track();
+  return document.getElementById('lay-' + tr + '-' + typeKey() + '-' + o)
+      || document.getElementById('lay-' + typeKey() + '-' + o)
+      || document.getElementById('lay-A-' + o);
+}
+function paintPlans(){
+  ['A','B','C'].forEach(function(o){
+    var box = $('p-' + o);
+    var tpl = layTpl(o);
+    box.innerHTML = '';
+    if (tpl && tpl.content && tpl.content.firstElementChild){
+      box.appendChild(tpl.content.firstElementChild.cloneNode(true));
+      box.classList.remove('miss');
+    } else {
+      box.classList.add('miss');
+    }
+  });
+  if (zoomOpen) paintZoom(zoomOpen);   /* 开着的时候换了户型/分流，跟着重画 */
+}
+
+/* ── 放大版 ───────────────────────────────────────────────
+   取模板的规矩和家属版一样，但**多一条**：这一分流只要有自己的卡片平面，
+   就宁可用卡片平面顶上，也不跨分流去借 mobility 的放大版 ——
+   小卡片是 memory 的房子、点开放大却是 mobility 的房子，那是两张图对不上。
+   （家属版 2026-09-13 修的就是这一条，这里照抄。） */
+var zoomOpen = null;
+function zoomTpl(o){
+  var tr = C.track(), t = typeKey();
+  var tracked = document.getElementById('zoom-' + tr + '-' + t + '-' + o);
+  if (tracked) return { tpl:tracked, full:true };
+  var ownLay = document.getElementById('lay-' + tr + '-' + t + '-' + o);
+  var plain  = ownLay ? null : document.getElementById('zoom-' + t + '-' + o);
+  if (plain) return { tpl:plain, full:true };
+  return { tpl:layTpl(o), full:false };     /* 连放大版都没有 → 用卡片平面 */
+}
+function paintZoom(o){
+  var got = zoomTpl(o), box = $('zplan');
+  box.innerHTML = '';
+  box.classList.remove('miss');
+  var bleed = !!(got.tpl && got.tpl.dataset && got.tpl.dataset.fit === 'bleed');
+  box.classList.toggle('bleed', bleed);
+  if (got.tpl && got.tpl.content && got.tpl.content.firstElementChild){
+    box.appendChild(got.tpl.content.firstElementChild.cloneNode(true));
+  } else {
+    box.classList.add('miss');
+  }
+  $('zlab').textContent = ('OPTION ') + o;
+  /* 右上角写清楚这是哪一档的哪个户型 —— 医护把图截进材料里，
+     得能看出来这张图配的是谁。分流名用和第 2 步同一套说法。 */
+  var lab = C.TRACK_LABEL[C.track()]['en'];
+  $('zmeta').textContent = ('TYPE ') + typeKey() + '  ·  ' + lab.toUpperCase();
+}
+function openZoom(o){
+  zoomOpen = o;
+  paintZoom(o);
+  $('czoom').classList.add('on');
+  $('zclose').focus();
+}
+function closeZoom(){
+  if (!zoomOpen) return;
+  var back = $('o-' + zoomOpen);
+  zoomOpen = null;
+  $('czoom').classList.remove('on');
+  if (back) back.focus();
+}
+Array.prototype.slice.call(document.querySelectorAll('.enl')).forEach(function(b){
+  b.addEventListener('click', function(){ openZoom(b.dataset.k); });
+});
+$('zclose').addEventListener('click', closeZoom);
+$('czoom').addEventListener('click', function(e){ if (e.target === $('czoom')) closeZoom(); });
+/* Esc 关放大平面。**关掉之后要挡住后面的 Esc 监听** ——
+   内核的对话坞放大也听 Esc，不挡的话一个 Esc 会把两个都收掉。
+   这里能挡住是因为这段在 C.boot() 之前注册，跑在内核那个之前。 */
+document.addEventListener('keydown', function(e){
+  if (e.key !== 'Escape' || !zoomOpen) return;
+  closeZoom();
+  e.stopImmediatePropagation();
+});
+fetch('assets/carer-layouts.html')
+  .then(function(r){ return r.ok ? r.text() : Promise.reject(0); })
+  .then(function(html){
+    var holder = document.createElement('div');
+    holder.style.display = 'none';
+    holder.innerHTML = html;
+    document.body.appendChild(holder);
+    paintPlans();
+  })
+  .catch(function(){ paintPlans(); });   /* 走占位，不弹错 */
+
+/* ── 选方案 ───────────────────────────────────────────── */
+/* 默认值**不能写在这里** —— 见文件末尾 C.boot() 之后那一段。
+   内核的 C.boot() 开头还会再 load() 一次，把这里设的默认值
+   用 sessionStorage 里的空串又盖回去。 */
+
+['A','B','C'].forEach(function(k){
+  $('o-' + k).addEventListener('click', function(){
+    if (data.layout === k) return;
+    data.layout = k;
+    C.stamp(); C.render();
+  });
+});
+
+/* ── 一条规则一行：她今天量到多少 → 这个方案给到多少 ────── */
+function paintRule(el, req, todayVal, todayUnit, after){
+  el.querySelector('.rq').textContent = req;
+  var rt = el.querySelector('.rt'), ra = el.querySelector('.ra'), rv = el.querySelector('.rv');
+  var known = !!todayVal;
+  rt.textContent = known
+    ? (todayVal + (todayUnit ? ' ' + todayUnit : '') + (' today'))
+    : ('not measured');
+  rt.style.color = known ? 'var(--hint)' : 'var(--faint)';
+  ra.style.left = (rt.offsetWidth + 10) + 'px';
+  rv.style.left = (rt.offsetWidth + 10 + 22) + 'px';
+  rv.textContent = after;
+}
+
+var LABEL = { en:{ layout:'the chosen layout' } };
+
+C.boot({
+  usesExtract: false,
+  verb: { en:'Noted —' },
+
+  parse: function(text){
+    var p = {};
+    var m = text.match(/\boption\s*([ABC])\b/i) || text.match(/([ABC])\s*(?:方案|案)/);
+    if (m) p.layout = m[1].toUpperCase();
+    else if (/\b(?:pick|choose|go with|take)\s+([ABC])\b/i.test(text)) p.layout = RegExp.$1.toUpperCase();
+    else if (/就(?:选|要)\s*([ABC])/.test(text)) p.layout = RegExp.$1.toUpperCase();
+    return p;
+  },
+
+  apply: function(patch){
+    var names = LABEL.en, hit = [];
+    if (patch.layout && patch.layout !== data.layout){
+      data.layout = patch.layout;
+      hit.push(names.layout);
+      C.flash($('o-' + patch.layout));
+    }
+    if (hit.length){ C.stamp(); C.render(); }
+    return hit;
+  },
+
+  question: function(){
+    return 'Which of the three layouts do you want?';
+  },
+
+  ctx: function(){
+    var o = OPT[data.layout] || OPT.C;
+    var b = ['Step 3 of 5: a care worker is choosing between three layouts that all passed the rules'];
+    if (data.name)     b.push('resident: ' + data.name);
+    if (data.homeStd)  b.push('home type: ' + data.homeStd);
+    if (data.doorway)  b.push('doorway measured today: ' + data.doorway + ' mm');
+    if (data.corridor) b.push('corridor measured today: ' + data.corridor + ' mm');
+    b.push('scores: A 7.6 compact services, B 7.9 daylight-first bedroom, C 8.2 one loop with wide corridors');
+    b.push('currently chosen: Option ' + data.layout + ' — ' + o.desc);
+    return b.join('; ');
+  },
+
+  tail: function(){
+    var o = OPT[data.layout] || OPT.C;
+    return o.note.en;
+  },
+
+  miss: function(){
+    return 'I could not tell which option you meant. Clicking one of the three on the left is quicker.';
+  },
+
+  render: function(){
+    var k = data.layout || 'C', o = OPT[k];
+
+    /* 「MNEMO SUGGESTS」跟的是分最高的那个，不是用户点中的那个。
+       跟着选中走会变成一句谎话 —— 她选了 7.6 分的 A，标签却说这是我推荐的。 */
+    var best = ['A','B','C'].reduce(function(a, x){
+      return parseFloat(OPT[x].score) > parseFloat(OPT[a].score) ? x : a;
+    }, 'A');
+    ['A','B','C'].forEach(function(x){
+      $('o-' + x).setAttribute('aria-pressed', String(x === k));
+      $('k-' + x).textContent = (x === best)
+        ? 'OPTION ' + x + '  ·  MNEMO SUGGESTS'
+        : 'OPTION ' + x;
+    });
+
+    $('rlab').innerHTML = 'RULES CHECKED &nbsp;·&nbsp; OPTION ' + k;
+    $('rsub').textContent = 'Each rule is checked against what you measured today.';
+
+    paintRule($('r0'), '≥ ' + o.corridor + ' mm', data.corridor, 'mm', o.corridor + ' mm');
+    paintRule($('r1'), 'Ø 1500 mm',               data.turning,  '',   'Ø 1500 mm');
+    paintRule($('r2'), '≥ ' + o.door + ' mm',     data.doorway,  'mm', o.door + ' mm');
+
+    $('when').innerHTML = (data.name || 'New file') +
+      ' &nbsp;·&nbsp; ' + (data.homeStd || 'type not chosen') +
+      ' &nbsp;·&nbsp; 24 arrangements tested';
+  },
+
+  next: { href:'./flow-carer-4.html', label:'Step 4' }
+});
+
+/* ═══ 方案的默认值（2026-09-17 修）═══════════════════════════
+   这一屏三张卡里 Option C 一进来就画成选中的（分最高的那个，和
+   家属版、本人版一致）。但 data.layout 原来一直是空的 ——
+   屏幕上说"已经选了 C"，档案里却写着"还没选方案"。
+   后果：一路走到底，档案页上 ROOM SCORE 是「—」、写着
+   「No plan chosen yet」，而她明明看着 C 被选中走完了全程。
+
+   ⚠️ 为什么必须放在 C.boot() **之后**：
+     carer-core.js 末尾已经 C.load() 过一次，C.boot() 开头**又
+     load 了一次**。第 1 步存下来的那份数据里 layout 是空字符串，
+     `if (s[k] != null)` 对空串是成立的 —— 于是第二次 load 会把
+     boot 之前设的 'C' 原样盖回空串。写在前面等于没写。
+     这一版没有动内核那两次 load（六个页面都在用），只在这里绕开。 */
+if (!data.layout){
+  data.layout = 'C';
+  C.stamp(); C.render();      /* render 里会 save，不写这一句就只活在内存里 */
+}
+
+/* ═══ 「正在分析」过渡（2026-09-16）═══════════════════════════
+   这一版每一步是**一个独立页面**，所以"进第 3 步"就是"打开这一页"。
+   过渡盖在左边那张放三个方案的面板上，念完九行再揭开。
+
+   放几次：按「分流-户型」记在 sessionStorage 里，同一套房子只放一次。
+   从第 4 步退回来不会重放；回第 2 步换个户型再过来，key 变了会重放 ——
+   这时候确实是另一套房子，重算一遍是对的。
+
+   ⚠️ 这是过渡动画，不是真在算 —— 理由写在 thinking.js 顶上。 */
+(function(){
+  var TH = window.MNEMO_THINKING, panel = document.querySelector('.panel');
+  if (!TH || !panel) return;
+  var SKEY = 'mnemo:carer:thought';
+  var key = C.track() + '-' + (data.homeStd || '');
+  try { if (sessionStorage.getItem(SKEY) === key) return; } catch(e){}
+
+  var box = document.createElement('div'); box.className = 'think';
+  var t = document.createElement('p'); t.className = 'think-t mono';
+  t.textContent = 'MNEMO IS WORKING';
+  /* 转圈。必须用 createElementNS —— innerHTML 拼出来的 <svg> 在 HTML
+     命名空间里不会被当成 SVG，画不出来。 */
+  var NS = 'http://www.w3.org/2000/svg';
+  var spin = document.createElementNS(NS, 'svg');
+  spin.setAttribute('class', 'think-spin');
+  spin.setAttribute('viewBox', '0 0 24 24');
+  spin.setAttribute('aria-hidden', 'true');
+  var arc = document.createElementNS(NS, 'circle');
+  arc.setAttribute('cx', '12'); arc.setAttribute('cy', '12'); arc.setAttribute('r', '9');
+  spin.appendChild(arc);
+
+  var ul = document.createElement('ul'); ul.className = 'think-list';
+  var lis = TH.lines(C.track()).map(function(r){
+    var li = document.createElement('li');
+    li.textContent = TH.text(r);
+    ul.appendChild(li); return li;
+  });
+  box.appendChild(t); box.appendChild(spin); box.appendChild(ul);
+  panel.appendChild(box);
+  if ($('next')) $('next').disabled = true;
+
+  var i = 0;
+  (function step(){
+    if (i >= lis.length){
+      setTimeout(function(){
+        try { sessionStorage.setItem(SKEY, key); } catch(e){}
+        box.classList.add('is-out');
+        setTimeout(function(){
+          if (box.parentNode) box.remove();
+          if ($('next')) $('next').disabled = false;
+        }, 340);
+      }, TH.HOLD);
+      return;
+    }
+    lis.forEach(function(x, n){ x.classList.toggle('is-now', n === i); });
+    lis[i].classList.add('on');
+    i++;
+    setTimeout(step, TH.STEP);
+  })();
+})();
+})();
+</script>
+</body>
+</html>

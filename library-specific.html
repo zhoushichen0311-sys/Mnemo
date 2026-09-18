@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MNEMOSYNE — Specific Furniture</title>
+
+<style>
+@font-face{
+  font-family:'InterLocal';
+  src:url('assets/fonts/inter-var.woff2') format('woff2-variations');
+  font-weight:100 900; font-style:normal; font-display:block;
+}
+@font-face{
+  font-family:'SpaceMonoLocal';
+  src:url('assets/fonts/space-mono-700.woff2') format('woff2');
+  font-weight:700; font-style:normal; font-display:block;
+}
+</style>
+
+<style>
+/* ============================================================
+   MNEMOSYNE · Library / Specific Furniture
+   对应 Figma 560:65 —— 1440 × 1945
+   三个特写块，图文左右交替：
+     ① MNEMO ROBOT   图左（x=307）文右
+     ② SOFLOW SOFA   文左        图右（x=868）
+     ③ MORPH         图左（x=152）文右          ← 2026-09-17 新增
+   交替不是为了好看：每块都是「一件家具 + 它的四条特性」，
+   左右一换，读的人一眼就知道换了一件，不用靠标题去分段。
+   ============================================================ */
+:root{
+  --bg:#EFECE6;
+  --nav:#141414;
+  --crumb:#8C8780;
+  --title:#1C1A17;
+  --body:#6B6661;
+  --accent:#ED7119;
+  --caps:#F5F3EF;
+  --nav-dim:#9E9991;
+  --meta:#8C8780;
+
+  --sans:'InterLocal','Inter',system-ui,-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+  --mono:'SpaceMonoLocal','Space Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+
+  --stage:1440px;
+  --pad:152px;
+  --nav-h:76px;
+  --col-l:616px;         /* 左列 152→768 */
+}
+*{ box-sizing:border-box }
+html{ background:var(--bg); scroll-behavior:smooth; scroll-padding-top:var(--nav-h) }
+body{
+  margin:0; background:var(--bg); color:var(--body);
+  font-family:var(--sans); -webkit-font-smoothing:antialiased; overflow-x:clip;
+}
+.wrap{ width:min(100%, var(--stage)); margin-inline:auto; padding-inline:var(--pad) }
+
+/* ---------- 导航 ---------- */
+.nav{ position:fixed; top:0; left:0; right:0; z-index:60;
+      height:var(--nav-h); background:var(--nav) }
+.nav-in{
+  width:min(100%, var(--stage)); margin-inline:auto; height:100%;
+  padding-inline:56px; display:flex; align-items:center; justify-content:space-between;
+}
+.brand{ display:block; line-height:0 }
+.brand img{ display:block; width:92.9px; height:36px; object-fit:contain }
+.nav-r{ display:flex; align-items:center; gap:32px }
+.contact{ font-size:13px; font-weight:500; color:var(--nav-dim); text-decoration:none;
+          transition:color .22s ease }
+.contact:hover{ color:var(--caps) }
+.burger{ width:24px; height:18px; padding:0; background:none; border:0; cursor:pointer;
+         display:flex; flex-direction:column; justify-content:space-between }
+.burger i{ display:block; height:2px; border-radius:1px; background:var(--caps);
+           transition:transform .26s ease, opacity .2s ease }
+.burger[aria-expanded="true"] i:nth-child(1){ transform:translateY(8px) rotate(45deg) }
+.burger[aria-expanded="true"] i:nth-child(2){ opacity:0 }
+.burger[aria-expanded="true"] i:nth-child(3){ transform:translateY(-8px) rotate(-45deg) }
+/* ============================================================
+   全屏毛玻璃菜单（沿用 v1 hero4 的 Foster 风格面板）
+   盖满视口、透出背后的视频/页面并做高斯模糊；
+   z-index 55 压在导航条（60）之下，所以 logo 和汉堡始终可点。
+   ============================================================ */
+.menu{
+  position:fixed; inset:0; z-index:55;
+  display:flex; align-items:center;
+  background:rgba(14,13,15,.32);
+  -webkit-backdrop-filter:blur(22px) saturate(1.25);
+          backdrop-filter:blur(22px) saturate(1.25);
+  opacity:0; visibility:hidden;
+  transition:opacity .5s ease, visibility 0s linear .5s;
+}
+.menu[data-open="true"]{
+  opacity:1; visibility:visible;
+  transition:opacity .5s ease, visibility 0s linear 0s;
+}
+.menu ul{
+  width:min(100%, var(--stage));
+  margin-inline:auto;
+  padding:0 56px;            /* 与导航条同一条左线 */
+  list-style:none;
+}
+.menu a{
+  display:flex; align-items:baseline; gap:22px;
+  padding:7px 0; text-decoration:none;
+  font-size:clamp(30px, 4.6vw, 56px);
+  font-weight:700; letter-spacing:-.02em; line-height:1.28;
+  color:var(--caps);
+  width:max-content;
+  opacity:0; transform:translateY(26px);
+  transition:opacity .5s ease,
+             transform .6s cubic-bezier(.2,.6,.2,1),
+             color .25s ease;
+}
+.menu[data-open="true"] a{ opacity:1; transform:none }
+.menu[data-open="true"] li:nth-child(1) a{ transition-delay:.10s }
+.menu[data-open="true"] li:nth-child(2) a{ transition-delay:.16s }
+.menu[data-open="true"] li:nth-child(3) a{ transition-delay:.22s }
+.menu[data-open="true"] li:nth-child(4) a{ transition-delay:.28s }
+.menu[data-open="true"] li:nth-child(5) a{ transition-delay:.34s }
+.menu[data-open="true"] li:nth-child(6) a{ transition-delay:.40s }
+.menu[data-open="true"] li:nth-child(7) a{ transition-delay:.46s }
+.menu a:hover{ color:var(--accent) }
+.menu a[aria-disabled="true"]{ color:rgba(245,243,239,.34); pointer-events:none }
+.menu a[aria-current="page"]{ color:var(--accent) }
+.menu .no{
+  flex:none; width:46px;
+  font-family:var(--mono); font-weight:700;
+  font-size:12px; letter-spacing:1.2px; color:var(--meta);
+}
+
+main{ padding-top:var(--nav-h) }
+
+/* ---------- 页头 ---------- */
+.head{ padding-top:46px }                 /* 76 + 46 → 面包屑落在画板 y=122 */
+.crumb{
+  display:inline-flex; align-items:center; gap:9px;
+  margin:0; font-size:12px; font-weight:600; line-height:15px;
+  letter-spacing:1.68px; color:var(--crumb); text-decoration:none;
+  transition:color .2s ease;
+}
+.crumb:hover{ color:var(--title) }
+.crumb .arw{ transition:transform .22s ease }
+.crumb:hover .arw{ transform:translateX(-3px) }
+.head h1{
+  margin:27px 0 0; font-size:44px; font-weight:700; line-height:53px; color:var(--title);
+}
+.lede{ margin:15px 0 0; font-size:14.5px; line-height:18px; color:var(--body) }
+
+/* ---------- 特写块 ---------- */
+.piece{
+  display:grid; grid-template-columns:var(--col-l) 1fr;
+  align-items:start;
+}
+.piece + .piece{ margin-top:115px }       /* 745 → 860 */
+#robot{ margin-top:50px }                 /* 250 → 300 */
+
+/* 文字列与图列在两块里互换；Figma 两块的图都不是列心对齐，
+   所以用 Figma 实测的左偏移，而不是简单居中 */
+#robot  .txt{ grid-column:2 }
+#robot  .fig{ grid-column:1; grid-row:1; margin-left:155px }   /* 307 − 152 */
+#soflow .txt{ grid-column:1 }
+#soflow .fig{ grid-column:2; grid-row:1; margin-left:100px }   /* 868 − 768 */
+/* MORPH 的图贴着页面左边线（Figma x=152 = --pad），所以不用再左偏 */
+#morph  .txt{ grid-column:2 }
+#morph  .fig{ grid-column:1; grid-row:1; margin-left:0 }
+
+/* Figma 里三块的图相对各自标题的错位量都不一样：
+     机器人  +7（标题 300 → 图 307）
+     Soflow  +6（标题 860 → 图 866）
+     MORPH  −32（标题 1455 → 图 1423，图比标题**高**出一截）
+   照实写，别用一个值套三块。 */
+#robot  .fig{ margin-top:7px }
+#soflow .fig{ margin-top:6px }
+#morph  .fig{ margin-top:-32px }
+.fig img{
+  display:block;
+  filter:drop-shadow(0 22px 30px rgba(62,52,42,.16));
+}
+
+.p-nm{
+  margin:0; font-size:28px; font-weight:700; line-height:34px; color:var(--title);
+}
+.p-kicker{
+  margin:6px 0 0; font-size:11px; font-weight:600; line-height:13px;
+  letter-spacing:1.76px; color:var(--accent);
+}
+.feats{ margin:25px 0 0 }                 /* 353 → 378 */
+.feat + .feat{ margin-top:8px }
+.feat dt{
+  margin:0; font-size:13px; font-weight:600; line-height:16px; color:var(--title);
+}
+.feat dd{
+  margin:6px 0 0; max-width:500px;
+  font-size:12.5px; font-weight:400; line-height:165%; color:var(--body);
+}
+
+footer.foot{
+  margin-top:80px; padding-bottom:56px;
+  display:flex; justify-content:space-between;
+  font-family:var(--mono); font-weight:700; font-size:9.8px;
+  letter-spacing:1.32px; color:var(--meta);
+}
+
+.rv{ opacity:0; transition:opacity .6s ease }
+.rv.in{ opacity:1 }
+@media (prefers-reduced-motion:reduce){ .rv{ opacity:1; transition:none } }
+
+@media (max-width:1300px){ :root{ --pad:56px; --col-l:1fr } }
+@media (max-width:980px){
+  .piece{ grid-template-columns:1fr; gap:40px }
+  #robot .txt, #soflow .txt, #morph .txt{ grid-column:1; grid-row:2 }
+  #robot .fig, #soflow .fig, #morph .fig{ grid-column:1; grid-row:1;
+    margin-left:0; margin-top:0; justify-self:center }
+  .piece + .piece{ margin-top:80px }
+}
+@media (max-width:640px){
+  :root{ --pad:24px }
+  .head h1{ font-size:32px; line-height:40px }
+  .fig img{ max-width:100%; height:auto }
+}
+</style>
+</head>
+
+<body>
+
+<header class="nav">
+  <div class="nav-in">
+    <a class="brand" href="./index.html" aria-label="MNEMOSYNE">
+      <img src="assets/logo-dark.png" alt="MNEMOSYNE">
+    </a>
+    <div class="nav-r">
+      <a class="contact" href="mailto:zhoushichen0311@gmail.com">Contact</a>
+      <button class="burger" id="burger" aria-expanded="false" aria-controls="menu" aria-label="Menu">
+        <i></i><i></i><i></i>
+      </button>
+    </div>
+  </div>
+  <nav class="menu" id="menu" data-open="false" aria-label="Sections">
+    <ul>
+      <li><a href="./index.html#about"><span class="no">01</span>About</a></li>
+      <li><a href="./research.html"><span class="no">02</span>Research</a></li>
+      <li><a href="./project.html"><span class="no">03</span>Project</a></li>
+      <li><a href="./library.html" aria-current="page"><span class="no">04</span>Library</a></li>
+      <li><a href="./cube-system.html"><span class="no">05</span>Cube System</a></li>
+      <li><a href="./core-system.html"><span class="no">06</span>Core System</a></li>
+      <li><a href="./home-file-empty.html"><span class="no">07</span>Home File</a></li>
+    </ul>
+  </nav>
+</header>
+
+<main>
+  <div class="wrap">
+
+    <div class="head">
+      <a class="crumb" href="./library.html">
+        <svg class="arw" width="11" height="9" viewBox="0 0 11 9" fill="none" aria-hidden="true">
+          <path d="M11 4.5H1M4 1 .5 4.5 4 8" stroke="currentColor" stroke-width="1.6"
+                stroke-linecap="round" stroke-linejoin="round"/></svg>
+        LIBRARY&nbsp;&nbsp;/&nbsp;&nbsp;SPECIFIC FURNITURE
+      </a>
+      <h1>Specific Furniture</h1>
+      <!-- Figma（560:74）这句还写着 Two，那是加第三件之前留下的。
+           页面上是三件，这里跟着实际数量走，写 Three。 -->
+      <p class="lede">Three purpose-built pieces that move with the resident, beyond the static cube families.</p>
+    </div>
+
+    <!-- ── 01 机器人：图左，文右 ── -->
+    <section class="piece rv" id="robot">
+      <div class="fig">
+        <!-- Figma 190×438；用去背图真实比例 0.427 换算 -->
+        <img src="assets/library/robot.webp" alt="MNEMO care robot"
+             width="187" height="438" style="width:187px;height:438px" decoding="async">
+      </div>
+      <div class="txt">
+        <h2 class="p-nm">MNEMO ROBOT</h2>
+        <p class="p-kicker">CARE COMPANION · STORAGE · SAFETY</p>
+        <dl class="feats">
+          <div class="feat">
+            <dt>Smart Panel</dt>
+            <dd>A clear touch interface for reminders, status feedback and daily care information.</dd>
+          </div>
+          <div class="feat">
+            <dt>Mobile Care Storage</dt>
+            <dd>Stores and delivers essential items, cutting walking distance and physical strain.</dd>
+          </div>
+          <div class="feat">
+            <dt>Safety &amp; Emergency Monitoring</dt>
+            <dd>Infrared sensors detect falls or unusual activity and trigger assistance automatically.</dd>
+          </div>
+          <div class="feat">
+            <dt>Emotional &amp; Interaction Status</dt>
+            <dd>Standby, listening, reminder and assistance states, readable at a glance.</dd>
+          </div>
+        </dl>
+      </div>
+    </section>
+
+    <!-- ── 02 Soflow：文左，图右 ── -->
+    <section class="piece rv" id="soflow">
+      <div class="txt">
+        <h2 class="p-nm">SOFLOW SOFA</h2>
+        <p class="p-kicker">SOFA-WHEELCHAIR INTEGRATION</p>
+        <dl class="feats">
+          <div class="feat">
+            <dt>Soft Panel</dt>
+            <dd>A seamless fabric panel, easy to clean, cushioning collisions while staying comfortable.</dd>
+          </div>
+          <div class="feat">
+            <dt>Foldable Armrests</dt>
+            <dd>The wheelchair folds into the sofa or bed edge and becomes part of the furniture.</dd>
+          </div>
+          <div class="feat">
+            <dt>Intelligent Control Panel</dt>
+            <dd>A simple control surface that lets seniors drive the chair without menus.</dd>
+          </div>
+          <div class="feat">
+            <dt>Foot Pedal Design</dt>
+            <dd>Footrests disappear when docked; edge lighting shows the pedal area at night.</dd>
+          </div>
+        </dl>
+      </div>
+      <div class="fig">
+        <!-- Figma 371×474；去背图真实比例 0.781 -->
+        <img src="assets/library/soflow.webp" alt="SOFLOW sofa-wheelchair"
+             width="370" height="474" style="width:370px;height:474px"
+             loading="lazy" decoding="async">
+      </div>
+    </section>
+
+    <!-- ── 03 MORPH：图左，文右（Figma 3388:93 / 3388:106…115） ── -->
+    <section class="piece rv" id="morph">
+      <div class="fig">
+        <!-- Figma 548×466；去背 PNG 原始 2192×1864，比例 1.176，正好一致，没裁过 -->
+        <img src="assets/library/morph.webp" alt="MORPH convertible coffee and dining table"
+             width="548" height="466" style="width:548px;height:466px"
+             loading="lazy" decoding="async">
+      </div>
+      <div class="txt">
+        <h2 class="p-nm">MORPH</h2>
+        <p class="p-kicker">CONVERTIBLE COFFEE &amp; DINING TABLE</p>
+        <dl class="feats">
+          <div class="feat">
+            <dt>Convertible Tabletop</dt>
+            <dd>Switches between coffee-table and dining-table modes to support different everyday
+                activities in one compact footprint.</dd>
+          </div>
+          <div class="feat">
+            <dt>Horizontal Sliding System</dt>
+            <dd>The tabletop moves outward to create additional usable space without requiring the
+                furniture itself to be relocated.</dd>
+          </div>
+          <div class="feat">
+            <dt>Vertical Lift Mechanism</dt>
+            <dd>Raises the surface to dining height, reducing bending and supporting a more
+                comfortable seated posture.</dd>
+          </div>
+          <div class="feat">
+            <dt>Telescopic Extension Support</dt>
+            <dd>Integrated supports extend with the tabletop to provide a stable, enlarged surface
+                for dining and daily use.</dd>
+          </div>
+        </dl>
+      </div>
+    </section>
+
+    <footer class="foot">
+      <span>ADAPTIVE BY DESIGN</span>
+      <span>300MM CUBE SYSTEM</span>
+    </footer>
+
+  </div>
+</main>
+
+<script>
+/* 汉堡菜单 */
+(function(){
+  var b = document.getElementById('burger'), m = document.getElementById('menu'), open = false;
+  function set(v){
+    open = v;
+    b.setAttribute('aria-expanded', open ? 'true' : 'false');
+    m.dataset.open = open ? 'true' : 'false';
+    document.body.style.overflow = open ? 'hidden' : '';   /* 全屏面板期间锁滚动 */
+  }
+  b.addEventListener('click', function(e){ e.stopPropagation(); set(!open); });
+  /* 面板铺满视口后，点空白处关闭是最自然的关法；点条目也一并关掉 */
+  m.addEventListener('click', function(){ set(false); });
+  document.addEventListener('click', function(e){ if (!e.target.closest('.nav')) set(false); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') set(false); });
+})();
+
+/* 滚动淡入 */
+(function(){
+  var items = document.querySelectorAll('.rv');
+  if (!('IntersectionObserver' in window)){
+    items.forEach(function(el){ el.classList.add('in'); });
+    return;
+  }
+  var io = new IntersectionObserver(function(en){
+    en.forEach(function(e){
+      if (!e.isIntersecting) return;
+      e.target.classList.add('in'); io.unobserve(e.target);
+    });
+  }, { rootMargin:'0px 0px -10% 0px', threshold:.1 });
+  items.forEach(function(el){ io.observe(el); });
+})();
+</script>
+
+</body>
+</html>

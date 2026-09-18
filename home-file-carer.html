@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MNEMOSYNE — Client file</title>
+
+<!-- ============================================================
+     MNEMO · 医护人员版 · 档案页（home file）
+     ------------------------------------------------------------
+     参照 Figma：2325:65「CARER · Home file」
+     内容左边距对齐五步流程：x=121（Figma 那张还是 140，已知差异）
+
+     ⚠️ 这一版**只渲染真实存在的数据**。
+     Figma 上画的是"这份档案跑了半年之后"的满状态：
+     七次评分的趋势线、14 条访视记录、signed off 4 of 6、
+     30 天监测热力条 —— 这些流程一次都产不出来。
+     照抄就等于屏幕上七成数字是编的。
+
+     所以：
+       · 趋势图 → 一个点 + 「第二次访视之后才会连成线」
+       · 30 天热力条 → 换成「本次改动」（真的，来自第 4 步）
+       · 14 条访视记录 → 每条实测值一行，BASIS 列是真的
+       · Not recorded yet → 真的算哪些字段还空着
+     数据源：sessionStorage['mnemo:carer']，由五步流程写入。
+     ============================================================ -->
+
+<style>
+@font-face{ font-family:'InterLocal'; src:url('assets/fonts/inter-var.woff2') format('woff2-variations');
+  font-weight:100 900; font-style:normal; font-display:block; }
+@font-face{ font-family:'SpaceMonoLocal'; src:url('assets/fonts/space-mono-700.woff2') format('woff2');
+  font-weight:700; font-style:normal; font-display:block; }
+</style>
+
+<style>
+:root{
+  --cream-a:#F8ECDC; --cream-b:#F1ECE5;
+  --ink:#1A1917; --mut:#736E66; --faint:#948F87; --hint:#B0A99D; --mono-c:#8A8378;
+  --hair:#DEDAD2; --line:#CFC8BB; --hair-2:#ECE7DE;
+  --white:#FFFFFF; --soft:#F1EAE0; --chipbg:#E7DED1; --plan-bg:#F6F3EE;
+  --sand:#EFE6D8; --clay:#F5E5D8; --sage:#E2EBE1; --sky:#E0E9F1; --okbg:#E8EEE6;
+  --dark:#0E0D0F; --dark-mut:#8F8A82; --dark-faint:#615C55;
+  --accent:#ED7119; --accent-d:#B0570F; --ok:#4F6A48; --amber:#E0A94F;
+  --r-card:14px;
+}
+*,*::before,*::after{ box-sizing:border-box }
+/* ⚠️ 2026-09-17 补：浏览器自带的 [hidden]{display:none} 在 UA 样式表里，
+   作者写的**任何** display 声明都能压过它。这一页有好几个 display:inline-flex /
+   display:flex 的元素要靠 hidden 收起来（#demobar、#seeex、#gapsNone、#histEmpty），
+   不加这条就会出现「el.hidden = true 了，东西还在屏幕上」。
+   这个坑在本人版和医护版第 4 步都犯过一次了。 */
+[hidden]{ display:none !important }
+p,h1,h2,ul,li{ margin:0 }
+ul{ padding:0; list-style:none }
+html{ -webkit-text-size-adjust:100%; background:var(--cream-b) }
+body{
+  margin:0; font-family:'InterLocal','Inter',system-ui,-apple-system,'Segoe UI','PingFang SC',sans-serif;
+  color:var(--ink); background:
+    url('assets/bg/bg-family-carer.webp') center center / cover no-repeat fixed,
+    linear-gradient(160deg,var(--cream-a) 0%,var(--cream-b) 100%);
+  -webkit-font-smoothing:antialiased; min-height:100dvh; overflow-x:hidden;
+}
+.mono{ font-family:'SpaceMonoLocal','Space Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-weight:700; text-transform:uppercase; letter-spacing:.09em; }
+
+.stagewrap{ width:100%; display:flex; justify-content:center; overflow:hidden }
+.stage{ position:relative; width:1440px; height:1480px; transform-origin:top center; transform:scale(var(--k,1)); flex:none }
+
+/* ── 左侧导航（档案页是仪表盘，不是向导，所以是导航不是退出钮） ── */
+.logo{ position:absolute; left:34px; top:38px; width:68px; height:68px; object-fit:contain }
+/* ── logo 可点（2026-09-17）────────────────────────
+   这个 logo 原来是一张干瞊眼的 <img>。家属版、本人版、身份页的 logo
+   都包在 <a href="./index.html"> 里、点一下回首页，只有医护版没包。
+   现在补上：定位挪到外面这层 <a> 上，图片本身还是 68×68、
+   还在 left:34 top:38，Figma 的位置和尺寸一点没变。 */
+.logo-a{ position:absolute; left:34px; top:38px; width:68px; height:68px;
+  display:block; border-radius:50% }
+.logo-a .logo{ position:static; width:100%; height:100% }
+.logo-a:focus-visible{ outline:2px solid var(--accent); outline-offset:3px }
+.rail{ position:absolute; left:34px; width:68px; background:var(--white); border-radius:34px }
+/* ── 田字格 = 工具栏开关（2026-09-17）─────────────────
+   和家属版 home-file.html 是同一套做法，只是这一版是绝对定位。
+   两条白轨的高度写在标签里的行内 style 上（Figma 导出来就是这样），
+   行内样式的权重 CSS 压不过，所以高度交给 JS 直接改 style.height，
+   这里只负责给它一条过渡曲线。
+   收起后第一条正好剩 10+48+10 = 68px，和 width 一样，圆角 34px——
+   缩成一个正圆，跟上面的 logo 同一个尺寸。 */
+.rail{ transition:height .26s cubic-bezier(.4,0,.2,1), opacity .17s ease,
+                  transform .26s cubic-bezier(.4,0,.2,1) }
+.rail .rb.tuck{ transition:opacity .17s ease, transform .26s cubic-bezier(.4,0,.2,1),
+                           background .16s ease }
+.is-tucked .rb.tuck{ opacity:0; transform:scale(.55); pointer-events:none }
+.is-tucked .rail--more{ opacity:0; transform:scale(.8); pointer-events:none }
+/* 田字格现在是能按的了，光标和按下去的反馈要跟上（原来是 cursor:default）*/
+.rail .rb.on.rb--toggle{ cursor:pointer }
+.rail .rb.on.rb--toggle:active{ transform:scale(.94) }
+.no-anim, .no-anim *{ transition:none !important }
+.rail .rb{ position:absolute; left:10px; width:48px; height:48px; border-radius:16px;
+  display:grid; place-items:center; border:0; background:transparent; padding:0;
+  cursor:pointer; color:inherit; text-decoration:none;
+  transition:background .16s ease, transform .12s ease }
+.rail .rb:hover{ background:var(--soft) }
+.rail .rb:active{ transform:scale(.94) }
+.rail .rb:focus-visible{ outline:2px solid var(--accent); outline-offset:2px }
+/* 当前这一页那一个：黑底，而且不该还表现得能按 */
+.rail .rb.on{ background:var(--ink); cursor:default }
+.rail .rb.on:hover{ background:var(--ink) }
+.rail .rb.on:active{ transform:none }
+.rail .rb svg{ display:block }
+.avatar{ position:absolute; left:40px; top:1318px; width:56px; height:56px; border-radius:50%;
+  background:var(--chipbg); display:grid; place-items:center; font-size:22px; font-weight:600; color:var(--white) }
+
+/* ── 顶部 ───────────────────────────────────────────────── */
+.back{ position:absolute; left:121px; top:36px; font-size:12px; color:var(--mut); text-decoration:none }
+.back:hover{ color:var(--accent-d) }
+h1.who{ position:absolute; left:121px; top:54px; width:700px; font-size:34px; line-height:1.1;
+  letter-spacing:-.022em; font-weight:700 }
+h1.who.empty{ color:var(--hint); font-weight:400 }
+.meta{ position:absolute; left:121px; top:104px; width:800px; font-size:14.5px; line-height:21px; color:var(--mut) }
+
+.search{ position:absolute; left:951px; top:46px; width:262px; height:48px; border-radius:24px;
+  background:var(--white); border:1px solid var(--hair); padding:0 22px;
+  font-family:inherit; font-size:13.5px; color:var(--ink); outline:0;
+  transition:border-color .16s ease, box-shadow .2s ease }
+.search::placeholder{ color:var(--hint) }
+.search:focus{ border-color:var(--accent); box-shadow:0 0 0 3px rgba(237,113,25,.16) }
+/* 搜索的高亮落在**行**上，不是整张卡 —— 这一屏不滚动，只能靠明暗指路。
+   对得上的那一行描一圈橙边，同一张卡里对不上的行压暗；
+   整张卡一条都没中就整卡压暗。 */
+.findnote{ position:absolute; left:951px; top:100px; width:262px; margin:0;
+  font-size:9.5px; color:var(--accent-d); line-height:14px }
+.card.dim, #changed.dim, .frow.dim{ opacity:.3; transition:opacity .2s ease }
+.frow.hit{ box-shadow:0 0 0 2px var(--accent); border-radius:8px;
+  transition:box-shadow .2s ease }
+.card.hitcard, #changed.hitcard{ box-shadow:0 0 0 1px var(--accent) }
+.rec{ position:absolute; right:48px; top:46px; height:48px; padding:0 22px; border-radius:24px;
+  background:var(--ink); border:0; display:flex; align-items:center; gap:10px; cursor:pointer;
+  font-family:inherit; font-size:13.5px; font-weight:600; color:#F6EFE5; text-decoration:none;
+  transition:transform .14s ease, box-shadow .2s ease }
+.rec:hover{ transform:translateY(-1px); box-shadow:0 8px 20px rgba(40,32,22,.22) }
+.rec b{ color:var(--accent); font-size:17px; line-height:1 }
+
+/* ── KPI ────────────────────────────────────────────────── */
+.kpi{ position:absolute; top:160px; width:302px; height:112px; border-radius:var(--r-card) }
+.kpi .k{ position:absolute; left:24px; top:18px; font-size:8.5px; color:var(--mono-c) }
+.kpi .v{ position:absolute; left:24px; top:38px; font-size:30px; line-height:40px; font-weight:700;
+  letter-spacing:-.02em; color:var(--ink) }
+.kpi .s{ position:absolute; left:24px; top:82px; width:258px; font-size:11.5px; line-height:15px; color:var(--mut) }
+.kpi .s.acc{ color:var(--accent-d) }
+
+/* ── 卡片通用 ───────────────────────────────────────────── */
+.card{ position:absolute; background:var(--white); border:1px solid var(--hair); border-radius:var(--r-card) }
+.card > .t{ position:absolute; left:30px; top:26px; font-size:19px; line-height:23px; font-weight:600; letter-spacing:-.01em }
+.card > .st{ position:absolute; left:30px; top:54px; width:600px; font-size:12px; line-height:15px; color:var(--mut) }
+.card .hair{ position:absolute; height:1px; background:var(--hair) }
+.card .foot{ position:absolute; font-size:8.5px; color:var(--faint) }
+
+/* ── 示例档案 ?demo=1（2026-09-17）─────────────────────
+   和家属版 home-file.html 同一套做法、同一个开关名。
+   要改什么不是我拍脑袋 —— 07-医护版实现记录.md 里列了一张表，
+   说清了 Figma 满状态和现在这个首次访视态差在哪里，就改那几项。
+
+   为什么要腾出顶上那 64px：
+   这一页是 1440×1480 的定位画布，每个元素都写死了 top，
+   没有「插一行」这种操作。给 #stage 加一条 64px 的透明上边框，
+   绝对定位子元素是从 **padding 盒**算起的，于是整屏原样下移 64px，
+   一个 top 都不用改。高度跟着加 64（box-sizing 是 border-box，
+   不加的话底部会被 stagewrap 的 overflow:hidden 裁掉）。
+   fitStage 是现读 stage.offsetHeight 的，所以只要在 C.boot() 之前加上这个
+   class，缩放自己就算对了。 */
+#stage.is-demo{ border-top:64px solid transparent; height:1544px }
+.demobar{
+  position:absolute; left:121px; right:48px; top:-56px; height:44px;
+  display:flex; align-items:center; gap:16px; padding:0 20px;
+  background:#2B2823; color:#D8D2C9; border-radius:14px;
+  font-size:11.5px; line-height:1.4;
+}
+.demobar b{ color:var(--amber); font-weight:600; letter-spacing:.08em; font-size:9px; flex:none }
+.demobar a{
+  margin-left:auto; color:#F1ECE4; font-weight:600; text-decoration:none;
+  white-space:nowrap; border-bottom:1px solid #5A554D; padding-bottom:2px;
+  transition:border-color .16s ease;
+}
+.demobar a:hover{ border-bottom-color:var(--accent) }
+/* 入口放在趋势卡那句「One recording so far…」底下 ——
+   读到那里自然会想知道「连成线之后长什么样」。 */
+#trend .exlink{
+  position:absolute; left:30px; top:74px;
+  display:inline-flex; align-items:center; gap:7px;
+  font-size:11px; font-weight:600; color:var(--accent-d); text-decoration:none;
+  border-bottom:1px solid transparent; padding-bottom:2px;
+  transition:border-color .16s ease;
+}
+#trend .exlink:hover{ border-bottom-color:var(--accent-d) }
+/* ⚠️ 上面第 153 行附近有一条 `#trend svg{ position:absolute; left:30px; top:96px }`——
+   它是为那张折线图写的，但选择器是「#trend 里的所有 svg」，
+   把这条链接里的小箭头也插到图表左上角去了。拉回来。 */
+#trend .exlink svg{ position:static; left:auto; top:auto; flex:none }
+/* 示例入口之二：趋势卡右上角的小胶囊。
+   样式照着下面 #hist 那个「All time ▾」写，让它看起来就是
+   这张卡自己的控件，而不是外来的东西。
+   副标题底下那条橙字入口**保留** —— 两个都在，先看到哪个都行。 */
+#trend .expill{
+  position:absolute; right:30px; top:56px; height:32px; padding:0 16px; border-radius:16px;
+  border:1px solid var(--line); background:var(--white);
+  display:inline-flex; align-items:center; gap:8px;
+  font-size:11.5px; font-weight:600; color:var(--accent-d); text-decoration:none;
+  transition:border-color .16s ease, background .16s ease;
+}
+#trend .expill:hover{ border-color:var(--accent); background:#FFF6EF }
+#trend .expill:focus-visible{ outline:2px solid var(--accent); outline-offset:2px }
+/* 和上面同一个坑：#trend svg 那条规则会把这个箭头也插到图表里 */
+#trend .expill svg{ position:static; left:auto; top:auto; flex:none }
+#trend .exlink:focus-visible{ outline:2px solid var(--accent); outline-offset:3px }
+
+/* 趋势 */
+#trend{ left:121px; top:296px; width:779px; height:360px }
+#trend .rng{ position:absolute; right:30px; top:32px; font-size:8.5px; color:var(--faint) }
+#trend svg{ position:absolute; left:30px; top:96px }
+#trend .cap{ position:absolute; left:30px; top:324px; font-size:8.5px; color:var(--faint) }
+
+/* 本次改动（深色） */
+#changed{ position:absolute; left:924px; top:296px; width:468px; height:360px;
+  background:var(--dark); border-radius:var(--r-card) }
+#changed .t{ position:absolute; left:30px; top:24px; font-size:17.5px; line-height:24px; font-weight:600; color:#fff }
+#changed .st{ position:absolute; left:30px; top:50px; width:400px; font-size:11px; line-height:15px; color:var(--dark-mut) }
+#changed .pill{ position:absolute; right:30px; top:24px; height:25px; padding:0 13px; border-radius:12.5px;
+  border:1px solid #6d5a30; display:flex; align-items:center; gap:7px; font-size:8px; color:var(--amber) }
+#changed .pill em{ width:7px; height:7px; border-radius:50%; background:var(--amber); font-style:normal }
+#changed .hr{ position:absolute; left:30px; width:408px; height:1px; background:#2A2724 }
+#changed ul{ position:absolute; left:30px; top:100px; width:408px }
+#changed li{ position:relative; height:56px }
+#changed li .d{ position:absolute; left:0; top:5px; width:9px; height:9px; border-radius:50%; background:var(--amber) }
+#changed li .tm{ position:absolute; left:18px; top:2px; font-size:8.5px; color:var(--dark-mut);
+  font-family:'SpaceMonoLocal','Space Mono',monospace; font-weight:700; letter-spacing:.09em }
+#changed li .w{ position:absolute; left:18px; top:16px; width:300px; font-size:12.5px; line-height:17px;
+  font-weight:500; color:#fff }
+#changed li .b{ position:absolute; left:18px; top:34px; width:300px; font-size:11px; line-height:15px; color:var(--dark-mut) }
+#changed li .ot{ position:absolute; right:0; top:14px; font-size:9px; color:var(--amber);
+  font-family:'SpaceMonoLocal','Space Mono',monospace; font-weight:700; letter-spacing:.09em }
+#changed .lk{ position:absolute; left:30px; bottom:26px; font-size:12.5px; font-weight:500; color:#fff;
+  border-bottom:1px solid #fff; padding-bottom:3px }
+#changed .empty{ position:absolute; left:30px; top:110px; width:408px; font-size:12.5px; line-height:18px; color:var(--dark-mut) }
+
+/* 房间 */
+#room{ left:121px; top:680px; width:368px; height:176px }
+#room .t{ font-size:17px; top:16px; left:26px }
+#room .st{ top:40px; left:26px; width:300px; font-size:11.5px }
+#room .thumb{ position:absolute; left:26px; top:74px; width:120px; height:78px; border-radius:8px;
+  background:var(--plan-bg); border:1px solid var(--hair); overflow:hidden; display:grid; place-items:center }
+#room .thumb svg{ width:72px; height:72px }
+#room .spec{ position:absolute; left:166px; top:70px; font-size:8.5px; color:var(--mut) }
+#room .l1{ position:absolute; left:166px; top:86px; width:176px; font-size:13px; line-height:17px; font-weight:500 }
+#room .l2{ position:absolute; left:166px; top:104px; width:176px; font-size:13px; line-height:17px; font-weight:500 }
+#room .go{ position:absolute; left:166px; top:128px; height:26px; padding:0 14px; border-radius:13px;
+  border:1px solid var(--line); display:inline-flex; align-items:center; font-size:11.5px; color:var(--mut);
+  text-decoration:none }
+#room .go:hover{ border-color:var(--mut); color:var(--ink) }
+
+/* 还没记录 */
+#gaps{ left:121px; top:880px; width:368px; height:176px }
+#gaps .t{ font-size:17px; top:16px; left:26px }
+#gaps .st{ top:40px; left:26px; width:316px; font-size:11.5px }
+/* 这张卡只有 176 高，里面要塞下：标题 + 副标 + 最多 3 条 + 「还有 N 条」
+   + 分隔线 + 底部那行 mono。原来 li 是 25 高、ul 从 70 起，四行就排到 170，
+   而分隔线在 146、mono 在 155 —— 「and 2 more」直接压在它们身上。
+   算清楚的排布（都是相对卡片顶边）：
+       标题 16–37 · 副标 40–55 · 列表 62 起
+       三条 × 22  = 62–128
+       「还有 N 条」 128–148（自己一行，矮一点）
+       分隔线 153 · mono 159–170 · 卡片底 176，留 6px
+   条目从 25 收到 22 不挤：字号 12、行高 16，上下各还有 3px。 */
+#gaps ul{ position:absolute; left:26px; top:62px; width:316px }
+#gaps li{ position:relative; height:22px; font-size:12px; line-height:16px; color:var(--ink); font-weight:500; padding-left:18px }
+#gaps li em{ position:absolute; left:0; top:3px; width:8px; height:8px; border-radius:2px;
+  border:1px solid var(--faint); font-style:normal }
+#gaps li span{ font-weight:400; color:var(--faint) }
+/* 「还有 N 条」不是一条记录，是一句汇总 —— 没有勾选框，字也小半号 */
+#gaps li.more{ height:20px; padding-top:4px; font-size:11.5px; font-weight:400; color:var(--faint) }
+#gaps .none{ position:absolute; left:26px; top:74px; width:316px; font-size:12.5px; line-height:18px; color:var(--ok) }
+
+/* 档案上还有谁 */
+#who{ left:513px; top:680px; width:879px; height:376px }
+#who .t{ top:30px }
+#who .st{ top:56px }
+#who .row{ position:absolute; left:30px; width:819px; height:62px; border-radius:12px; background:#F8F6F3 }
+#who .row .av{ position:absolute; left:16px; top:11px; width:40px; height:40px; border-radius:50%; background:#C6BDAE }
+#who .row .n{ position:absolute; left:68px; top:13px; font-size:14px; line-height:17px; font-weight:600 }
+#who .row .r{ position:absolute; left:68px; top:33px; font-size:11.5px; line-height:14px; color:var(--mut) }
+#who .row .p{ position:absolute; left:330px; top:24px; width:330px; font-size:11.5px; line-height:14px; color:var(--mut) }
+#who .row .g{ position:absolute; right:16px; top:17px; height:28px; padding:0 14px; border-radius:14px;
+  display:flex; align-items:center; font-size:11.5px; font-weight:500; background:var(--okbg); color:var(--ok) }
+#who .row .g.warn{ background:transparent; border:1px solid var(--accent-d); color:var(--accent-d) }
+#who .row .g.off{ background:transparent; border:1px solid var(--line); color:var(--hint) }
+#who .foot{ left:30px; top:352px }
+
+/* 访视记录 */
+#hist{ left:121px; top:1080px; width:1271px; height:352px }
+#hist .t{ top:28px }
+#hist .st{ top:54px }
+#hist .filter{ position:absolute; right:30px; top:28px; height:32px; padding:0 18px; border-radius:16px;
+  border:1px solid var(--line); display:flex; align-items:center; gap:8px; font-size:11.5px;
+  font-weight:500; color:#403D38 }
+#hist .th{ position:absolute; top:96px; font-size:8.5px; color:var(--faint) }
+#hist .tr{ position:absolute; left:30px; width:1211px; height:52px }
+#hist .tr .c{ position:absolute; top:11px }
+#hist .tr .date{ font-size:9px; color:var(--mut); font-family:'SpaceMonoLocal','Space Mono',monospace;
+  font-weight:700; letter-spacing:.09em; top:18px }
+#hist .tr .nm{ font-size:12.5px; line-height:16px; font-weight:600; top:11px }
+#hist .tr .rl{ font-size:11px; line-height:14px; color:var(--faint); top:29px }
+#hist .tr .wt{ font-size:12.5px; line-height:16px; font-weight:500; top:11px }
+#hist .tr .wb{ font-size:11px; line-height:14px; color:var(--faint); top:29px }
+#hist .tr .bs{ font-size:11.5px; line-height:15px; color:var(--mut); top:18px }
+#hist .tr .stt{ position:absolute; top:13px; height:26px; padding:0 13px; border-radius:13px;
+  display:flex; align-items:center; gap:7px; font-size:11.5px; font-weight:500;
+  border:1px solid var(--line); color:#403D38 }
+#hist .tr .stt em{ width:6px; height:6px; border-radius:50%; font-style:normal; background:var(--ok) }
+#hist .tr .stt.wait{ border-color:#D8B478; color:#7A5410 }
+#hist .tr .stt.wait em{ background:#C08018 }
+#hist .tr .stt.none em{ display:none }
+#hist .rh{ position:absolute; left:30px; width:1211px; height:1px; background:var(--hair-2) }
+#hist .empty{ position:absolute; left:30px; top:130px; width:800px; font-size:13px; color:var(--hint) }
+#hist .foot{ left:30px; top:330px }
+
+@media (prefers-reduced-motion:reduce){ *{ animation-duration:.001ms !important; transition-duration:.001ms !important } }
+</style>
+</head>
+
+<body>
+<div class="stagewrap" id="stagewrap">
+<div class="stage" id="stage">
+
+  <!-- 只在 ?demo=1 时显示。文案把话说死：不是真人，也不是真数据。 -->
+  <div class="demobar" id="demobar" hidden>
+    <b>EXAMPLE FILE</b>
+    <span id="demobar-t"></span>
+    <a href="#" id="demobar-x">Back to the real file</a>
+  </div>
+
+  <a class="logo-a" href="./index.html" aria-label="MNEMOSYNE home">
+    <img class="logo" src="assets/logo.png" alt="MNEMOSYNE">
+  </a>
+  <div class="rail rail--main" id="railMain" style="top:160px;height:150px">
+    <!-- 2026-09-17：左边这一排原来是四个 <i>，纯装饰 —— 白色胶囊里的图标，
+         看着就是侧边栏按钮，点了什么都不会发生。换成真控件。
+         当前这一页那个保持黑底、不可按（aria-current 说明它就是这一页）。 -->
+    <button class="rb on rb--toggle" type="button" id="railtoggle" aria-current="page"
+            aria-label="Home file" aria-expanded="true" title="Hide tools" style="top:10px">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
+        <rect x="2" y="2" width="8" height="8" rx="2" fill="#ED7119"/><rect x="12" y="2" width="8" height="8" rx="2" fill="#F2B82F"/>
+        <rect x="2" y="12" width="8" height="8" rx="2" fill="#F2B82F"/><rect x="12" y="12" width="8" height="8" rx="2" fill="#ED7119"/>
+      </svg>
+    </button>
+    <a class="rb tuck" href="./flow-carer.html" aria-label="Record a visit" style="top:82px">
+      <svg width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+        <path d="M13 5v16M5 13h16" stroke="#1A1917" stroke-width="3.4" stroke-linecap="round"/>
+      </svg>
+    </a>
+  </div>
+  <div class="rail rail--more" style="top:328px;height:110px">
+    <button class="rb" type="button" style="top:10px" aria-label="Notifications"
+            data-act="say" data-say="Anything that changes on this file lands here — a new visit, an OT sign-off, a correction to something you recorded.">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
+        <path d="M4 16h14M6 16V9a5 5 0 0 1 10 0v7M9.5 19a2 2 0 0 0 3 0" stroke="#736E66" stroke-width="1.7"
+              stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+    <button class="rb" type="button" style="top:52px" aria-label="Settings"
+            data-act="say" data-say="Language, text size, and which team this file is exported to.">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
+        <path d="M3 8h16M3 15h16" stroke="#736E66" stroke-width="1.7" stroke-linecap="round"/>
+        <circle cx="8" cy="8" r="2.6" fill="#F1ECE5" stroke="#736E66" stroke-width="1.7"/>
+        <circle cx="14" cy="15" r="2.6" fill="#F1ECE5" stroke="#736E66" stroke-width="1.7"/>
+      </svg>
+    </button>
+  </div>
+  <div class="avatar" id="avatar">A</div>
+
+  <a class="back" href="./flow-carer-5.html">←&nbsp;&nbsp;Back to the visit</a>
+  <h1 class="who empty" id="hdrWho">No name yet</h1>
+  <p class="meta" id="hdrMeta">Nothing recorded</p>
+  <!-- 2026-09-17：原来这里是个 <div>，长得和输入框一模一样却打不了字。
+       换成真 input，输入时把对得上的卡片高亮、对不上的压暗，并报个数。 -->
+  <input class="search" id="find" type="search" autocomplete="off"
+         placeholder="Search this file" aria-label="Search this file">
+  <p class="findnote mono" id="findnote" hidden></p>
+  <a class="rec" href="./flow-carer.html"><b>+</b>Record a visit</a>
+
+  <!-- ══ KPI（全部来自这次访视） ═══════════════════════════ -->
+  <div class="kpi" id="k0" style="left:121px"></div>
+  <div class="kpi" id="k1" style="left:444px"></div>
+  <div class="kpi" id="k2" style="left:767px"></div>
+  <div class="kpi" id="k3" style="left:1090px"></div>
+
+  <!-- ══ 分数趋势（首次访视状态） ══════════════════════════ -->
+  <section class="card" id="trend">
+    <h2 class="t">Room score over time</h2>
+    <p class="st" id="trendSub">&nbsp;</p>
+    <p class="rng mono" id="trendRange">&nbsp;</p>
+    <a class="expill" id="seeexpill" href="?demo=1">Example file
+      <svg width="13" height="9" viewBox="0 0 13 9" fill="none" aria-hidden="true">
+        <path d="M1 4.5h10M7.6 1l3.6 3.5-3.6 3.5" stroke="currentColor"
+              stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </a>
+    <a class="exlink" id="seeex" href="?demo=1">See what this looks like after six months
+      <svg width="13" height="9" viewBox="0 0 13 9" fill="none" aria-hidden="true">
+        <path d="M1 4.5h10M7.6 1l3.6 3.5-3.6 3.5" stroke="currentColor"
+              stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </a>
+    <svg id="chart" width="719" height="216" viewBox="0 0 719 216" aria-hidden="true"></svg>
+    <p class="cap mono">DOTS ARE VISITS &nbsp;·&nbsp; THE DASHED LINE AT 8.0 IS WHERE THE TEAM RE-CHECKS</p>
+  </section>
+
+  <!-- ══ 本次改动（真的，来自第 4 步） ═════════════════════ -->
+  <section id="changed">
+    <h2 class="t">What this visit changed</h2>
+    <p class="st" id="chSub">&nbsp;</p>
+    <div class="pill" id="chPill"><em></em><span class="mono" id="chPillT"></span></div>
+    <div class="hr" style="top:84px"></div>
+    <ul id="chList"></ul>
+    <a class="lk" href="./flow-carer-4.html">Open the full log&nbsp;&nbsp;→</a>
+  </section>
+
+  <!-- ══ 房间 ══════════════════════════════════════════════ -->
+  <section class="card" id="room">
+    <h2 class="t">The room</h2>
+    <p class="st" id="roomSub">&nbsp;</p>
+    <div class="thumb" id="roomThumb"></div>
+    <p class="spec mono" id="roomSpec">&nbsp;</p>
+    <p class="l1" id="roomL1">&nbsp;</p>
+    <p class="l2" id="roomL2">&nbsp;</p>
+    <a class="go" href="./flow-carer-4.html">See the plan&nbsp;&nbsp;→</a>
+  </section>
+
+  <!-- ══ 还没记录 ══════════════════════════════════════════ -->
+  <section class="card" id="gaps">
+    <h2 class="t" id="gapsT">Not recorded yet</h2>
+    <p class="st" id="gapsSub">&nbsp;</p>
+    <ul id="gapsList"></ul>
+    <p class="none" id="gapsNone" hidden>Nothing to chase before the next visit.</p>
+    <div class="hair" style="left:26px;top:153px;width:316px"></div>
+    <p class="foot mono" style="left:26px;top:159px">BLANK IS NOT THE SAME AS FINE</p>
+  </section>
+
+  <!-- ══ 档案上还有谁 ══════════════════════════════════════ -->
+  <section class="card" id="who">
+    <h2 class="t">On this file</h2>
+    <p class="st" id="whoSub">&nbsp;</p>
+    <div class="row" id="w0" style="top:92px"></div>
+    <div class="row" id="w1" style="top:158px"></div>
+    <div class="row" id="w2" style="top:224px"></div>
+    <div class="row" id="w3" style="top:290px"></div>
+    <p class="foot mono">EVERY ENTRY CARRIES WHO RECORDED IT AND WHAT IT WAS BASED ON</p>
+  </section>
+
+  <!-- ══ 访视记录 ══════════════════════════════════════════ -->
+  <section class="card" id="hist">
+    <h2 class="t">Visit history</h2>
+    <p class="st">Every entry keeps who recorded it and what it was based on.</p>
+    <div class="filter">All time <span style="color:var(--mut)">▾</span></div>
+    <div id="thead"></div>
+    <div class="hair" style="left:30px;top:114px;width:1211px"></div>
+    <div id="rows"></div>
+    <p class="empty" id="histEmpty" hidden>Nothing recorded on this file yet. Start a visit to add the first entry.</p>
+    <div class="hair" id="histFootHair" style="left:30px;top:322px;width:1211px"></div>
+    <p class="foot mono" id="histFoot">&nbsp;</p>
+  </section>
+
+</div>
+</div>
+
+<script src="assets/personas.js?v=20260917"></script>
+<script src="assets/nlu-rules.js"></script>
+<script src="assets/toast.js"></script>
+<script src="assets/carer-core.js?v=20260917"></script>
+<script>
+(function(){
+'use strict';
+var C = window.MNEMO_CARER, $ = C.$, data = C.data;
+
+/* ── 示例档案 ?demo=1（2026-09-17）────────────────────────
+   医护版的数据全在 C.data 里，而 C.render() 默认会 C.save() 回
+   sessionStorage。所以进示例态第一件事是把读和写都断掉 ——
+   不断的话，谁点一下示例，他自己那份真档案就被盖掉了。
+   家属版那边踩过一次类似的坑（localStorage 把示例顶掉一半），
+   这一版一开始就把路封死。
+
+   示例人用 assets/personas.js 里行动那一档（Ying Zhang）——
+   和 flow-carer.html 的「Use an example」填的是同一个人、同一套说法，
+   我没另编一份。尺寸是我补的，理由写在下面。 */
+var DEMO = false, _back = '';
+try{
+  DEMO  = /[?&]demo=1\b/.test(location.search);
+  _back = (new URLSearchParams(location.search).get('back') || '').trim();
+}catch(e){}
+
+if (DEMO){
+  C.save = function(){};                        /* 绝不写回真档案 */
+  C.load = function(){ return C.data; };        /* 也不把真档案读进来 */
+  var _st = document.getElementById('stage');
+  if (_st) _st.classList.add('is-demo');        /* 要在 C.boot() 之前，fitStage 才读得到新高度 */
+  /* carer-core.js 文末已经「立刻读档」过一次了，所以要先清干净 */
+  for (var _k in C.data) C.data[_k] = '';
+  var _P = window.MNEMO_PERSONAS;
+  if (_P){
+    var _p = _P.list[0], _R = _P.recorder;      /* [0] = 行动那一档 */
+    var _S = {
+      carerName:_R.carerName, carerRole:_R.carerRole, carerTeam:_R.carerTeam,
+      name:_p.name, age:_p.age, gender:_p.pron,
+      lives:(_P.map.carer.lives[_p.lives] || _p.lives), home:_p.home,
+      homeStd:'Type C', layout:'C',
+      /* 这四个尺寸是我补的 —— persona 图上没有尺寸，而一份「跑了半年」
+         的档案这几格不能是空的。取值都在 C.LIMITS 范围内，
+         而且故意让门洞和走廊小于 Option C 的要求（900 / 1400），
+         这样「本次改动」那张卡才有东西可算 —— 它算的是真规则，
+         不是我填的结果。 */
+      doorway:'760',   bDoorway:'measured',
+      corridor:'1100', bCorridor:'measured',
+      bath:'1700',     bBath:'measured',
+      turning:'1200',  bTurning:'told',
+      signedAt:'09:14', signedBy:_R.carerName, declared:'1'
+    };
+    for (var _j in _S) if (_j in C.data) C.data[_j] = _S[_j];
+    [['mobility','mob'], ['vision','vis'], ['memory','mem']].forEach(function(pair){
+      var list = _P.words(_p, 'carer', pair[1]);
+      C.data[pair[0]] = list.join(',');
+      C.data['b' + pair[0].charAt(0).toUpperCase() + pair[0].slice(1)] = list.length ? 'records' : '';
+    });
+  }
+}
+
+/* 和第 3–5 步同一份方案数据 */
+var OPT = { A:{ base:7.6, corridor:1200, door:850, desc:'Compact services' },
+            B:{ base:7.9, corridor:1250, door:850, desc:'Daylight-first bedroom' },
+            C:{ base:8.2, corridor:1400, door:900, desc:'One loop · wide corridors' } };
+function opt(){ return OPT[data.layout] || OPT.C; }
+function typeKey(){ var m = /^Type ([ABC])$/.exec(data.homeStd || ''); return m ? m[1] : 'A'; }
+
+/* 第 4 步那份改动清单，规则在这里重算一遍（不复制状态，只复制规则） */
+function changes(){
+  /* 还没选方案 = 还没有计划 = 没有分数也没有改动。
+     默认返回 8.2（Option C 的底分）会让一份空档案显示得像做完了。 */
+  if (!data.layout) return { kept: [], needOT: 0, score: null };
+  var o = opt(), all = [], t = 0;
+  /* 原来这里发的是 09:38 / 09:39 / 09:40 —— 流程从没记过每条改动是几点做的，
+     那三个时间是编的。改成序号，位置和字号都不变。 */
+  function at(){ t++; return 'NO. ' + t; }
+  var d = parseInt(data.doorway, 10), c = parseInt(data.corridor, 10);
+  if (d > 0 && d < o.door)     all.push({ id:'door', tm:at(), w:'Doorway widened ' + d + ' → ' + o.door + ' mm', by:'from your measurement', ot:true,  cost:0.4 });
+  if (c > 0 && c < o.corridor) all.push({ id:'corr', tm:at(), w:'Corridor widened ' + c + ' → ' + o.corridor + ' mm', by:'from your measurement', ot:true,  cost:0.3 });
+  if (!data.turning || /^none$/i.test(data.turning))
+                               all.push({ id:'turn', tm:at(), w:'Turning circle added — Ø1500', by:'from your measurement', ot:true, cost:0.5 });
+  all.push({ id:'soft', tm:at(), w:'Soft edge added at the door frame', by:'by MNEMO', ot:false, cost:0.1 });
+
+  var undone = C.listGet('undone');
+  var kept = all.filter(function(x){ return undone.indexOf(x.id) < 0; });
+  var lost = all.filter(function(x){ return undone.indexOf(x.id) > -1; });
+  var score = Math.max(0, o.base - lost.reduce(function(s,x){ return s + x.cost; }, 0));
+  kept.forEach(function(x){ x.needOT = C.listHas('otFlags', x.id) ? !x.ot : x.ot; });
+  return { kept: kept, needOT: kept.filter(function(x){ return x.needOT; }).length,
+           score: Math.round(score * 10) / 10 };
+}
+
+/* 这次访视真的记下来的观察 —— 访视记录表的每一行 */
+function entries(){
+  var out = [];
+  [['doorway','bDoorway','Doorway'], ['corridor','bCorridor','Corridor'],
+   ['bath','bBath','Bath'], ['turning','bTurning','Turning space']].forEach(function(m){
+    if (!data[m[0]]) return;
+    var unit = (m[0] === 'doorway' || m[0] === 'corridor') ? ' mm' : '';
+    out.push({ what: m[2] + ' ' + data[m[0]] + unit, basis: data[m[1]] || '' });
+  });
+  return out;
+}
+
+function today(){
+  var d = new Date();
+  return String(d.getDate()) + ' ' +
+    ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'][d.getMonth()];
+}
+function todayLong(){
+  var d = new Date();
+  return ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][d.getDay()] +
+    ' ' + d.getDate() + ' ' +
+    ['January','February','March','April','May','June','July','August','September','October','November','December'][d.getMonth()];
+}
+
+/* ── 方案缩略图 ───────────────────────────────────────── */
+/* 2026-09-16：和第 3、4 步一样接了分流。三级回退，
+   mobility 落在第二级，行为完全没变。不接的话档案页上那张缩略图
+   会是 mobility 的房子，而她的记录里写的是另一批 —— 同一份档案自相矛盾。 */
+function paintThumb(){
+  var box = $('roomThumb');
+  var o = data.layout || 'C';
+  var tpl = document.getElementById('lay-' + C.track() + '-' + typeKey() + '-' + o)
+         || document.getElementById('lay-' + typeKey() + '-' + o)
+         || document.getElementById('lay-A-' + o);
+  box.innerHTML = '';
+  if (tpl && tpl.content && tpl.content.firstElementChild)
+    box.appendChild(tpl.content.firstElementChild.cloneNode(true));
+}
+fetch('assets/carer-layouts.html')
+  .then(function(r){ return r.ok ? r.text() : Promise.reject(0); })
+  .then(function(h){
+    var d = document.createElement('div'); d.style.display = 'none';
+    d.innerHTML = h; document.body.appendChild(d); paintThumb();
+  })
+  .catch(function(){});
+
+/* ── 趋势图：一次访视只有一个点，别假装有曲线 ───────────── */
+function paintChart(score){
+  /* 9.0 那条线不能贴着 svg 顶边，否则标签的上半截被裁掉 */
+  var X0 = 54, X1 = 690, Y = function(v){ return 172 - (v - 7.0) * 80; };
+  var g = ['<rect x="' + X0 + '" y="0" width="' + (X1-X0) + '" height="0" fill="none"/>'];
+  [9.0, 8.5, 8.0, 7.5, 7.0].forEach(function(v){
+    var y = Y(v);
+    if (v === 8.0){
+      g.push('<line x1="' + X0 + '" y1="' + y + '" x2="' + X1 + '" y2="' + y +
+             '" stroke="#A89F92" stroke-width="1.5" stroke-dasharray="5 4"/>');
+    } else {
+      g.push('<line x1="' + X0 + '" y1="' + y + '" x2="' + X1 + '" y2="' + y + '" stroke="#ECE7DE" stroke-width="1"/>');
+    }
+    g.push('<text x="22" y="' + (y + 3) + '" font-family="SpaceMonoLocal, monospace" font-weight="700" ' +
+           'font-size="8.5" letter-spacing="0.9" fill="' + (v === 8.0 ? '#57524A' : '#948F87') + '">' +
+           v.toFixed(1) + '</text>');
+  });
+  if (score === null){                       /* 还没有分数就别画点 */
+    $('chart').innerHTML = g.join('');
+    return;
+  }
+  /* 唯一的一个点，放在最右边 —— 时间轴上的“今天” */
+  var x = X1, y = Y(score);
+  g.push('<circle cx="' + x + '" cy="' + y + '" r="6.5" fill="#ED7119"/>');
+  g.push('<text x="' + (x - 30) + '" y="' + (y - 14) + '" font-family="InterLocal, Inter, sans-serif" ' +
+         'font-weight="700" font-size="14" fill="#B0570F">' + score.toFixed(1) + '</text>');
+  g.push('<text x="' + (x - 16) + '" y="200" font-family="SpaceMonoLocal, monospace" font-weight="700" ' +
+         'font-size="8.5" letter-spacing="0.9" fill="#948F87">TODAY</text>');
+  g.push('<text x="' + X0 + '" y="200" font-family="SpaceMonoLocal, monospace" font-weight="700" ' +
+         'font-size="8.5" letter-spacing="0.9" fill="#B0A99D">FIRST VISIT</text>');
+  $('chart').innerHTML = g.join('');
+}
+
+/* 谁能收到：和第 5 步共用内核里那一份，只从真实字段推。 */
+
+/* ── 还没记录的东西：真的去数 ─────────────────────────── */
+var FIELD_NAME = {
+  carerName:'Your name', carerRole:'Your role', carerTeam:'Your team',
+  name:'Their name', age:'Age', gender:'Gender', lives:'Lives with',
+  home:'Home type',
+  mobility:'How she gets around', vision:'Her eyesight', memory:'Her memory',
+  homeStd:'Closest standard type', doorway:'Doorway width', corridor:'Corridor width',
+  bath:'Bathroom size', turning:'Turning space'
+};
+var WHY = {
+  bath:'not measured', turning:'not measured',
+  doorway:'not measured', corridor:'not measured',
+  mobility:'never asked — nothing can be derived without it',
+  vision:'never asked', memory:'never asked'
+};
+function gaps(){
+  var keys = C.COUNTED.concat(['bath','turning']);
+  var out = [];
+  keys.forEach(function(k){
+    if (!data[k]) out.push({ n: FIELD_NAME[k] || k, w: WHY[k] || 'never asked' });
+  });
+  return out;
+}
+
+C.boot({
+  parse: function(){ return {}; },
+  apply: function(){ return []; },
+  question: function(){ return ''; },
+  ctx: function(){ return 'A care worker is looking at a client file.'; },
+  miss: function(){ return ''; },
+
+  render: function(){
+    var ch = changes(), ent = entries(), signed = !!data.signedAt;
+
+    /* 顶部。用 hdrWho / hdrMeta 而不是 fWho / fMeta：
+       内核的 paintHead() 会接管后者，而且跑在 page.render() 之后，
+       会把这里拼的那行概要覆盖掉。 */
+    $('hdrWho').textContent = data.name || 'No name yet';
+    $('hdrWho').classList.toggle('empty', !data.name);
+    var bits = [];
+    if (data.age)  bits.push(data.age);
+    if (data.home) bits.push(data.home);
+    if (data.lives && /alone/i.test(data.lives)) bits.push('lives alone');
+    /* 转介来源那一格已经不收了。改成显示最要紧的一条状况 ——
+       「72 · 一楼公寓 · 独居 · 室内轮椅」比「由 OT 转介」有用得多。 */
+    var mw = C.listGet('mobility');
+    if (mw.length) bits.push(C.needLong('mobility', mw[0], false).toLowerCase());
+    $('hdrMeta').textContent = bits.length ? bits.join('  ·  ') : 'Nothing recorded on this file yet';
+    $('avatar').textContent = (data.carerName || 'A').charAt(0).toUpperCase();
+
+    /* KPI —— 四格全部来自这次访视 */
+    var hasPlan = ch.score !== null;
+    var low = hasPlan && ch.score < 8.0;
+    [
+      { el:'k0', bg: low ? 'var(--sand)' : 'var(--sand)', stroke: low, k:'ROOM SCORE',
+        v: hasPlan ? ch.score.toFixed(1) : '—',
+        s: hasPlan ? ('As planned today · ' + opt().desc.toLowerCase()) : 'No plan chosen yet', acc: low },
+      { el:'k1', bg:'var(--white)', border:true, k:'THIS VISIT', v:'Today',
+        s: data.carerName ? ('Recorded by ' + data.carerName) : 'No recorder named yet' },
+      { el:'k2', bg:'var(--clay)', k:'OPEN ACTIONS', v: String(ch.needOT),
+        s: ch.needOT ? 'Waiting on the OT' : 'Nothing waiting on anyone' },
+      { el:'k3', bg: signed ? 'var(--sage)' : 'var(--sky)', k:'SIGNED',
+        v: signed ? data.signedAt : 'Not yet',
+        s: signed ? ('By ' + (data.signedBy || '—')) : 'Sign at the end of the visit', acc: !signed }
+    ].forEach(function(t){
+      var el = $(t.el);
+      el.style.background = t.bg;
+      el.style.border = t.stroke ? '1px solid var(--accent)' : (t.border ? '1px solid var(--hair)' : '0');
+      el.innerHTML = '<p class="k mono"></p><p class="v"></p><p class="s"></p>';
+      el.querySelector('.k').textContent = t.k;
+      el.querySelector('.v').textContent = t.v;
+      var s = el.querySelector('.s');
+      s.textContent = t.s;
+      if (t.acc) s.classList.add('acc');
+    });
+
+    /* 趋势：一次访视 = 一个点 */
+    paintChart(hasPlan ? ch.score : null);
+    $('trendSub').textContent = hasPlan
+      ? 'One recording so far. The line appears from the second visit onwards.'
+      : 'No score yet. It appears once a layout is chosen in the visit.';
+    $('trendRange').textContent = todayLong().toUpperCase();
+
+    /* 本次改动 */
+    $('chSub').textContent = ch.kept.length
+      ? (ch.kept.length + ' change' + (ch.kept.length===1?'':'s') + ' to the plan, ' + ch.needOT + ' waiting on the OT.')
+      : 'Nothing was changed in this visit.';
+    $('chPillT').textContent = ch.needOT ? (ch.needOT + ' NEED THE OT') : 'ALL CLEAR';
+    $('chPill').style.display = ch.kept.length ? '' : 'none';
+    var ul = $('chList');
+    ul.innerHTML = '';
+    ch.kept.slice(0, 4).forEach(function(c){
+      var li = document.createElement('li');
+      li.innerHTML = '<span class="d"></span><span class="tm"></span><span class="w"></span>' +
+                     '<span class="b"></span><span class="ot"></span>';
+      li.querySelector('.d').style.background = c.needOT ? 'var(--amber)' : '#4C4842';
+      li.querySelector('.tm').textContent = c.tm;
+      li.querySelector('.w').textContent = c.w;
+      li.querySelector('.b').textContent = c.by;
+      li.querySelector('.ot').textContent = c.needOT ? 'NEEDS OT' : '';
+      ul.appendChild(li);
+    });
+    if (!ch.kept.length){
+      var e = document.createElement('p');
+      e.className = 'empty';
+      e.textContent = 'Every change from this visit was undone. The plan is back to how it was generated.';
+      ul.appendChild(e);
+    }
+
+    /* 房间 */
+    $('roomSub').textContent = (data.homeStd || 'Type not chosen') +
+      '  ·  ' + (data.layout ? ('Option ' + data.layout) : 'no layout yet');
+    paintThumb();
+    var bD = data.bDoorway;
+    $('roomSpec').textContent = data.doorway
+      ? ('DOORWAY ' + C.basisLabel(bD, false) + ' TODAY')
+      : 'DOORWAY NOT MEASURED';
+    $('roomL1').textContent = data.doorway ? ('Doorway ' + data.doorway + ' mm.') : 'Doorway not measured.';
+    $('roomL2').textContent = hasPlan ? ('The plan gives ' + opt().door + ' mm.') : 'No plan chosen yet.';
+
+    /* 还没记录 */
+    var g = gaps();
+    $('gapsT').textContent = g.length ? 'Not recorded yet' : 'Nothing missing';
+    $('gapsSub').textContent = g.length
+      ? (g.length + ' thing' + (g.length===1?'':'s') + ' this file cannot answer')
+      : 'Everything this visit asked for has an answer.';
+    var gl = $('gapsList');
+    gl.innerHTML = '';
+    $('gapsNone').hidden = g.length > 0;
+    g.slice(0, 3).forEach(function(x){
+      var li = document.createElement('li');
+      li.innerHTML = '<em></em>';
+      li.appendChild(document.createTextNode(x.n + ' '));
+      var sp = document.createElement('span'); sp.textContent = '— ' + x.w;
+      li.appendChild(sp);
+      gl.appendChild(li);
+    });
+    if (g.length > 3){
+      var more = document.createElement('li');
+      more.className = 'more';
+      more.textContent = 'and ' + (g.length - 3) + ' more';
+      gl.appendChild(more);
+    }
+
+    /* 档案上还有谁 */
+    $('whoSub').textContent = 'Only what this file actually knows about. Nobody here was invented.';
+    C.people(ch.needOT, false, 4).forEach(function(p, i){
+      var el = $('w' + i);
+      el.innerHTML = '<span class="av"></span><span class="n"></span><span class="r"></span>' +
+                     '<span class="p"></span><span class="g"></span>';
+      el.querySelector('.n').textContent = p.n;
+      el.querySelector('.r').textContent = p.r;
+      el.querySelector('.p').textContent = p.p;
+      var g2 = el.querySelector('.g');
+      g2.textContent = p.g;
+      if (p.c) g2.classList.add(p.c);
+      /* 2026-09-17：Owner / You / Export / Waiting 这四个胶囊长得就是按钮，
+         原来点了什么都不会发生。现在点一下说清楚这一枚标签是什么意思。
+         ⚠️ 写的是「这一下是什么」，不写"已导出"——导出这件事确实还没接。 */
+      var SAY = {
+        'Owner':   'The file belongs to ' + (data.name || 'the resident')
+                 + '. He can take anyone off it, including you.',
+        'You':     'That is you. Your name and the basis you chose go on every line you record here.',
+        'Export':  'The whole file goes to ' + (data.carerTeam || 'your team')
+                 + ' \u2014 notes, measurements and the signed record together.',
+        'Waiting': 'These changes stay out of the shared file until someone qualified signs them off.'
+      };
+      if (SAY[p.g]){
+        g2.setAttribute('data-act','say');
+        g2.setAttribute('data-say', SAY[p.g]);
+        g2.setAttribute('role','button');
+        g2.setAttribute('tabindex','0');
+        g2.style.cursor = 'pointer';
+      }
+    });
+
+    /* 访视记录：一次观察一行，BASIS 列是真的 */
+    var COL = { date:0, who:98, what:306, basis:770, stt:980 };
+    $('thead').innerHTML = '';
+    [['DATE',COL.date],['RECORDED BY',COL.who],['WHAT WAS RECORDED',COL.what],
+     ['BASIS',COL.basis],['STATUS',COL.stt]].forEach(function(c){
+      var s = document.createElement('span');
+      s.className = 'th mono'; s.style.left = (30 + c[1]) + 'px';
+      s.textContent = c[0];
+      $('thead').appendChild(s);
+    });
+
+    var rows = $('rows');
+    rows.innerHTML = '';
+    $('histEmpty').hidden = ent.length > 0;
+    ent.slice(0, 4).forEach(function(e, i){
+      var y = 122 + i * 52;
+      if (i){
+        var hr = document.createElement('div');
+        hr.className = 'rh'; hr.style.top = (y - 1) + 'px';
+        rows.appendChild(hr);
+      }
+      var tr = document.createElement('div');
+      tr.className = 'tr'; tr.style.top = y + 'px';
+      tr.innerHTML =
+        '<span class="c date"></span><span class="c nm"></span><span class="c rl"></span>' +
+        '<span class="c wt"></span><span class="c wb"></span><span class="c bs"></span>' +
+        '<span class="stt"></span>';
+      var q = function(s){ return tr.querySelector(s); };
+      q('.date').style.left = COL.date + 'px';  q('.date').textContent = today();
+      q('.nm').style.left   = COL.who + 'px';   q('.nm').textContent   = data.carerName || '(you)';
+      q('.rl').style.left   = COL.who + 'px';   q('.rl').textContent   = (data.carerRole || 'Care worker') + ' · you';
+      q('.wt').style.left   = COL.what + 'px';  q('.wt').textContent   = e.what;
+      q('.wb').style.left   = COL.what + 'px';
+      q('.wb').textContent  = 'Before any change to the plan';
+      q('.bs').style.left   = COL.basis + 'px'; q('.bs').textContent   = C.basisLong(e.basis, false);
+      var st = q('.stt');
+      st.style.left = COL.stt + 'px';
+      st.innerHTML = '<em></em><span></span>';
+      var label = signed ? 'Signed' : (ch.needOT ? 'Waiting on OT' : 'Not signed');
+      st.querySelector('span').textContent = label;
+      if (!signed && ch.needOT) st.classList.add('wait');
+      if (!signed && !ch.needOT) st.classList.add('none');
+      rows.appendChild(tr);
+    });
+
+    var shown = Math.min(ent.length, 4);
+    $('histFoot').textContent = ent.length
+      ? ('SHOWING ' + shown + ' OF ' + ent.length + ' ENTR' + (ent.length === 1 ? 'Y' : 'IES') +
+         '  ·  NOTHING HERE CAN BE DELETED, ONLY CORRECTED')
+      : 'NOTHING RECORDED YET  ·  NOTHING HERE CAN BE DELETED, ONLY CORRECTED';
+  }
+});
+
+/* ═══ 搜索这份档案（2026-09-17）═══════════════════════════════
+   顶上那个「Search this file」原来是个 <div> —— 长得和输入框一模一样，
+   点进去打不了字。现在是真 input。
+
+   搜什么：**这份档案自己装着的东西**，一行一行地搜 ——
+     · 访视记录的每一条（日期 / 谁记的 / 记了什么 / 依据 / 状态）
+     · 这次访视改了什么
+     · 还没记下来的那几项
+     · 档案上有谁
+     · 「The room」那张卡上的户型、方案、门洞
+   不去别处查。查不到就说查不到，不猜。
+
+   这一屏是定高的 1440×960，没有滚动条，所以搜到了不能"滚过去"，
+   只能靠明暗指路：对上的那一行描橙边，同卡里没对上的行压暗，
+   一条都没中的整卡压暗。上面报一句「在哪几张卡里、共几行」。 */
+(function(){
+  var box = $('find'), note = $('findnote');
+  if (!box) return;
+
+  /* 每张卡里"一行"是什么，各不相同，在这里说清楚一次 */
+  var GROUPS = [
+    { card:'trend', name:'Room score',   rows:'' },
+    { card:'changed', name:'What changed', rows:'#chList > *' },
+    { card:'room',  name:'The room',     rows:'' },
+    { card:'gaps',  name:'Not recorded', rows:'#gapsList > *' },
+    { card:'who',   name:'On this file', rows:'#who .row' },
+    { card:'hist',  name:'Visit history',rows:'#rows > *' }
+  ];
+  function cardsOf(){
+    return GROUPS.map(function(g){
+      var el = document.getElementById(g.card);
+      return el ? { g:g, el:el,
+                    rows: g.rows ? Array.prototype.slice.call(el.querySelectorAll(g.rows)) : [] } : null;
+    }).filter(Boolean);
+  }
+  function clear(){
+    document.querySelectorAll('.dim,.hit,.hitcard,.frow').forEach(function(e){
+      e.classList.remove('dim','hit','hitcard','frow');
+    });
+    note.hidden = true; note.textContent = '';
+  }
+  function run(){
+    var q = box.value.trim().toLowerCase();
+    if (q.length < 2){ clear(); return; }
+    clear();
+    var lines = 0, cards = 0, where = [];
+    cardsOf().forEach(function(c){
+      var inCard = (c.el.textContent || '').toLowerCase().indexOf(q) > -1;
+      if (!inCard){ c.el.classList.add('dim'); return; }
+      where.push(c.g.name);
+      if (!c.rows.length){ c.el.classList.add('hitcard'); cards++; return; }
+      var any = false;
+      c.rows.forEach(function(r){
+        var on = (r.textContent || '').toLowerCase().indexOf(q) > -1;
+        r.classList.add('frow');
+        r.classList.toggle('hit', on);
+        r.classList.toggle('dim', !on);
+        if (on){ any = true; lines++; }
+      });
+      /* 卡里有这个词但没落在任何一行上（比如在标题里）：整卡描边 */
+      if (!any){ c.el.classList.add('hitcard'); cards++; }
+    });
+    /* 行和整卡分开数：一整张卡对上，不能报成「1 LINE」 */
+    var bits = [];
+    if (lines) bits.push(lines + (lines === 1 ? ' LINE' : ' LINES'));
+    if (cards) bits.push(cards + (cards === 1 ? ' CARD' : ' CARDS'));
+    note.hidden = false;
+    note.textContent = bits.length
+      ? (bits.join(', ') + '  \u00b7  ' + where.join(', ').toUpperCase())
+      : 'NOT ON THIS FILE';
+  }
+  box.addEventListener('input', run);
+  box.addEventListener('keydown', function(e){ if (e.key === 'Escape'){ box.value = ''; clear(); } });
+})();
+
+/* 四个胶囊（Owner / You / Export / Waiting）的点击由 assets/toast.js 代理。
+   键盘也要能按：span 上的 role="button" 不会自动把 Enter 变成 click。 */
+document.addEventListener('keydown', function(e){
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  var t = e.target;
+  if (!t || t.getAttribute('role') !== 'button' || !t.hasAttribute('data-act')) return;
+  e.preventDefault();
+  t.click();
+});
+
+/* ── 示例态把「流程永远产不出来」的那几块补上（2026-09-17）─────
+   07-医护版实现记录.md §七 里的那张表，就是这一段要做的事：
+
+     | Figma 上画的      | 实际做的                                |
+     | 七个点的趋势线    | 一个点 + 「第二次访视之后才会连成线」   |
+     | 14 条访视记录     | 每条实测值一行，BASIS 列是真的        |
+     | VISIT 3 OF 6     | FIRST FILE —— 这是她的第一份档案       |
+
+   那三项是时间的问题（档案跑了多久），示例态补这三项。
+
+   但文档里还列了一项我**故意不补**：
+     | Mei Zhang·孙女、R. Ellis·职业治疗师 | 删了。流程从没问过家属是谁 |
+   那两个人是编的，不是「还没跑到那一步」。就算挂了示例明牌，
+   把删掉的假人再放回去也是往回走，所以「档案上还有谁」那张卡一行都没改。
+   同理，30 天热力条也没恢复 —— 文档把它换成「本次改动」是个决定，不是妥协。 */
+if (DEMO){
+  var VISITS = [7.1, 7.3, 7.5, 7.7, 7.9, 8.0, 8.2];   /* 最后一次才跨过 8.0 那条虚线 */
+  var DATES  = ['17 SEP', '02 SEP', '11 AUG', '24 JUL'];
+
+  function chart7(){
+    /* 坐标系和 paintChart() 完全一致，只是点从 1 个变成 7 个。
+       抄一遍而不是改 paintChart，是为了不动真实那条路径一行代码。 */
+    var X0 = 54, X1 = 690, Y = function(v){ return 172 - (v - 7.0) * 80; };
+    var g = [];
+    [9.0, 8.5, 8.0, 7.5, 7.0].forEach(function(v){
+      var y = Y(v);
+      g.push(v === 8.0
+        ? '<line x1="'+X0+'" y1="'+y+'" x2="'+X1+'" y2="'+y+'" stroke="#A89F92" stroke-width="1.5" stroke-dasharray="5 4"/>'
+        : '<line x1="'+X0+'" y1="'+y+'" x2="'+X1+'" y2="'+y+'" stroke="#ECE7DE" stroke-width="1"/>');
+      g.push('<text x="22" y="'+(y+3)+'" font-family="SpaceMonoLocal, monospace" font-weight="700" '
+           + 'font-size="8.5" letter-spacing="0.9" fill="'+(v === 8.0 ? '#57524A' : '#948F87')+'">'
+           + v.toFixed(1) + '</text>');
+    });
+    var step = (X1 - X0) / (VISITS.length - 1);
+    var pts = VISITS.map(function(v, i){ return (X0 + i * step).toFixed(1) + ',' + Y(v).toFixed(1); });
+    g.push('<polyline points="'+pts.join(' ')+'" fill="none" stroke="#ED7119" stroke-width="2" '
+         + 'stroke-linejoin="round" stroke-linecap="round"/>');
+    VISITS.forEach(function(v, i){
+      var last = (i === VISITS.length - 1);
+      g.push('<circle cx="'+(X0 + i * step).toFixed(1)+'" cy="'+Y(v).toFixed(1)+'" r="'+(last ? 6.5 : 4)+'" '
+           + 'fill="'+(last ? '#ED7119' : '#fff')+'" stroke="#ED7119" stroke-width="2"/>');
+    });
+    var lv = VISITS[VISITS.length - 1];
+    g.push('<text x="'+(X1 - 30)+'" y="'+(Y(lv) - 14)+'" font-family="InterLocal, Inter, sans-serif" '
+         + 'font-weight="700" font-size="14" fill="#B0570F">' + lv.toFixed(1) + '</text>');
+    g.push('<text x="'+(X1 - 16)+'" y="200" font-family="SpaceMonoLocal, monospace" font-weight="700" '
+         + 'font-size="8.5" letter-spacing="0.9" fill="#948F87">TODAY</text>');
+    g.push('<text x="'+X0+'" y="200" font-family="SpaceMonoLocal, monospace" font-weight="700" '
+         + 'font-size="8.5" letter-spacing="0.9" fill="#B0A99D">FIRST VISIT</text>');
+    $('chart').innerHTML = g.join('');
+  }
+
+  function demoFill(){
+    $('demobar').hidden = false;
+    $('demobar-t').textContent =
+      'Ying Zhang, seven visits since March. Nothing on this page is real data \u2014 '
+      + 'it is what a care worker sees once a file has been running for a while.';
+    $('demobar-x').setAttribute('href',
+      location.pathname + (_back ? ('?plan=' + encodeURIComponent(_back)) : ''));
+    ['seeex', 'seeexpill'].forEach(function(id){ var e = $(id); if (e) e.hidden = true; });
+
+    /* ① 趋势：七个点 */
+    chart7();
+    $('trendSub').textContent =
+      'Seven visits since March. The room crossed 8.0 at the last one.';
+    $('trendRange').textContent = 'MAR 2026 \u2014 SEP 2026';
+
+    /* ② VISIT 3 OF 6：这一格本来写的是 Today，因为只有一次访视 */
+    var v1 = $('k1') && $('k1').querySelector('.v');
+    if (v1) v1.textContent = 'Visit ' + VISITS.length;
+    var s1 = $('k1') && $('k1').querySelector('.s');
+    if (s1) s1.textContent = 'Today \u00b7 recorded by ' + (data.carerName || 'you');
+
+    /* ③ 访视记录：行里的 what / basis 不动（那是上面那份数据真算出来的），
+       只把日期铺开 —— 原来四行写的都是今天。
+       记录人一律保留 Alice：再编一个同事的名字，就是文档里删掉的那类假人。 */
+    var trs = document.querySelectorAll('#rows .tr');
+    Array.prototype.forEach.call(trs, function(tr, i){
+      var dEl = tr.querySelector('.date');
+      if (dEl && DATES[i]) dEl.textContent = DATES[i];
+      var st = tr.querySelector('.stt span');
+      if (st) st.textContent = 'Signed';
+      tr.querySelector('.stt').classList.remove('wait', 'none');
+    });
+    $('histFoot').textContent =
+      'SHOWING ' + trs.length + ' OF 14 ENTRIES  \u00b7  NOTHING HERE CAN BE DELETED, ONLY CORRECTED';
+  }
+
+  /* C.render 会被语言切换等再调，包一层，否则一切换语言上面补的都没了 */
+  var _render = C.render;
+  C.render = function(){ _render(); demoFill(); };
+  C.render();
+}
+
+/* 空态那条入口：把当前的 ?plan= 存进 ?back=，退回来才还是同一套 */
+(function(){
+  var q = '';
+  try{ q = (new URLSearchParams(location.search).get('plan') || '').trim(); }catch(e){}
+  var href = location.pathname + '?demo=1' + (q ? ('&back=' + encodeURIComponent(q)) : '');
+  ['seeex', 'seeexpill'].forEach(function(id){
+    var a = $(id);
+    if (!a) return;
+    if (DEMO){ a.hidden = true; return; }
+    a.setAttribute('href', href);
+  });
+})();
+
+if (window.MNEMO_TOAST) window.MNEMO_TOAST.wire();
+/* ── 田字格 = 工具栏开关（2026-09-17）────────────────────
+   这个按钮原来是 disabled 的：它标着 aria-current="page"，就是「你在这一页」，
+   点了本来也没地方可去。现在把「收起工具栏」交给它 —— 没有抢走任何原有
+   行为，只是把一次死点击变成有用的。aria-current 保留，另加 aria-expanded。
+   高度要用 JS 改，是因为 150px 写在行内 style 上，CSS 压不过它。 */
+(function(){
+  var stage = document.getElementById('stage');
+  var main  = document.getElementById('railMain');
+  var btn   = document.getElementById('railtoggle');
+  if (!stage || !main || !btn) return;
+  var FULL = main.style.height || (main.offsetHeight + 'px');   /* 行内那个 150px */
+  var SHUT = '68px';                                            /* 10 + 48 + 10 */
+  var KEY  = 'mnemo:carer:rail';
+  function paint(tucked, quiet){
+    if (quiet) stage.classList.add('no-anim');
+    stage.classList.toggle('is-tucked', tucked);
+    main.style.height = tucked ? SHUT : FULL;
+    btn.setAttribute('aria-expanded', tucked ? 'false' : 'true');
+    btn.title = tucked ? 'Show tools' : 'Hide tools';
+    /* 收起来以后不能再被 Tab 选中：看不见却能聚焦是无障碍上的坑 */
+    Array.prototype.forEach.call(
+      document.querySelectorAll('.rb.tuck, .rail--more .rb'), function(e){
+        if (tucked) e.setAttribute('tabindex', '-1'); else e.removeAttribute('tabindex');
+      });
+    if (quiet) requestAnimationFrame(function(){
+      requestAnimationFrame(function(){ stage.classList.remove('no-anim'); });
+    });
+  }
+  var saved = '0';
+  try { saved = sessionStorage.getItem(KEY) || '0'; } catch(e){}
+  paint(saved === '1', true);
+  btn.addEventListener('click', function(){
+    var tucked = !stage.classList.contains('is-tucked');
+    paint(tucked, false);
+    try { sessionStorage.setItem(KEY, tucked ? '1' : '0'); } catch(e){}
+  });
+})();
+})();
+</script>
+</body>
+</html>

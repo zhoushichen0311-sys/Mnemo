@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MNEMOSYNE — Library 排版三方案对比</title>
+
+<style>
+@font-face{
+  font-family:'InterLocal';
+  src:url('assets/fonts/inter-var.woff2') format('woff2-variations');
+  font-weight:100 900; font-style:normal; font-display:block;
+}
+@font-face{
+  font-family:'SpaceMonoLocal';
+  src:url('assets/fonts/space-mono-700.woff2') format('woff2');
+  font-weight:700; font-style:normal; font-display:block;
+}
+</style>
+
+<style>
+/* ============================================================
+   Furniture Library — 排版三方案
+   文案 / 字号 / 颜色全部取自 Figma 559:65
+   图改用 3Dfurniture/library + 智能家具 里的去背 PNG（同一套等轴测相机）
+   ============================================================ */
+:root{
+  --bg:#EFECE6;
+  --nav:#141414;
+  --eyebrow:#8C8780;
+  --title:#1C1A17;
+  --body:#6B6661;
+  --meta:#8C8780;
+  --accent:#ED7119;
+  --rule:#CCC7BD;
+  --rule-soft:#DAD5CB;
+  --caps:#F5F3EF;
+  --nav-dim:#9E9991;
+
+  --sans:'InterLocal','Inter',system-ui,-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+  --mono:'SpaceMonoLocal','Space Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+
+  --stage:1440px;
+  --pad:152px;          /* Figma 559:65 的正文内缩，左右对称 */
+  --nav-h:76px;
+}
+*{ box-sizing:border-box }
+html{ background:var(--bg); scroll-behavior:smooth; scroll-padding-top:calc(var(--nav-h) + 54px) }
+body{
+  margin:0; background:var(--bg); color:var(--body);
+  font-family:var(--sans); -webkit-font-smoothing:antialiased;
+  overflow-x:clip;
+}
+.wrap{ width:min(100%, var(--stage)); margin-inline:auto; padding-inline:var(--pad) }
+
+/* ---------- 导航（与 index.html 同一套，浅色页固定实底） ---------- */
+.nav{
+  position:fixed; top:0; left:0; right:0; z-index:60;
+  height:var(--nav-h); background:var(--nav);
+}
+.nav-in{
+  width:min(100%, var(--stage)); margin-inline:auto; height:100%;
+  padding-inline:56px;
+  display:flex; align-items:center; justify-content:space-between;
+}
+.nav-in img{ display:block; width:92.9px; height:36px; object-fit:contain }
+.nav-r{ display:flex; align-items:center; gap:32px }
+.contact{ font-size:13px; font-weight:500; color:var(--nav-dim); text-decoration:none }
+.contact:hover{ color:var(--caps) }
+.burger{ width:24px; height:18px; padding:0; background:none; border:0; cursor:pointer;
+         display:flex; flex-direction:column; justify-content:space-between }
+.burger i{ display:block; height:2px; border-radius:1px; background:var(--caps) }
+
+/* ---------- 方案切换条（仅对比用，不属于成品页） ---------- */
+.switch{
+  position:fixed; top:var(--nav-h); left:0; right:0; z-index:55;
+  background:rgba(239,236,230,.94);
+  -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--rule-soft);
+}
+.switch-in{
+  width:min(100%, var(--stage)); margin-inline:auto;
+  padding:0 56px; height:54px;
+  display:flex; align-items:center; gap:8px;
+}
+.switch b{
+  font-family:var(--mono); font-size:10px; letter-spacing:1.2px;
+  color:var(--meta); margin-right:12px; font-weight:700;
+}
+.switch button{
+  font-family:var(--sans); font-size:12.5px; font-weight:600;
+  padding:7px 14px; border-radius:999px; cursor:pointer;
+  border:1px solid var(--rule); background:transparent; color:var(--body);
+  transition:background .18s ease, color .18s ease, border-color .18s ease;
+}
+.switch button:hover{ border-color:#B9B3A8 }
+.switch button[aria-pressed="true"]{
+  background:var(--title); border-color:var(--title); color:#F7F4EE;
+}
+
+main{ padding-top:calc(var(--nav-h) + 54px) }
+
+/* ---------- 页头（三方案共用） ---------- */
+.head{ padding:88px 0 0 }
+.eyebrow{
+  margin:0; font-size:13px; font-weight:600; line-height:16px;
+  letter-spacing:3.64px; color:var(--eyebrow);
+}
+.head h1{
+  margin:26px 0 0; font-size:56px; font-weight:700;
+  line-height:116%; letter-spacing:-.56px; color:var(--title);
+}
+.lede{
+  margin:30px 0 0; width:fit-content; max-width:100%;
+  font-size:16px; line-height:180%; color:var(--body);
+}
+
+/* ---------- 方案标签 ---------- */
+.vlabel{
+  margin:92px 0 0; padding-bottom:14px;
+  border-bottom:1px solid var(--rule);
+  display:flex; align-items:baseline; gap:16px; flex-wrap:wrap;
+}
+.vlabel .tag{
+  font-family:var(--mono); font-weight:700; font-size:10.5px;
+  letter-spacing:1.3px; color:var(--accent);
+}
+.vlabel .nm{ font-size:19px; font-weight:700; color:var(--title) }
+.vlabel .note{ font-size:13px; color:var(--meta) }
+
+.v[hidden]{ display:none }
+
+/* ============================================================
+   共用：物件与文字部件
+   ============================================================ */
+/* 去背图直接压在米色底上，不加卡片框。
+   drop-shadow 走 alpha 轮廓，所以是贴合物件形状的接地投影，
+   不是一个假的椭圆。 */
+.obj{
+  display:block;
+  width:auto; max-width:100%;
+  object-fit:contain; object-position:bottom center;
+  filter:drop-shadow(0 16px 20px rgba(62,52,42,.14));
+}
+/* 一组物件共用一条地平线 —— 混杂纵横比能读成一套的关键 */
+.objs{ display:flex; align-items:flex-end; justify-content:center; }
+
+.f-no{
+  margin:0; font-size:12px; font-weight:600; line-height:15px;
+  letter-spacing:2.4px; color:var(--accent);
+}
+.f-nm{
+  margin:8px 0 0; font-weight:700; letter-spacing:.34px;
+  color:var(--title);
+}
+.f-meta{
+  margin:8px 0 0; font-size:12px; font-weight:600; line-height:15px;
+  letter-spacing:1.44px; color:var(--meta);
+}
+.f-desc{
+  margin:14px 0 0; font-size:13.5px; line-height:170%; color:var(--body);
+}
+.f-link{
+  display:inline-flex; align-items:center; gap:8px;
+  margin-top:22px; font-size:13px; font-weight:600;
+  color:var(--accent); text-decoration:none;
+}
+.f-link svg{ transition:transform .22s ease }
+.f-link:hover svg{ transform:translateX(4px) }
+
+/* ============================================================
+   方案 A —— 行式加宽：图跨过原来那 479px 的空档
+   ============================================================ */
+.A .row{
+  display:grid; grid-template-columns:448px 1fr;
+  gap:0 40px; align-items:center;
+  padding:44px 0 48px;
+  border-bottom:1px solid var(--rule-soft);
+}
+.A .row:first-of-type{ border-top:1px solid var(--rule); }
+.A .f-nm{ font-size:34px; line-height:41px }
+/* 等面积算出的物件比 668 的带宽窄，若居中就会在文字与图之间又空出一块。
+   右对齐锁到页面右边距（1288），空白集中成一条正常的编辑留白。 */
+.A .objs{ height:300px; gap:48px; justify-content:flex-end }
+.A .f-desc{ max-width:400px }
+
+/* ============================================================
+   方案 B —— 2×2 网格
+   ============================================================ */
+.B .grid{ display:grid; grid-template-columns:1fr 1fr; gap:76px 64px; margin-top:44px }
+.B .cell{ display:flex; flex-direction:column }
+.B .objs{ height:360px; gap:40px; margin-bottom:30px }
+.B .txt{ border-top:1px solid var(--rule); padding-top:20px }
+.B .f-nm{ font-size:30px; line-height:37px }
+.B .f-desc{ max-width:430px }
+
+/* ============================================================
+   方案 C —— 一行四列（货架式）
+   ============================================================ */
+.C .shelf{ display:grid; grid-template-columns:repeat(4,1fr); gap:32px; margin-top:44px }
+.C .cell{ display:flex; flex-direction:column }
+.C .objs{ height:250px; gap:16px; margin-bottom:26px }
+.C .txt{ border-top:1px solid var(--rule); padding-top:18px }
+.C .f-nm{ font-size:22px; line-height:28px }
+.C .f-desc{ font-size:12.5px }
+/* 四个物件落在同一条地平线上，尺度可直接对照 */
+.C .shelf::after{ content:none }
+
+footer.foot{
+  margin-top:110px; padding:26px 0 60px;
+  border-top:1px solid var(--rule);
+  display:flex; justify-content:space-between;
+  font-family:var(--mono); font-weight:700; font-size:9.8px;
+  letter-spacing:1.32px; color:var(--meta);
+}
+
+@media (max-width:1300px){ :root{ --pad:56px } }
+@media (max-width:1080px){
+  .A .row{ grid-template-columns:1fr; gap:32px }
+  .A .objs{ height:260px }
+  .C .shelf{ grid-template-columns:1fr 1fr }
+}
+@media (max-width:760px){
+  :root{ --pad:24px }
+  .head h1{ font-size:36px }
+  .B .grid{ grid-template-columns:1fr }
+  .C .shelf{ grid-template-columns:1fr }
+}
+@media (prefers-reduced-motion:reduce){ *{ transition:none !important } }
+</style>
+</head>
+
+<body>
+
+<header class="nav">
+  <div class="nav-in">
+    <a href="./index.html" aria-label="MNEMOSYNE"><img src="assets/logo-dark.png" alt="MNEMOSYNE"></a>
+    <div class="nav-r">
+      <a class="contact" href="mailto:zhoushichen0311@gmail.com">Contact</a>
+      <button class="burger" aria-label="Menu"><i></i><i></i><i></i></button>
+    </div>
+  </div>
+</header>
+
+<div class="switch">
+  <div class="switch-in">
+    <b>排版方案</b>
+    <button data-v="all" aria-pressed="true">三个并排看</button>
+    <button data-v="A" aria-pressed="false">A 行式加宽</button>
+    <button data-v="B" aria-pressed="false">B 2×2 网格</button>
+    <button data-v="C" aria-pressed="false">C 一行四列</button>
+  </div>
+</div>
+
+<main>
+  <div class="wrap">
+
+    <div class="head">
+      <p class="eyebrow">LIBRARY</p>
+      <h1>Furniture,<br>Built from the Cube.</h1>
+      <p class="lede">Every piece assembles from the same 300 mm module. Browse by family: each one<br>
+        opens the full set, with sizes and the needs it serves.</p>
+    </div>
+
+    <!-- 方案 A -->
+    <section class="v A" id="vA">
+      <div class="vlabel">
+        <span class="tag">方案 A</span>
+        <span class="nm">行式加宽</span>
+        <span class="note">保留 01–04 竖排编号的索引读法，图从 297 宽拉到 668 宽，吃掉中间空档。改动最小。</span>
+      </div>
+      <div class="rows"></div>
+    </section>
+
+    <!-- 方案 B -->
+    <section class="v B" id="vB">
+      <div class="vlabel">
+        <span class="tag">方案 B</span>
+        <span class="nm">2 × 2 网格</span>
+        <span class="note">单个物件面积最大，最像产品目录。丢掉竖排编号的索引读法。</span>
+      </div>
+      <div class="grid"></div>
+    </section>
+
+    <!-- 方案 C -->
+    <section class="v C" id="vC">
+      <div class="vlabel">
+        <span class="tag">方案 C</span>
+        <span class="nm">一行四列（货架式）</span>
+        <span class="note">四个家族一屏并排、共用一条地平线，尺度可直接互相对照 —— 最贴合「同一个 300 mm 模块」的论点。</span>
+      </div>
+      <div class="shelf"></div>
+    </section>
+
+    <footer class="foot">
+      <span>ADAPTIVE BY DESIGN</span>
+      <span>300MM CUBE SYSTEM</span>
+    </footer>
+
+  </div>
+</main>
+
+<script>
+/* ---------------- 内容：逐字取自 Figma 559:65 ---------------- */
+/* 描述不写死 <br> —— 三个方案的文字列宽差很多（448 / 536 / 260），
+   同一组硬断点在窄列里会断得很难看。交给各方案的 max-width 自然折行。 */
+var FAM = [
+  { no:'01', name:'SOFA', meta:'13 modules',
+    desc:'Low-entry seating with firm cushions and continuous support edges.',
+    imgs:[ {k:'sofa', a:1.040, alt:'Modular sofa with docked wheelchair'} ] },
+  { no:'02', name:'BED', meta:'13 modules',
+    desc:'Transfer-height beds, from single rails to full enclosure frames.',
+    imgs:[ {k:'bed', a:1.224, alt:'Modular bed with storage surround'} ] },
+  { no:'03', name:'CABINET', meta:'13 modules',
+    desc:'Reachable storage: pull-down shelves, grip edges, rounded corners.',
+    imgs:[ {k:'cabinet', a:0.768, alt:'Modular shelving grid'} ] },
+  { no:'04', name:'SPECIFIC FURNITURE', meta:'2 products',
+    desc:'Purpose-built pieces: the MNEMO care robot and the SOFLOW sofa-wheelchair.',
+    imgs:[ {k:'soflow', a:0.781, alt:'SOFLOW sofa-wheelchair'},
+           {k:'robot',  a:0.427, alt:'MNEMO care robot'} ] }
+];
+
+/* ---------------- 等面积归一 ----------------
+   之前把四张图统一到「满高」，结果横向留白的差异被推到极限
+   （床几乎出血、机器人两侧各 96px 白）。改成按面积归一：
+   宽物件和高物件在页面上的存在感相当，谁都不会出血或缩成细条。
+   一组内多个物件平分该组面积，超出盒子再整组等比缩回去。 */
+function layout(fam, boxW, boxH, area, gap){
+  var per = area / fam.imgs.length;
+  var out = fam.imgs.map(function(im){
+    var h = Math.min(boxH, Math.sqrt(per / im.a));
+    var w = h * im.a;
+    if (w > boxW){ w = boxW; h = w / im.a; }
+    return { k:im.k, alt:im.alt, w:w, h:h };
+  });
+  /* 一组放不下就整组等比缩。注意缩放基数要先扣掉间距 ——
+     间距是固定值、不参与缩放，用 boxW/total 会缩不到位，还是会超出。 */
+  var gaps = gap * (out.length - 1);
+  var sumW = out.reduce(function(s,o){ return s + o.w; }, 0);
+  if (sumW + gaps > boxW){
+    var s = (boxW - gaps) / sumW;
+    out.forEach(function(o){ o.w *= s; o.h *= s; });
+  }
+  return out;
+}
+
+function objsHTML(list){
+  return '<div class="objs">' + list.map(function(o){
+    return '<picture>'
+         + '<source srcset="assets/library/' + o.k + '.webp" type="image/webp">'
+         + '<img class="obj" src="assets/library/' + o.k + '.png" alt="' + o.alt + '"'
+         + ' style="width:' + o.w.toFixed(1) + 'px;height:' + o.h.toFixed(1) + 'px"'
+         + ' loading="lazy" decoding="async">'
+         + '</picture>';
+  }).join('') + '</div>';
+}
+function txtHTML(f, withNm){
+  return '<p class="f-no">' + f.no + '</p>'
+       + '<h3 class="f-nm">' + f.name + '</h3>'
+       + '<p class="f-meta">' + f.meta + '</p>'
+       + '<p class="f-desc">' + f.desc + '</p>'
+       + '<a class="f-link" href="#">View all'
+       + '<svg width="14" height="10" viewBox="0 0 14 10" fill="none" aria-hidden="true">'
+       + '<path d="M0 5h12M9 1l4 4-4 4" stroke="currentColor" stroke-width="1.7"'
+       + ' stroke-linecap="round" stroke-linejoin="round"/></svg></a>';
+}
+
+/* ---------------- 方案 A：行式加宽 ---------------- */
+(function(){
+  var box = { w:668, h:300 }, A = box.h * box.h * 1.093;   // 上限由最方的沙发定
+  document.querySelector('.A .rows').innerHTML = FAM.map(function(f){
+    return '<div class="row"><div class="txt">' + txtHTML(f) + '</div>'
+         + objsHTML(layout(f, box.w, box.h, A, 48)) + '</div>';
+  }).join('');
+})();
+
+/* ---------------- 方案 B：2×2 ---------------- */
+(function(){
+  var box = { w:536, h:360 }, A = box.h * box.h * 1.093;
+  document.querySelector('.B .grid').innerHTML = FAM.map(function(f){
+    return '<div class="cell">' + objsHTML(layout(f, box.w, box.h, A, 40))
+         + '<div class="txt">' + txtHTML(f) + '</div></div>';
+  }).join('');
+})();
+
+/* ---------------- 方案 C：一行四列 ---------------- */
+(function(){
+  var box = { w:260, h:250 }, A = box.w * box.w / 1.093;   // 窄列里宽度是约束，面积上限由此定
+  document.querySelector('.C .shelf').innerHTML = FAM.map(function(f){
+    return '<div class="cell">' + objsHTML(layout(f, box.w, box.h, A, 16))
+         + '<div class="txt">' + txtHTML(f) + '</div></div>';
+  }).join('');
+})();
+
+/* ---------------- 方案切换 ---------------- */
+(function(){
+  var btns = document.querySelectorAll('.switch button');
+  var secs = { A:document.getElementById('vA'), B:document.getElementById('vB'), C:document.getElementById('vC') };
+  btns.forEach(function(b){
+    b.addEventListener('click', function(){
+      var v = b.dataset.v;
+      btns.forEach(function(x){ x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+      Object.keys(secs).forEach(function(k){ secs[k].hidden = (v !== 'all' && v !== k); });
+      if (v !== 'all') secs[v].scrollIntoView({ block:'start' });
+    });
+  });
+})();
+</script>
+
+</body>
+</html>

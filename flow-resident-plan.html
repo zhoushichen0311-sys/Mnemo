@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MNEMOSYNE — Your home</title>
+
+<!-- ============================================================
+     MNEMO · 本人版（老人版）· 第 2 步：上传平面图
+     ------------------------------------------------------------
+     逻辑照搬 v2\flow.html 第 1 步（dropzone → 读图 → 1:100 平面）。
+     设计体系照搬 v3\flow-resident.html（同一套 oklch token、同一套
+     .page / .progress / .body / .ask / .say / .said / .foot 骨架）。
+
+     和 v2 的差别不是文案，是「谁在操作」：
+       · v2 的第一交互是「把文件拖进来」——老人几乎不会拖拽。
+         这里把顺序倒过来：拍照 → 从设备里选 → 拖拽只作为附注。
+       · 每个选项是一整块可点区域（≥ 96px 高），不是一行小字。
+       · 读图状态用整句话说，不用 spinner。
+       · 读完后的复述用大字整句，不用一排 mono 小标签
+         —— chips 那种写法对这一版的读者是无效信息。
+       · 多一条 v2 和医护版都不需要的出路：「让家人帮我传」。
+         老人拿不到图纸时，现实里的解法就是问子女要。
+
+     未接后端的地方都标了 TODO，没有假装已经能用。
+     ============================================================ -->
+
+<style>
+/* 本地字体：和 home-file-resident / flow-carer 用同一份，不联网 */
+@font-face{
+  font-family:'Inter';
+  src:url('assets/fonts/inter-var.woff2') format('woff2-variations');
+  font-weight:100 900; font-style:normal; font-display:block;
+}
+@font-face{
+  font-family:'Space Mono';
+  src:url('assets/fonts/space-mono-700.woff2') format('woff2');
+  font-weight:700; font-style:normal; font-display:block;
+}
+</style>
+
+<style>
+/* ── token：与 flow-resident.html 完全一致 ─────────────── */
+:root{
+  --color-paper:      oklch(95.5% 0.016 78);
+  --color-paper-2:    oklch(92.6% 0.020 78);
+  --color-rule:       oklch(86.0% 0.018 80);
+  --color-rule-2:     oklch(76.0% 0.016 80);
+  --color-muted:      oklch(46.0% 0.014 75);
+  --color-ink:        oklch(20.0% 0.012 70);
+  --color-ink-2:      oklch(24.0% 0.012 70);
+  --color-chip:       oklch(96.0% 0.013 82);
+  --color-chip-edge:  oklch(55.0% 0.020 78);
+  --color-chip-on:    oklch(96.8% 0.020 65);
+  --color-chip-on-ink:oklch(48.7% 0.105 55);
+  --color-accent:     oklch(60.0% 0.170 48);
+  --color-focus:      oklch(52.0% 0.190 48);
+
+  --font-display:'Inter','InterLocal',system-ui,-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+  --font-body:   var(--font-display);
+  --font-outlier:'Space Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+
+  --text-mono:1rem; --text-body:1.1875rem; --text-answer:1.375rem;
+  --text-lede:1.5625rem; --text-display:3.375rem;
+
+  --space-3xs:.125rem; --space-2xs:.25rem; --space-xs:.5rem;  --space-sm:.75rem;
+  --space-md:1rem;     --space-lg:1.5rem;  --space-xl:2.5rem; --space-2xl:3.5rem;
+  --space-3xl:4.5rem;  --space-4xl:5.5rem;
+
+  --size-tap:60px; --size-send:56px; --size-rail:340px; --size-bar:8px;
+  --rule-hair:1px; --rule-input:2px; --rule-chip:2px;
+  --radius-pill:999px; --radius-card:20px;
+  --ease-out:cubic-bezier(.16,1,.3,1); --dur-short:180ms;
+}
+*,*::before,*::after{box-sizing:border-box}
+/* .ways 是 display:grid，作者样式会盖掉 UA 的 [hidden]，必须显式兜住 */
+[hidden]{display:none !important}
+html,body{overflow-x:clip}
+body{margin:0;min-height:100vh;color:var(--color-ink);
+  background:
+    url('assets/bg/bg-resident.webp') center center / cover no-repeat fixed,
+    var(--color-paper);
+  font-family:var(--font-body);font-size:var(--text-body);line-height:1.55;
+  font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
+:where(a,button,input):focus-visible{outline:3px solid var(--color-focus);outline-offset:3px;border-radius:2px}
+
+.page{max-width:1440px;margin-inline:auto;padding:var(--space-2xl) 4.5rem var(--space-lg) 6rem}
+.top{display:flex;align-items:center;justify-content:space-between;gap:var(--space-lg)}
+.wordmark{display:block;width:68px;height:68px;margin:0;border-radius:50%}
+.wordmark img{display:block;width:100%;height:100%;object-fit:contain}
+.count{font-family:var(--font-outlier);font-weight:700;font-size:var(--text-mono);
+  letter-spacing:.09em;color:var(--color-muted);margin:0}
+
+.progress{margin-top:var(--space-xl)}
+.bars{display:grid;grid-template-columns:repeat(5,1fr);gap:var(--space-xs);list-style:none;margin:0;padding:0}
+.bars li{height:var(--size-bar);border-radius:calc(var(--size-bar)/2);background:var(--color-rule)}
+.bars li[data-done]{background:var(--color-accent)}
+.steps{margin:var(--space-md) 0 0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:var(--space-sm) 0}
+.steps li{display:flex;align-items:center;color:var(--color-muted)}
+.steps li+li::before{content:'·';margin-inline:.7em;color:var(--color-rule-2)}
+.steps li[aria-current]{color:var(--color-ink);font-weight:600}
+.rule{border:0;border-top:var(--rule-hair) solid var(--color-rule);margin:var(--space-xl) 0 0}
+
+.body{display:grid;grid-template-columns:minmax(0,1fr) var(--size-rail);
+  column-gap:var(--space-4xl);margin-top:var(--space-2xl);align-items:start}
+.main{grid-column:1;min-width:0}
+.said{grid-column:2;border-left:var(--rule-hair) solid var(--color-rule);
+  padding-left:var(--space-xl);align-self:stretch}
+.said h2{margin:0 0 var(--space-md);font:inherit;font-weight:600;color:var(--color-muted)}
+.log{max-height:520px;overflow-y:auto;padding-right:var(--space-sm)}
+.log p{margin:0 0 var(--space-md)}
+.log .q{color:var(--color-muted);margin-bottom:var(--space-2xs)}
+.log .a{font-weight:600}
+.log .none{color:var(--color-muted)}
+
+.ask{margin:0;font-family:var(--font-display);font-weight:700;font-size:var(--text-display);
+  line-height:1.04;letter-spacing:-.028em;overflow-wrap:anywhere}
+.hint{margin:var(--space-lg) 0 0;color:var(--color-muted);max-width:48ch}
+
+/* ── 三条路：每条都是一整块，不是一行小字 ───────────────── */
+.ways{display:grid;gap:var(--space-md);margin:var(--space-xl) 0 0;padding:0;list-style:none;max-width:760px}
+.way{width:100%;display:flex;align-items:center;gap:var(--space-lg);text-align:left;font:inherit;
+  cursor:pointer;background:var(--color-chip);border:var(--rule-chip) solid var(--color-chip-edge);
+  border-radius:var(--radius-card);padding:var(--space-lg);min-height:96px;
+  transition:background var(--dur-short) var(--ease-out),border-color var(--dur-short) var(--ease-out)}
+.way:hover{background:var(--color-paper);border-color:var(--color-ink)}
+.way:active{transform:translateY(1px)}
+.way .ic{flex:none;width:52px;height:52px;border-radius:50%;background:var(--color-paper);
+  border:var(--rule-hair) solid var(--color-rule);display:grid;place-items:center;color:var(--color-ink)}
+.way .tx{min-width:0}
+.way .wt{display:block;font-size:var(--text-answer);font-weight:600}
+.way .ws{display:block;color:var(--color-muted)}
+.way .arw{margin-left:auto;flex:none;color:var(--color-accent);font-size:var(--text-answer)}
+.way.is-quiet{background:none;border-style:dashed;border-color:var(--color-rule-2);min-height:76px}
+
+.dragnote{margin:var(--space-md) 0 0;color:var(--color-muted);max-width:48ch}
+.dragnote b{color:var(--color-ink);font-weight:600}
+
+/* 拖拽仍然可用，只是不当成主路 */
+.drop-on .main{outline:3px dashed var(--color-accent);outline-offset:14px;border-radius:var(--radius-card)}
+
+/* ── 家人代传（TODO 未接后端）─────────────────────────── */
+.helper{margin:var(--space-lg) 0 0;padding:var(--space-lg);max-width:760px;
+  background:var(--color-chip-on);border:var(--rule-chip) solid var(--color-accent);
+  border-radius:var(--radius-card)}
+.helper[hidden]{display:none}
+.helper p{margin:0 0 var(--space-sm)}
+.helper .code{font-family:var(--font-outlier);font-weight:700;font-size:2.5rem;
+  letter-spacing:.22em;margin:var(--space-sm) 0;color:var(--color-chip-on-ink)}
+.helper .small{color:var(--color-muted);margin:0}
+
+/* ── 读图中 ───────────────────────────────────────────── */
+.reading{margin:var(--space-xl) 0 0;max-width:760px}
+.reading[hidden]{display:none}
+.reading .rt{margin:0;font-size:var(--text-lede);font-weight:600}
+.reading .rs{margin:var(--space-sm) 0 0;color:var(--color-muted)}
+.readbar{height:var(--size-bar);border-radius:calc(var(--size-bar)/2);
+  background:var(--color-rule);margin:var(--space-lg) 0 0;overflow:hidden}
+.readbar i{display:block;height:100%;width:0;background:var(--color-accent);
+  transition:width .5s var(--ease-out)}
+
+/* ── 读完：平面 + 整句复述 ─────────────────────────────── */
+.result{margin:var(--space-xl) 0 0}
+.result[hidden]{display:none}
+.planbox{background:var(--color-paper-2);border:var(--rule-hair) solid var(--color-rule);
+  border-radius:var(--radius-card);padding:var(--space-lg)}
+.planbox svg{display:block;width:100%;height:auto;max-height:400px}
+.said-it{margin:var(--space-xl) 0 0;font-size:var(--text-lede);line-height:1.45;max-width:34ch}
+.said-it b{color:var(--color-chip-on-ink)}
+.facts{margin:var(--space-lg) 0 0;padding:0;list-style:none;color:var(--color-muted)}
+.facts li{margin-bottom:var(--space-xs)}
+.facts b{color:var(--color-ink);font-weight:600}
+/* 平面单独占满宽再放文字 —— 并排的话 SVG 里的房间名会缩到 8px 以下，
+   对这一版的读者等于没有。 */
+.resultrow{display:block;max-width:880px}
+.planbox svg{max-height:none}
+.again{display:inline-block;text-align:left;margin:var(--space-lg) 0 0;font:inherit;background:none;border:0;padding:0 0 var(--space-3xs);
+  cursor:pointer;color:var(--color-muted);border-bottom:var(--rule-hair) solid var(--color-rule-2)}
+.again:hover{color:var(--color-ink);border-bottom-color:var(--color-ink)}
+
+/* ── 输入 ─────────────────────────────────────────────── */
+.say{margin-top:var(--space-2xl);max-width:760px}
+.say label{display:block;color:var(--color-muted)}
+.field{display:flex;align-items:center;gap:var(--space-md);
+  border-bottom:var(--rule-input) solid var(--color-chip-edge);margin-top:var(--space-sm)}
+.field input{flex:1 1 auto;min-width:0;font:inherit;font-size:var(--text-lede);color:var(--color-ink);
+  background:none;border:0;padding:var(--space-sm) 0;min-height:var(--size-send)}
+.field input::placeholder{color:var(--color-muted)}
+.send{flex:none;width:var(--size-send);height:var(--size-send);border-radius:var(--radius-pill);
+  border:0;background:var(--color-ink);color:var(--color-paper);font-size:var(--text-answer);
+  cursor:pointer;display:grid;place-items:center}
+.send:hover{background:var(--color-ink-2)}
+.note{min-height:1lh;margin:var(--space-xs) 0 0;color:var(--color-muted)}
+
+/* ── 底部 ─────────────────────────────────────────────── */
+.foot{display:flex;align-items:center;justify-content:space-between;gap:var(--space-lg);
+  margin-top:var(--space-3xl)}
+.back{font:inherit;background:none;border:0;padding:0 0 var(--space-3xs);cursor:pointer;
+  color:var(--color-muted);border-bottom:var(--rule-hair) solid var(--color-rule-2)}
+.back:hover{color:var(--color-ink);border-bottom-color:var(--color-ink)}
+.go{font:inherit;font-weight:600;white-space:nowrap;background:var(--color-ink);color:var(--color-paper);
+  border:var(--rule-chip) solid var(--color-ink);border-radius:var(--radius-pill);
+  padding:0 var(--space-xl);min-height:var(--size-tap);cursor:pointer}
+.go:hover{background:var(--color-ink-2);border-color:var(--color-ink-2)}
+.go[disabled]{background:var(--color-paper-2);color:var(--color-muted);
+  border-color:var(--color-rule);cursor:not-allowed}
+.arw{color:var(--color-accent)}
+.go[disabled] .arw{color:var(--color-muted)}
+
+@media (max-width:1080px){
+  .page{padding-inline:2rem}
+  .body{grid-template-columns:minmax(0,1fr)}
+  .said{grid-column:1;border-left:0;border-top:var(--rule-hair) solid var(--color-rule);
+    padding-left:0;padding-top:var(--space-xl);margin-top:var(--space-xl)}
+  .resultrow{grid-template-columns:minmax(0,1fr)}
+}
+@media (prefers-reduced-motion:reduce){
+  *{transition:none !important}
+}
+</style>
+</head>
+<body>
+
+<main class="page">
+  <header class="top">
+    <a class="wordmark" href="./index.html" aria-label="MNEMOSYNE home">
+      <img src="assets/logo.png" alt="MNEMOSYNE">
+    </a>
+    <p class="count">STEP 2 OF 5</p>
+  </header>
+
+  <nav class="progress" aria-label="Progress">
+    <ol class="bars"><li data-done></li><li data-done></li><li></li><li></li><li></li></ol>
+    <ol class="steps">
+      <li>About you</li>
+      <li aria-current="step">Your home</li>
+      <li>Layouts</li>
+      <li>Preview</li>
+      <li>Share</li>
+    </ol>
+  </nav>
+  <hr class="rule">
+
+  <div class="body">
+    <section class="main" id="main">
+
+      <h1 class="ask" id="ask">Can you show me your home?</h1>
+      <p class="hint" id="hint">
+        A plan of your flat, if you have one. A photo of a printed one is fine —
+        it does not need to be straight or to scale.
+      </p>
+
+      <!-- ══ 三条路 ══════════════════════════════════════ -->
+      <ul class="ways" id="ways">
+        <li>
+          <button class="way" type="button" id="w-photo">
+            <span class="ic" aria-hidden="true">
+              <svg width="26" height="22" viewBox="0 0 26 22" fill="none">
+                <rect x="1" y="4.5" width="24" height="16.5" rx="3" stroke="currentColor" stroke-width="1.8"/>
+                <path d="M8.5 4.5 10 1h6l1.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                <circle cx="13" cy="12.5" r="4.5" stroke="currentColor" stroke-width="1.8"/>
+              </svg>
+            </span>
+            <span class="tx">
+              <span class="wt">Take a photo of it</span>
+              <span class="ws">Hold the paper flat and photograph the whole sheet.</span>
+            </span>
+            <span class="arw" aria-hidden="true">→</span>
+          </button>
+        </li>
+        <li>
+          <button class="way" type="button" id="w-file">
+            <span class="ic" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path d="M14 1.5H5.5A2.5 2.5 0 0 0 3 4v16a2.5 2.5 0 0 0 2.5 2.5h13A2.5 2.5 0 0 0 21 20V8.5L14 1.5Z"
+                      stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                <path d="M13.8 1.8V8.6H20.6" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+              </svg>
+            </span>
+            <span class="tx">
+              <span class="wt">Choose a file on this device</span>
+              <span class="ws">A PDF or a picture you already have.</span>
+            </span>
+            <span class="arw" aria-hidden="true">→</span>
+          </button>
+        </li>
+        <li>
+          <button class="way" type="button" id="w-help">
+            <span class="ic" aria-hidden="true">
+              <svg width="26" height="22" viewBox="0 0 26 22" fill="none">
+                <circle cx="9" cy="6.5" r="4.3" stroke="currentColor" stroke-width="1.8"/>
+                <path d="M1.6 20.5c0-4 3.3-6.6 7.4-6.6s7.4 2.6 7.4 6.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                <path d="M19 8.5h6M22 5.5v6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+            </span>
+            <span class="tx">
+              <span class="wt">Ask someone to send it for you</span>
+              <span class="ws">Your daughter, son, or the care team can put it in from their own phone.</span>
+            </span>
+            <span class="arw" aria-hidden="true">→</span>
+          </button>
+        </li>
+        <li>
+          <button class="way is-quiet" type="button" id="w-none">
+            <span class="tx">
+              <span class="wt">I do not have a plan</span>
+              <span class="ws">That is fine. I will show you three common flats and you pick the closest.</span>
+            </span>
+            <span class="arw" aria-hidden="true">→</span>
+          </button>
+        </li>
+      </ul>
+
+      <p class="dragnote">
+        <b>On a computer</b> you can also drag the file anywhere onto this page.
+      </p>
+
+      <!-- 家人代传 —— TODO：取件码还没接后端，现在是本地生成的假号 -->
+      <div class="helper" id="helper" hidden>
+        <p>Read this number out to them. They open <b>mnemo.app</b> on their own phone,
+           type it in, and send the plan straight into your file.</p>
+        <p class="code" id="code">— — —</p>
+        <p class="small">The number works for one hour. Nothing else in your file is shared.</p>
+      </div>
+
+      <!-- ══ 读图中 ══════════════════════════════════════ -->
+      <div class="reading" id="reading" hidden>
+        <p class="rt" id="r-title">Looking at your plan…</p>
+        <p class="rs" id="r-sub">This takes a few seconds. You do not need to do anything.</p>
+        <div class="readbar"><i id="r-bar"></i></div>
+      </div>
+
+      <!-- ══ 读完 ════════════════════════════════════════ -->
+      <div class="result" id="result" hidden>
+        <div class="resultrow">
+          <div class="planbox">
+            <svg viewBox="46 118 700 476" role="img"
+                   aria-label="Parsed floor plan: 54 square metres, four rooms, one entrance on the east side, two south-facing windows">
+                <g opacity=".13">
+                  <rect x="97"  y="284" width="260" height="227" fill="#F2B82F"/>
+                  <rect x="357" y="132" width="113" height="152" fill="#A99AC8"/>
+                  <rect x="471" y="227" width="151" height="57"  fill="#A54F4F"/>
+                  <rect x="357" y="284" width="265" height="152" fill="#7399C7"/>
+                  <rect x="357" y="436" width="113" height="75"  fill="#7399C7"/>
+                  <rect x="470" y="436" width="152" height="75"  fill="#8DA973"/>
+                </g>
+                <g stroke="#A8A39C" stroke-width="1" fill="none">
+                  <path d="M357 291.5 H301.5"/>
+                  <path d="M301.5 291.5 C301.5 322.2 326.4 347 357 347"/>
+                  <path d="M440.5 284.5 V228.5"/>
+                  <path d="M440.5 228.5 C409.6 228.5 384.5 253.6 384.5 284.5"/>
+                </g>
+                <g stroke="#292624" stroke-width="2.4" fill="none">
+                  <path d="M622 227 L622 511.5 L96 511.5 L96 284 L357 284 L357 132 L470.5 132 L470.5 227 Z"/>
+                  <path d="M357 285 V510.5"/>
+                  <path d="M470.5 228 V284 H358"/>
+                  <path d="M471 284 H622"/>
+                </g>
+                <g fill="#fff">
+                  <rect x="516.8" y="282.6" width="104" height="3.6"/>
+                  <rect x="384"   y="282.6" width="57"  height="3.6"/>
+                  <rect x="355.2" y="291.5" width="3.6" height="55.5"/>
+                  <rect x="620.2" y="294"   width="3.6" height="52"/>
+                </g>
+                <g>
+                  <rect x="182"   y="506"   width="109"  height="10"  fill="#fff"/>
+                  <rect x="182"   y="508.2" width="109"  height="1.5" fill="#292624"/>
+                  <rect x="182"   y="513"   width="109"  height="1.5" fill="#292624"/>
+                  <rect x="528.7" y="506"   width="51.3" height="10"  fill="#fff"/>
+                  <rect x="528.7" y="508.2" width="51.3" height="1.5" fill="#292624"/>
+                  <rect x="528.7" y="513"   width="51.3" height="1.5" fill="#292624"/>
+                </g>
+                <g text-anchor="middle" font-family="InterLocal, Inter, sans-serif"
+                   font-size="11.5" font-weight="600" fill="#383630">
+                  <text x="413.5" y="212">BATHROOM</text>
+                  <text x="546.5" y="261">STORAGE</text>
+                  <text x="224.5" y="405">BEDROOM</text>
+                  <text x="489.5" y="398">LIVINGROOM</text>
+                  <text x="546.5" y="477">KITCHEN</text>
+                </g>
+                <path d="M660 320 H634 M641 313 L634 320 L641 327"
+                      stroke="#ED7119" stroke-width="2" fill="none"
+                      stroke-linecap="round" stroke-linejoin="round"/>
+                <rect x="658" y="309" width="75" height="22" rx="11" fill="#FCEFE2" stroke="#EED3BA"/>
+                <text x="695.5" y="324" text-anchor="middle" font-size="8" fill="#8C4D1A"
+                      font-family="SpaceMonoLocal, monospace" font-weight="700" letter-spacing=".6">ENTRANCE</text>
+                <g stroke="#9E9991" stroke-width="1">
+                  <path d="M96 573 H622 M96 567.8 V577.8 M622 567.8 V577.8"/>
+                  <path d="M66 132 V511 M61 132 H71 M61 511 H71"/>
+                </g>
+                <rect x="335" y="565" width="48" height="15" fill="#fff"/>
+                <text x="359" y="576" text-anchor="middle" font-size="8.5" fill="#736E66"
+                      font-family="SpaceMonoLocal, monospace" font-weight="700">9.6 m</text>
+                <text x="66" y="322" text-anchor="middle" font-size="8.5" fill="#736E66"
+                      font-family="SpaceMonoLocal, monospace" font-weight="700"
+                      transform="rotate(-90 66 322)">6.6 m</text>
+                <text x="622" y="592" text-anchor="end" font-size="8.5" fill="#9E9891"
+                      font-family="SpaceMonoLocal, monospace" font-weight="700">SCALE 1:100</text>
+              </svg>
+          </div>
+          <div>
+            <p class="said-it" id="saidit">
+              I can see <b>four rooms</b>, about <b>54 square metres</b>, with the front door on the right.
+            </p>
+            <ul class="facts">
+              <li><b>9.6 m</b> across, <b>6.6 m</b> deep</li>
+              <li>One entrance, on the east side</li>
+              <li>Two windows facing south</li>
+              <li>Drawn at 1:100</li>
+            </ul>
+            <button class="again" type="button" id="again">That is not my home — try another file</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ 提问 ════════════════════════════════════════ -->
+      <div class="say">
+        <label for="own" id="saylabel">Not sure what counts as a plan? Ask me.</label>
+        <div class="field">
+          <input id="own" type="text" autocomplete="off" placeholder="Is a photo of the fire escape map alright?…">
+          <button class="send" type="button" id="send" aria-label="Send what you typed">→</button>
+        </div>
+        <p class="note" id="note" role="status" aria-live="polite"></p>
+      </div>
+
+    </section>
+
+    <aside class="said" aria-label="What you have told me">
+      <h2>What you&#8217;ve told me so far</h2>
+      <div class="log" id="log">
+        <p class="none" id="log-none">Nothing about your home yet.</p>
+      </div>
+    </aside>
+  </div>
+
+  <footer class="foot">
+    <button class="back" type="button" id="back">← Back</button>
+    <button class="go" type="button" id="go" disabled>Show me the layouts <span class="arw">→</span></button>
+  </footer>
+</main>
+
+<input type="file" id="file" accept="image/*,.pdf" hidden>
+<input type="file" id="cam" accept="image/*" capture="environment" hidden>
+
+<script>
+(function(){
+'use strict';
+var $ = function(id){ return document.getElementById(id); };
+
+/* ── 状态 ─────────────────────────────────────────────── */
+var uploaded = false, timer = null;
+
+function fmtSize(b){
+  if (b == null) return '';
+  return b < 1048576 ? (b/1024).toFixed(0) + ' KB' : (b/1048576).toFixed(1) + ' MB';
+}
+/* 文件名太长时从中间省略，保住扩展名 —— 和 v2 同一个函数 */
+function shortName(name, max){
+  max = max || 30;
+  if (name.length <= max) return name;
+  var dot = name.lastIndexOf('.');
+  var ext = dot > 0 ? name.slice(dot) : '';
+  var base = dot > 0 ? name.slice(0, dot) : name;
+  var keep = Math.max(6, max - ext.length - 1);
+  var head = Math.ceil(keep * 0.6);
+  return base.slice(0, head) + '…' + base.slice(-(keep - head)) + ext;
+}
+
+function logAdd(q, a){
+  var none = $('log-none'); if (none) none.remove();
+  var w = document.createElement('div');
+  var p1 = document.createElement('p'); p1.className = 'q'; p1.textContent = q;
+  var p2 = document.createElement('p'); p2.className = 'a'; p2.textContent = a;
+  w.appendChild(p1); w.appendChild(p2);
+  $('log').appendChild(w);
+}
+
+/* ── 读图 ─────────────────────────────────────────────── */
+/* 这四句是给人看的，不是给机器看的。v2 只有一个转圈，
+   对这一版的读者来说「有没有在动」比「转不转」重要得多。 */
+var BEATS = [
+  ['Looking at your plan…',      'This takes a few seconds. You do not need to do anything.', 12],
+  ['Finding the walls.',         'The thick lines are walls. The gaps in them are doors.',     42],
+  ['Measuring the rooms.',       'Working out how much floor there is in each one.',           74],
+  ['Almost done.',               'Checking the doorways are wide enough to get through.',      96]
+];
+
+function handleFile(file){
+  if (uploaded) return;
+  uploaded = true;
+
+  var name = (file && file.name) || 'floorplan.jpg';
+  var size = file ? fmtSize(file.size) : '';
+
+  $('ways').hidden = true;
+  document.querySelector('.dragnote').hidden = true;
+  $('helper').hidden = true;
+  $('ask').textContent  = 'Thank you. Let me read it.';
+  $('hint').textContent = shortName(name) + (size ? ' · ' + size : '');
+  $('reading').hidden = false;
+
+  var i = 0;
+  (function step(){
+    var b = BEATS[i];
+    $('r-title').textContent = b[0];
+    $('r-sub').textContent   = b[1];
+    $('r-bar').style.width   = b[2] + '%';
+    i++;
+    if (i < BEATS.length) timer = setTimeout(step, 900);
+    else timer = setTimeout(finish, 1000);
+  })();
+
+  function finish(){
+    $('reading').hidden = true;
+    $('result').hidden  = false;
+    $('ask').textContent  = 'This is your home.';
+    $('hint').textContent = 'Have a look. If anything is wrong, tell me and I will change it.';
+    $('saylabel').textContent = 'Anything I got wrong? Tell me in your own words.';
+    $('own').placeholder = 'The bathroom is on the other side…';
+
+    logAdd('your home', shortName(name) + ' · 54 m², 4 rooms');
+
+    var go = $('go');
+    go.disabled = false;
+    go.focus({ preventScroll:true });
+  }
+}
+
+/* ── 三条路 ───────────────────────────────────────────── */
+$('w-photo').addEventListener('click', function(){ $('cam').click(); });
+$('w-file').addEventListener('click',  function(){ $('file').click(); });
+
+$('w-help').addEventListener('click', function(){
+  var h = $('helper');
+  h.hidden = !h.hidden;
+  if (!h.hidden){
+    /* TODO 取件码还没接后端 —— 这里是本地随机数，只为把交互跑通。
+       真要上线，号码必须由服务端签发并绑定这份档案。 */
+    var n = '';
+    for (var i = 0; i < 6; i++) n += Math.floor(Math.random() * 10);
+    $('code').textContent = n.slice(0,3) + ' ' + n.slice(3);
+    h.scrollIntoView({ block:'nearest', behavior:'smooth' });
+  }
+});
+
+$('w-none').addEventListener('click', function(){
+  /* 没有图纸 → 回到 v3 原本的三选一户型（flow-resident.html 第 2 步） */
+  location.href = './flow-resident.html?step=2&noplan=1';
+});
+
+$('file').addEventListener('change', function(){ handleFile(this.files[0]); });
+$('cam').addEventListener('change',  function(){ handleFile(this.files[0]); });
+
+/* 拖拽仍然可用，只是没放在主路上 */
+['dragenter','dragover'].forEach(function(ev){
+  window.addEventListener(ev, function(e){
+    e.preventDefault();
+    if (!uploaded) document.body.classList.add('drop-on');
+  });
+});
+['dragleave','drop'].forEach(function(ev){
+  window.addEventListener(ev, function(e){
+    e.preventDefault();
+    document.body.classList.remove('drop-on');
+  });
+});
+window.addEventListener('drop', function(e){
+  var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+  if (f) handleFile(f);
+});
+
+/* 重来 */
+$('again').addEventListener('click', function(){ location.reload(); });
+
+/* ── 提问 ─────────────────────────────────────────────── */
+/* TODO 这里还没接 assets/llm.js。家属版和医护版走的是
+   MNEMO_LLM.route() → extract() → 本地兜底那一套，
+   本人版的自然语言输入本来就是 TODO.md 第 4 条，一起做比较省事。 */
+var CANNED = [
+  [/fire|escape|逃生|疏散/i,
+   'Yes, that works. The fire escape map by the front door shows the walls, and that is what I need.'],
+  [/scale|比例|尺寸|measure|量/i,
+   'It does not need to be to scale. Give me one length you know — a door is usually 80 cm — and I work out the rest.'],
+  [/photo|picture|照片|拍/i,
+   'A phone photo is fine. Lay the paper flat, stand over it, and get all four corners in.'],
+  [/no plan|没有|don.t have/i,
+   'Then use the last option. I will show you three common flats and you tell me which is closest to yours.']
+];
+function ask(){
+  var t = $('own').value.trim();
+  if (!t) return;
+  $('own').value = '';
+  var out = 'I have made a note of that. It will be with your file.';
+  for (var i = 0; i < CANNED.length; i++) if (CANNED[i][0].test(t)){ out = CANNED[i][1]; break; }
+  $('note').textContent = out;
+}
+$('send').addEventListener('click', ask);
+$('own').addEventListener('keydown', function(e){ if (e.key === 'Enter') ask(); });
+
+/* ── 上下步 ───────────────────────────────────────────── */
+$('back').addEventListener('click', function(){ location.href = './flow-resident.html'; });
+$('go').addEventListener('click', function(){
+  if (!$('go').disabled) location.href = './flow-resident.html?step=3';
+});
+})();
+</script>
+</body>
+</html>

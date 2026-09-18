@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MNEMOSYNE — Walk through it</title>
+
+<!-- ============================================================
+     MNEMO · 医护人员版 · 第 4 步（Preview）
+     ------------------------------------------------------------
+     对应 Figma：2353:65「CARER · 4 Preview」
+     外壳坐标照第 1 步：左面板 x=121 · 右卡 924,252 · 对话坞 y=633
+
+     这一屏和家属版最大的差别：右边那张「本次改动」日志。
+     每条改动都不是写死的文案 —— 是「她今天量到的数」和
+     「所选方案要求的数」之间的差算出来的：
+        门洞 760 → 方案要 850 ⇒ 生成一条「门洞加宽 90 mm」
+     撤掉一条，分数当场往下掉，规则那行也跟着变。
+
+     2026-09-16：**3D 接上了**。左上那个 712×392 的框现在装的是
+     preview-3d-<分流>-type<户型>-option<方案>.html，和家属版第 4 步同一批页面
+     （27 个房间，三档全齐）。按「分流-户型-方案」三段 key 查 PV_PAGE。
+
+     两条实现上的要紧事：
+       · iframe **只在 key 变了才重挂**。C.render() 每敲一个字就跑一次，
+         每次都重设 src 等于每次重下 5–12 MB 的模型，页面会卡死。
+       · 查不到对应页面时**退回平面图**，标签照实写，不假装是 3D。
+     ============================================================ -->
+
+<style>
+@font-face{ font-family:'InterLocal'; src:url('assets/fonts/inter-var.woff2') format('woff2-variations');
+  font-weight:100 900; font-style:normal; font-display:block; }
+@font-face{ font-family:'SpaceMonoLocal'; src:url('assets/fonts/space-mono-700.woff2') format('woff2');
+  font-weight:700; font-style:normal; font-display:block; }
+</style>
+
+<style>
+:root{
+  --cream-a:#F8ECDC; --cream-b:#F1ECE5;
+  --ink:#1A1917; --mut:#736E66; --faint:#948F87; --hint:#B0A99D; --mono-c:#8A8378;
+  --hair:#DEDAD2; --line:#CFC8BB; --hair-2:#ECE7DE;
+  --white:#FFFFFF; --soft:#F1EAE0; --chipbg:#E7DED1; --sel:#FAF3EA; --plan-bg:#F6F3EE;
+  --accent:#ED7119; --accent-d:#B0570F; --ok:#4F6A48;
+  --r-card:14px;
+}
+*,*::before,*::after{ box-sizing:border-box }
+/* ⚠️ hidden 属性必须压得住（2026-09-16 修）
+   浏览器自带的 [hidden]{display:none} 在 UA 样式表里，**任何**作者写的
+   display 都能盖过它。.nightbtn 写着 display:inline-flex，于是
+   `$('nightbtn').hidden = true` 在 DOM 里是 true、按钮却照常画出来 ——
+   结果 mobility 和 memory 那 18 间也带着夜间按钮，而只有 vision 有夜景。
+   家属版 flow.html 早就有这一行（第 1302 行），这里补上。
+   自动化测试读的是 el.hidden 这个属性，读不出这种问题，
+   必须量一次 getBoundingClientRect().width。 */
+[hidden]{ display:none !important }
+/* 所有 <p> 都是绝对定位 + 明确 top，浏览器默认的 1em 上边距会把
+   mono 小标整体压低 9.5px，和 Figma 对不上。 */
+p{ margin:0 }
+html{ -webkit-text-size-adjust:100%; background:var(--cream-b) }
+body{
+  margin:0; font-family:'InterLocal','Inter',system-ui,-apple-system,'Segoe UI','PingFang SC',sans-serif;
+  color:var(--ink); background:
+    url('assets/bg/bg-family-carer.webp') center center / cover no-repeat fixed,
+    linear-gradient(160deg,var(--cream-a) 0%,var(--cream-b) 100%);
+  -webkit-font-smoothing:antialiased; min-height:100dvh; overflow-x:hidden;
+}
+.mono{ font-family:'SpaceMonoLocal','Space Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-weight:700; text-transform:uppercase; letter-spacing:.09em; }
+
+.stagewrap{ width:100%; display:flex; justify-content:center; overflow:hidden }
+.stage{ position:relative; width:1440px; height:960px; transform-origin:top center; transform:scale(var(--k,1)); flex:none }
+
+/* ── 外壳 ───────────────────────────────────────────────── */
+.logo{ position:absolute; left:34px; top:38px; width:68px; height:68px; object-fit:contain }
+.exit{ position:absolute; left:40px; top:847px; width:56px; height:56px; border-radius:50%;
+  background:var(--white); border:1px solid var(--hair); display:grid; place-items:center;
+  color:var(--mut); text-decoration:none; cursor:pointer;
+  transition:box-shadow .2s ease, color .18s ease, transform .14s ease; }
+.exit:hover{ box-shadow:0 6px 16px rgba(80,66,48,.14); color:var(--ink) }
+.exit:active{ transform:scale(.95) }
+.exit:focus-visible{ outline:2px solid var(--accent); outline-offset:3px }
+.exit-label{ position:absolute; left:43px; top:908px; font-size:7.5px; color:var(--mut); letter-spacing:.06em }
+
+h1.title{ position:absolute; left:140px; top:44px; margin:0; width:900px;
+  font-size:34px; line-height:1.1; letter-spacing:-.022em; font-weight:700 }
+p.sub{ position:absolute; left:140px; top:94px; width:800px; font-size:14.5px; line-height:21px; color:var(--mut) }
+
+.stepchip{ position:absolute; left:1218px; top:52px; width:174px; height:36px; border-radius:18px;
+  background:var(--white); border:1px solid var(--hair); display:flex; align-items:center; gap:10px; padding-left:20px }
+.stepchip i{ width:8px; height:8px; border-radius:50%; background:var(--accent); flex:none }
+.stepchip span{ font-size:11px; color:var(--mut) }
+
+.steps{ position:absolute; left:121px; top:152px; width:948px; height:30px }
+.steps > div{ position:absolute; top:0; width:150px; height:30px }
+.steps b{ position:absolute; top:0; left:0; width:150px; height:3px; border-radius:2px; background:var(--hair); display:block }
+.steps s{ position:absolute; top:14px; left:0; white-space:nowrap; text-decoration:none; font-size:9.5px; color:var(--faint);
+  font-family:'SpaceMonoLocal','Space Mono',monospace; font-weight:700; text-transform:uppercase; letter-spacing:.09em }
+.steps .on b{ background:var(--accent) }
+.steps .on s{ color:var(--ink) }
+.steps a{ text-decoration:none; cursor:pointer }
+.steps a:hover s{ color:var(--accent-d) }
+
+.visit{ position:absolute; left:121px; top:206px; height:26px; padding:0 18px; border-radius:13px;
+  background:var(--ink); display:flex; align-items:center; font-size:9.5px; color:#F6EFE5 }
+.when{ position:absolute; left:249px; top:212px; font-size:13.5px; line-height:16px; color:var(--mut) }
+.saved{ position:absolute; right:48px; top:213px; text-align:right; font-size:9.5px; color:var(--faint) }
+
+/* ── 左：预览 + 实时分数 ────────────────────────────────── */
+.panel{ position:absolute; left:121px; top:252px; width:760px; height:566px;
+  background:var(--white); border:1px solid var(--hair); border-radius:var(--r-card) }
+.gtitle{ position:absolute; font-size:9.5px; color:var(--mono-c) }
+
+.view{ position:absolute; left:24px; top:24px; width:712px; height:392px;
+  background:var(--plan-bg); border:1px solid var(--line); border-radius:10px;
+  display:grid; place-items:center; overflow:hidden }
+/* ⚠ 必须是直接子选择器。写成 .view svg 会连按钮里那个 12px 的月亮图标
+   一起放成 330×330 —— 兜底平面是 insertBefore 到 .view 底下的**直接子元素**，
+   而夜间按钮里的 svg 是孙子，只有 `>` 分得开。踩过一次：一开夜间，
+   框顶上横着一道巨大的白月牙。 */
+.view > svg{ display:block; width:330px; height:330px; opacity:.9 }
+.view .vlab{ position:absolute; left:20px; top:20px; font-size:9.5px; color:var(--hint); z-index:2 }
+.view .vhint{ position:absolute; right:20px; bottom:18px; font-size:12px; color:var(--hint); z-index:2 }
+.view.miss::after{ content:'plan not loaded — open through the local server, not by double-clicking'; font-size:12px; color:var(--hint) }
+/* 3D。iframe 铺满整个框；模型没下完之前它是透明的，下面垫着 --plan-bg，
+   所以不会闪白。标签和提示用 z-index 压在上面。 */
+.view iframe{ position:absolute; inset:0; width:100%; height:100%; border:0;
+  display:block; background:transparent; opacity:0; transition:opacity .45s ease }
+.view iframe.ready{ opacity:1 }
+/* 模型在下的时候，这两行小字盖住整个框的中间 */
+.view .vwait{ position:absolute; left:0; right:0; top:50%; margin:0; transform:translateY(-50%);
+  text-align:center; font-size:11px; color:var(--hint); z-index:2; pointer-events:none }
+.view .vwait.gone{ display:none }
+
+/* ── 夜间模式 ──────────────────────────────────────────────
+   iframe 里的画布是**透明**的，房间背后透出来的是这个框的底色。
+   所以天黑要两边一起做：3D 那边压太阳、压环境光、让盲道和触摸板自发光，
+   这边把纸换成夜色。只改一边的话，深色房间会浮在一张米色纸上。
+   过渡给 .28s —— 突然一黑像出了故障，慢一拍才读得出是「入夜」。 */
+.view{ transition:background .28s ease, border-color .28s ease }
+.view.is-night{ background:#0E0D0C; border-color:#2B2724 }
+.view.is-night .vlab{ color:#8E877C }
+.view.is-night .vhint{ color:#8E877C }
+.view.is-night .vwait{ color:#8E877C }
+
+.nightbtn{ position:absolute; right:16px; top:14px; z-index:3; height:26px; padding:0 12px;
+  border-radius:13px; border:1px solid var(--line); background:rgba(255,255,255,.92);
+  font-family:'SpaceMonoLocal','Space Mono',monospace; font-weight:700;
+  font-size:8.5px; letter-spacing:.09em; color:var(--mut); cursor:pointer;
+  display:inline-flex; align-items:center; gap:6px;
+  transition:background .2s ease, border-color .16s ease, color .16s ease }
+.nightbtn svg{ display:block; width:12px; height:12px; flex:none }
+.nightbtn:hover{ border-color:var(--accent); color:var(--accent-d) }
+.nightbtn:focus-visible{ outline:2px solid var(--accent); outline-offset:2px }
+/* 夜里按钮也换成深色玻璃 —— 米白按钮压在黑底上刺眼 */
+.view.is-night .nightbtn{ color:#E8E3D9; background:rgba(28,26,24,.72);
+  border-color:rgba(255,255,255,.16) }
+.view.is-night .nightbtn:hover{ background:rgba(40,37,33,.9); border-color:rgba(255,255,255,.28) }
+
+.slab{ position:absolute; left:24px; top:442px; font-size:9.5px; color:var(--mono-c) }
+.score{ position:absolute; left:24px; top:458px; font-size:34px; line-height:40px; font-weight:700;
+  letter-spacing:-.02em; color:var(--accent); transition:color .2s ease }
+.score.bad{ color:var(--accent-d) }
+.snote{ position:absolute; top:470px; font-size:12.5px; line-height:16px; color:var(--mut) }
+.snote.bad{ color:var(--accent-d); font-weight:500 }
+
+.acts{ position:absolute; left:24px; top:512px; display:flex; gap:10px }
+.act{ height:34px; padding:0 16px; border-radius:17px; border:1px solid var(--line);
+  background:transparent; font-family:inherit; font-size:12.5px; font-weight:500; color:var(--mut);
+  cursor:pointer; white-space:nowrap; transition:border-color .16s ease, color .16s ease, background .16s ease }
+.act:hover{ border-color:var(--mut); color:var(--ink) }
+.act:disabled{ opacity:.4; cursor:default }
+.act:focus-visible{ outline:2px solid var(--accent); outline-offset:2px }
+.act.warn{ border-color:var(--accent-d); color:var(--accent-d); background:var(--soft) }
+
+/* ── 右：本次改动日志 ───────────────────────────────────── */
+.log{ position:absolute; left:924px; top:252px; width:468px; height:380px;
+  background:var(--white); border:1px solid var(--hair); border-radius:var(--r-card) }
+.log .lab{ position:absolute; left:26px; top:26px; font-size:9.5px; color:var(--mono-c) }
+.log .sub2{ position:absolute; left:26px; top:46px; width:416px; font-size:12.5px; line-height:15px; color:var(--mut) }
+.log .hair{ position:absolute; left:26px; width:416px; height:1px; background:var(--hair) }
+.log .rows{ position:absolute; left:0; top:96px; width:468px; height:212px; overflow:hidden }
+
+.lrow{ position:absolute; left:26px; width:416px; height:44px; border:0; background:transparent;
+  padding:0; font-family:inherit; text-align:left; cursor:pointer; border-radius:8px;
+  transition:background .16s ease }
+.lrow:hover{ background:var(--plan-bg) }
+.lrow:focus-visible{ outline:2px solid var(--accent); outline-offset:1px }
+.lrow .t{ position:absolute; left:0; top:3px; font-size:9.5px; color:var(--faint);
+  font-family:'SpaceMonoLocal','Space Mono',monospace; font-weight:700; letter-spacing:.09em }
+.lrow .w{ position:absolute; left:56px; top:0; width:250px; font-size:13px; line-height:16px;
+  font-weight:500; color:var(--ink) }
+.lrow .b{ position:absolute; left:56px; top:19px; width:250px; font-size:11.5px; line-height:14px; color:var(--faint) }
+.lrow .tag{ position:absolute; right:0; top:0; height:22px; padding:0 10px; border-radius:11px;
+  border:1px solid var(--line); display:flex; align-items:center;
+  font-size:11px; font-weight:500; color:var(--hint); white-space:nowrap }
+.lrow[data-ot="1"] .tag{ border-color:var(--accent-d); color:var(--accent-d) }
+.lrow .rh{ position:absolute; left:0; top:38px; width:416px; height:1px; background:var(--hair-2) }
+
+.log .foot{ position:absolute; left:26px; top:332px; font-size:9.5px; color:var(--accent-d) }
+.log .undo{ position:absolute; left:26px; top:350px; font-size:12px; color:var(--hint);
+  background:none; border:0; padding:0; font-family:inherit; cursor:pointer }
+.log .undo:hover{ color:var(--accent-d); text-decoration:underline }
+.log .empty{ position:absolute; left:26px; top:120px; width:416px; font-size:13px; color:var(--hint) }
+
+/* ── 右下：对话坞 ───────────────────────────────────────── */
+.dock{ position:absolute; left:924px; top:633px; width:468px; height:156px; background:var(--soft); border-radius:var(--r-card) }
+.dock .av{ position:absolute; left:26px; top:30px; width:34px; height:34px; border-radius:50% }
+.dock .msgs{ position:absolute; left:74px; top:26px; width:368px; height:60px; overflow-y:auto;
+  overscroll-behavior:contain; font-size:13.5px; line-height:20px; color:var(--mut); scrollbar-width:thin }
+.dock .msgs p{ margin:0 0 8px }
+.dock .msgs p:last-child{ margin-bottom:0 }
+.dock .msgs p.me{ color:var(--ink); font-weight:500 }
+.dock .msgs p.ok{ color:var(--accent-d) }
+.composer{ position:absolute; left:26px; top:96px; width:416px; height:44px; background:var(--white);
+  border:1px solid var(--hair); border-radius:22px; display:flex; align-items:center }
+.composer input{ flex:1; min-width:0; height:42px; border:0; background:transparent; outline:none;
+  padding:0 8px 0 22px; font-family:inherit; font-size:13.5px; color:var(--ink) }
+.composer input::placeholder{ color:var(--hint) }
+.send{ width:32px; height:32px; margin-right:6px; flex:none; border-radius:50%; border:0; background:var(--ink);
+  color:var(--accent); display:grid; place-items:center; cursor:pointer; font-size:14px; line-height:1;
+  font-family:inherit; transition:transform .14s ease, opacity .2s ease }
+.send:hover{ transform:scale(1.06) }
+.send:disabled{ opacity:.45; cursor:default; transform:none }
+.dots i{ display:inline-block; width:4px; height:4px; margin-right:3px; border-radius:50%;
+  background:var(--faint); animation:blip 1.05s infinite ease-in-out }
+.dots i:nth-child(2){ animation-delay:.14s }
+.dots i:nth-child(3){ animation-delay:.28s }
+@keyframes blip{ 0%,60%,100%{ opacity:.25 } 30%{ opacity:1 } }
+
+@keyframes flash{ 0%{ background:rgba(237,113,25,.18) } 100%{ background:transparent } }
+.justfilled{ animation:flash .9s ease-out }
+
+.next{ position:absolute; left:1112px; top:858px; width:286px; height:44px; border-radius:22px;
+  background:var(--ink); border:0; cursor:pointer; display:flex; align-items:center;
+  justify-content:space-between; padding:0 20px 0 22px; font-family:inherit;
+  transition:transform .14s ease, box-shadow .2s ease }
+.next span{ font-size:13.5px; font-weight:600; color:#F6EFE5 }
+.next em{ font-style:normal; color:var(--accent); font-size:15px }
+.next:hover{ transform:translateY(-1px); box-shadow:0 8px 20px rgba(40,32,22,.22) }
+.next:focus-visible{ outline:2px solid var(--accent); outline-offset:3px }
+.nextnote{ position:absolute; left:1112px; top:910px; width:286px; font-size:11.5px;
+  color:var(--mut); text-align:right; opacity:0; transition:opacity .25s ease }
+.nextnote.show{ opacity:1 }
+
+@media (prefers-reduced-motion:reduce){ *{ animation-duration:.001ms !important; transition-duration:.001ms !important } }
+
+/* 签完字之后的横幅。位置在录入面板正上方，和「上下文带」同一行高度 */
+.lockbar{ position:absolute; left:121px; top:884px; width:900px;
+  font-size:9px; line-height:13px; color:#B0570F; letter-spacing:.06em;
+  text-transform:none; }
+</style>
+</head>
+
+<body>
+<div class="stagewrap" id="stagewrap">
+<div class="stage" id="stage">
+
+  <img class="logo" src="assets/logo.png" alt="MNEMOSYNE">
+  <a class="exit" href="./flow-carer-3.html" aria-label="Back to step 3">
+    <svg width="14" height="10" viewBox="0 0 14 10" fill="none" aria-hidden="true">
+      <path d="M5 1 1 5l4 4M1 5h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </a>
+  <p class="exit-label mono">SAVE&amp;EXIT</p>
+
+  <h1 class="title">Walk through it.</h1>
+  <p class="sub">The score moves as you change things. Every change is logged against your name.</p>
+
+  <div class="stepchip"><i></i><span class="mono">STEP 4 OF 5</span></div>
+
+  <nav class="steps" aria-label="Progress">
+    <div class="on" style="left:0"><b></b><a href="./flow-carer.html"><s>PROFILE</s></a></div>
+    <div class="on" style="left:162px"><b></b><a href="./flow-carer-2.html"><s>THEIR HOME</s></a></div>
+    <div class="on" style="left:324px"><b></b><a href="./flow-carer-3.html"><s>LAYOUTS</s></a></div>
+    <div class="on" style="left:486px"><b></b><s>PREVIEW</s></div>
+    <div style="left:648px"><b></b><s>HANDOVER</s></div>
+  </nav>
+
+  <div class="visit mono">FIRST FILE</div>
+  <p class="when" id="when">&nbsp;</p>
+  <p class="saved mono" id="saved">AUTOSAVED &nbsp;·&nbsp; NOTHING SIGNED YET</p>
+
+  <!-- ══ 左：预览 + 实时分数 ═══════════════════════════════ -->
+  <section class="panel" aria-label="Preview">
+    <div class="view" id="view">
+      <p class="vlab mono" id="vlab">3D &nbsp;·&nbsp; LOADING THE ROOM</p>
+      <p class="vwait mono" id="vwait">loading the room…</p>
+      <!-- 夜间：默认 hidden。等模型加载完、确认这个房间**有**夜景
+           （即它导出了 setNight）才显出来，见 syncNight()。 -->
+      <button type="button" class="nightbtn" id="nightbtn" hidden aria-pressed="false"
+              aria-label="Switch the room to night">
+        <svg width="12" height="12" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+          <path d="M11.1 8.2A5 5 0 0 1 4.8 1.9 4.95 4.95 0 1 0 11.1 8.2Z"
+                stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+        </svg><span id="nightlab">NIGHT</span>
+      </button>
+      <p class="vhint" id="vhint">Option C · Type A</p>
+    </div>
+
+    <p class="slab mono">LIVE ROOM SCORE</p>
+    <p class="score" id="score">8.2</p>
+    <p class="snote" id="snote">passes · Ø1500 turning · 900 mm doorways</p>
+
+    <div class="acts">
+      <button type="button" class="act" id="retest">Re-run room test</button>
+      <button type="button" class="act" id="undo">Undo last change</button>
+      <button type="button" class="act warn" id="flagall">Flag all for the OT</button>
+    </div>
+  </section>
+
+  <!-- ══ 右：本次改动 ══════════════════════════════════════ -->
+  <aside class="log" id="log" aria-label="Changes in this session" aria-live="polite">
+    <p class="lab mono">CHANGES IN THIS SESSION</p>
+    <p class="sub2" id="lsub">&nbsp;</p>
+    <div class="hair" style="top:84px"></div>
+
+    <div class="rows" id="rows"></div>
+
+    <div class="hair" style="top:316px"></div>
+    <p class="foot mono">NOTHING IS FILED UNTIL YOU SIGN AT STEP 5</p>
+    <button type="button" class="undo" id="undoAll">Undo everything from this visit</button>
+  </aside>
+
+  <!-- ══ 右下：对话 ════════════════════════════════════════ -->
+  <div class="dock">
+    <img class="av" src="assets/logo.png" alt="">
+    <div class="msgs" id="msgs">
+      <p id="lead">Tell me what you want moved and I will try it, then re-test the room and log it under your name.</p>
+    </div>
+    <form class="composer" id="composer">
+      <input id="say" autocomplete="off" placeholder="Ask MNEMO to change something…" aria-label="Ask MNEMO to change something">
+      <button class="send" id="send" type="submit" aria-label="Send">→</button>
+    </form>
+  </div>
+
+  <button class="next" id="next" type="button"><span>Continue — handover</span><em>→</em></button>
+  <p class="nextnote" id="nextnote"></p>
+
+</div>
+</div>
+
+<script src="assets/llm.js?v=20260917"></script>
+<script src="assets/nlu-rules.js"></script>
+<script src="assets/carer-core.js?v=20260917"></script>
+<script>
+(function(){
+'use strict';
+var C = window.MNEMO_CARER, $ = C.$, data = C.data;
+
+/* 和第 3 步同一份方案数据，别单独改 */
+var OPT = {
+  A:{ base:7.6, corridor:1200, door:850, desc:'Compact services' },
+  B:{ base:7.9, corridor:1250, door:850, desc:'Daylight-first bedroom' },
+  C:{ base:8.2, corridor:1400, door:900, desc:'One loop · wide corridors' }
+};
+function opt(){ return OPT[data.layout] || OPT.C; }
+function typeKey(){ var m = /^Type ([ABC])$/.exec(data.homeStd || ''); return m ? m[1] : 'A'; }
+
+/* ── 改动清单不是写死的：是「她量到的」和「方案要求的」之间的差 ──
+   每条都带一个代价 —— 撤掉它，分数就掉这么多，规则也就不满足了。 */
+function buildChanges(){
+  var o = opt(), list = [], t = 0;
+  /* 时间戳原来是写死的 09:38 起 —— 流程没有记录每条改动的时刻，改成序号 */
+  function at(){ t += 1; return 'NO. ' + t; }
+
+  /* 目标值 = 方案本身给的 和 她实际需要的，取更严的那个。
+     以前只看方案给的 —— 那等于假设每个人的需求都一样。
+
+     ⚠️ 说实话：**现在这个 max 永远取到方案值**。
+     三个方案的门洞是 850/850/900、走廊 1200/1250/1400，
+     而 needs() 推出来的上限是门洞 850、走廊 1200 —— 方案本来就够。
+     留着 max 是因为它是对的（以后调低方案参数或加严需求就会生效），
+     但不该假装它此刻改变了什么，更不该为它写一句
+     「因为她室内用轮椅」的说明 —— 那句话现在一次都不会出现。
+     需求真正起作用的地方是第 2 步：判断**她现在的房子**够不够。 */
+  var need = C.needs();
+  var tgtDoor = need && need.door ? Math.max(o.door, need.door) : o.door;
+  var tgtCorr = need ? Math.max(o.corridor, need.corridor) : o.corridor;
+
+  var door = parseInt(data.doorway, 10);
+  if (door > 0 && door < tgtDoor)
+    list.push({ id:'door', t:at(),
+      w:{ en:'Doorway widened ' + door + ' → ' + tgtDoor + ' mm' },
+      by:{ en:'from your measurement' },
+      cost:0.4, ot:true, rule:'doorway' });
+
+  var corr = parseInt(data.corridor, 10);
+  if (corr > 0 && corr < tgtCorr)
+    list.push({ id:'corr', t:at(),
+      w:{ en:'Corridor widened ' + corr + ' → ' + tgtCorr + ' mm' },
+      by:{ en:'from your measurement' }, cost:0.3, ot:true, rule:'corridor' });
+
+  if (!data.turning || /^none$/i.test(data.turning))
+    list.push({ id:'turn', t:at(),
+      w:{ en:'Turning circle added — Ø1500' },
+      by:{ en:'from your measurement' }, cost:0.5, ot:true, rule:'turning' });
+
+  list.push({ id:'soft', t:at(),
+    w:{ en:'Soft edge added at the door frame' },
+    by:{ en:'by MNEMO' }, cost:0.1, ot:false, rule:null });
+
+  return list;
+}
+
+function live(){
+  var all = buildChanges(), undone = C.listGet('undone');
+  var kept = all.filter(function(c){ return undone.indexOf(c.id) < 0; });
+  var lost = all.filter(function(c){ return undone.indexOf(c.id) > -1; });
+  var score = opt().base - lost.reduce(function(s, c){ return s + c.cost; }, 0);
+  return { all: all, kept: kept, lost: lost, score: Math.max(0, Math.round(score * 10) / 10) };
+}
+
+/* ── 3D 房间 ──────────────────────────────────────────────
+   27 个房间，key 是「分流-户型-方案」三段，和家属版 flow.html 的 PV_PAGE
+   **一字不差**。mobility 那九条的文件名是历史写法（没有 mobility- 前缀），
+   别为了整齐去改名 —— 文件真就叫那个名字。 */
+var PV_PAGE = {
+  'mobility-A-A':'preview-3d-optionA.html',
+  'mobility-A-B':'preview-3d-optionB.html',
+  'mobility-A-C':'preview-3d.html',
+  'mobility-B-A':'preview-3d-typeB-optionA.html',
+  'mobility-B-B':'preview-3d-typeB-optionB.html',
+  'mobility-B-C':'preview-3d-typeB-optionC.html',
+  'mobility-C-A':'preview-3d-typeC-optionA.html',
+  'mobility-C-B':'preview-3d-typeC-optionB.html',
+  'mobility-C-C':'preview-3d-typeC-optionC.html',
+  'vision-A-A':'preview-3d-vision-typeA-optionA.html',
+  'vision-A-B':'preview-3d-vision-typeA-optionB.html',
+  'vision-A-C':'preview-3d-vision-typeA-optionC.html',
+  'vision-B-A':'preview-3d-vision-typeB-optionA.html',
+  'vision-B-B':'preview-3d-vision-typeB-optionB.html',
+  'vision-B-C':'preview-3d-vision-typeB-optionC.html',
+  'vision-C-A':'preview-3d-vision-typeC-optionA.html',
+  'vision-C-B':'preview-3d-vision-typeC-optionB.html',
+  'vision-C-C':'preview-3d-vision-typeC-optionC.html',
+  'memory-A-A':'preview-3d-memory-typeA-optionA.html',
+  'memory-A-B':'preview-3d-memory-typeA-optionB.html',
+  'memory-A-C':'preview-3d-memory-typeA-optionC.html',
+  'memory-B-A':'preview-3d-memory-typeB-optionA.html',
+  'memory-B-B':'preview-3d-memory-typeB-optionB.html',
+  'memory-B-C':'preview-3d-memory-typeB-optionC.html',
+  'memory-C-A':'preview-3d-memory-typeC-optionA.html',
+  'memory-C-B':'preview-3d-memory-typeC-optionB.html',
+  'memory-C-C':'preview-3d-memory-typeC-optionC.html'
+};
+function pvId(){ return C.track() + '-' + typeKey() + '-' + (data.layout || 'C'); }
+
+/* ── 夜间模式 ──────────────────────────────────────────────
+   vision 这一档的要求里有「夜间动线全程有光」这一条（见 C.needs() 的 extras）。
+   白天那张图证明不了它 —— 盲道、触摸板、夜灯在白天和普通地面看着一样。
+   所以这个按钮不是装饰：**它是那条要求的证据**，医护要把这张图截进材料里。
+
+   ⚠ 按钮的显隐不是查表决定的，是**问房间自己有没有这个能力** ——
+   只有导出了 setNight 的 3D 页才显出按钮（现在是 vision 那九间）。
+   memory / mobility 的房间没有夜景，按钮自动不出现；
+   以后哪一间做了夜景，那边导出 setNight 就行，这里一行都不用改。
+   写一张「哪些 key 有夜间」的表是同样的效果，但那张表会和 PV_PAGE
+   一起长，早晚有一天忘了同步。这一条和家属版 pvNightOK() 一字不差。 */
+var pvNight = false;
+function pvWin(){
+  try { return pvFrame && pvFrame.contentWindow && pvFrame.contentWindow.__ROOM; }
+  catch(e){ return null; }
+}
+function nightOK(){ var R = pvWin(); return !!(R && R.setNight); }
+function syncNight(){
+  var ok = nightOK(), on = ok && pvNight;
+  $('nightbtn').hidden = !ok;
+  $('nightbtn').setAttribute('aria-pressed', on ? 'true' : 'false');
+  $('nightlab').textContent = on ? ('DAY') : ('NIGHT');
+  $('nightbtn').setAttribute('aria-label',
+    on ? 'Switch the room back to day' : 'Switch the room to night');
+  $('view').classList.toggle('is-night', on);
+}
+/* 状态存在**外层**：iframe 一重载，3D 页里的变量就回到初始值了，
+   而这里还记着，加载完再推一次就同步上。 */
+function pushNight(){
+  var R = pvWin();
+  if (R && R.setNight) R.setNight(pvNight);
+  syncNight();
+}
+$('nightbtn').addEventListener('click', function(){
+  if (!nightOK()) return;
+  pvNight = !pvNight;
+  pushNight();
+});
+
+/* 模型 5–12 MB，重挂一次就是重下一次。C.render() 每敲一个字跑一次，
+   所以这里记住上一次装的是哪个 key，**只有 key 变了才动 src**。 */
+var pvKey = '', pvFrame = null;
+function mount3D(){
+  var k = pvId(), page = PV_PAGE[k];
+  if (!page) return false;               /* 没有对应房间 → 交给平面兜底 */
+  if (k === pvKey && pvFrame) return true;
+  pvKey = k;
+  var v = $('view');
+  if (!pvFrame){
+    pvFrame = document.createElement('iframe');
+    pvFrame.title = '3D preview of the selected layout';
+    pvFrame.setAttribute('loading', 'lazy');
+    v.insertBefore(pvFrame, v.firstChild);
+  }
+  pvFrame.classList.remove('ready');
+  $('vwait').classList.remove('gone');
+  /* ⚠️ 别用 iframe 的 load 事件来收「loading」那层字。
+     load 在 3D 页的 HTML 和 three.js 到齐时就触发了，模型（5–12 MB）
+     还要再下很久 —— 提前收掉，用户盯着的是一个空框子，而标签已经写着 3D。
+     改成盯 3D 页自己那层 #load：它 display:none 的那一刻，
+     就是模型解析完、第一帧画出来的时候。这一条和家属版 pvMount() 一样。 */
+  syncNight();                           /* 换房间先把按钮收起来，等新房间报到 */
+  var mine = pvKey;
+  var waitModel = function(){
+    if (mine !== pvKey) return;            /* 中途换了方案，这一轮作废 */
+    var d = null;
+    try { d = pvFrame.contentDocument; } catch(e){}
+    var el = d && d.getElementById('load');
+    if (el && el.style.display === 'none'){
+      pvFrame.classList.add('ready');
+      $('vwait').classList.add('gone');
+      /* 到这一刻才问得出这个房间有没有夜景（iframe 加载完之前 pvWin() 是 null）。
+         顺便把外层记着的状态推进去 —— 用户开了夜间又换方案再换回来，
+         回来还是夜间。 */
+      pushNight();
+      return;
+    }
+    setTimeout(waitModel, 200);
+  };
+  /* 先挂监听后设 src，顺序不能反 —— 反了有可能错过 load 事件。 */
+  pvFrame.onload = waitModel;
+  /* 带时间戳：3D 页本身只有 ~180 KB，重下不值一提，但能杜绝
+     「父页面已更新、iframe 还吃着缓存的旧页」这种半新半旧的状态。
+     three.js、贴图、glb 是各自独立的 URL，照样走缓存，不受影响。 */
+  pvFrame.src = './' + page + '?v=' + Date.now();
+  return true;
+}
+
+/* ── 平面图：3D 没有对应房间时的兜底，标签照实写 ───────── */
+function paintPlan(){
+  var v = $('view');
+  var tpl = document.getElementById('lay-' + C.track() + '-' + typeKey() + '-' + (data.layout || 'C'))
+         || document.getElementById('lay-' + typeKey() + '-' + (data.layout || 'C'))
+         || document.getElementById('lay-A-' + (data.layout || 'C'));
+  Array.prototype.slice.call(v.querySelectorAll('svg')).forEach(function(s){ s.remove(); });
+  if (tpl && tpl.content && tpl.content.firstElementChild){
+    v.insertBefore(tpl.content.firstElementChild.cloneNode(true), v.firstChild);
+    v.classList.remove('miss');
+  } else v.classList.add('miss');
+}
+
+/* 装 3D，装不上才去取平面模板。两条路都会把左上角的标签写对。 */
+function paintView(){
+  if (mount3D()){
+    var lab = C.TRACK_LABEL[C.track()]['en'];
+    $('vlab').innerHTML = '3D &nbsp;·&nbsp; ' + lab.toUpperCase()
+                        + ' &nbsp;·&nbsp; ' + ('TYPE ') + typeKey();
+    return;
+  }
+  $('vwait').classList.add('gone');
+  if (pvFrame){ pvFrame.remove(); pvFrame = null; pvKey = ''; }
+  syncNight();                     /* 退回平面了，夜间按钮跟着收起来 */
+  $('vlab').innerHTML = ('PLAN')
+                      + ' &nbsp;·&nbsp; ' + ('NO 3D ROOM FOR THIS ONE YET');
+  if (document.getElementById('lay-A-C')) paintPlan();
+}
+
+fetch('assets/carer-layouts.html')
+  .then(function(r){ return r.ok ? r.text() : Promise.reject(0); })
+  .then(function(html){
+    var h = document.createElement('div'); h.style.display='none';
+    h.innerHTML = html; document.body.appendChild(h); paintView();
+  })
+  .catch(function(){ paintView(); });
+
+/* ── 动作 ─────────────────────────────────────────────── */
+$('undo').addEventListener('click', function(){
+  var L = live();
+  if (!L.kept.length) return;
+  C.listToggle('undone', L.kept[L.kept.length - 1].id);
+  C.stamp(); C.render();
+});
+$('undoAll').addEventListener('click', function(){
+  data.undone = ''; data.otFlags = '';
+  C.stamp(); C.render();
+});
+$('flagall').addEventListener('click', function(){
+  var L = live();
+  var ids = L.kept.map(function(c){ return c.id; });
+  var allOn = ids.every(function(id){ return isOT(id); });
+  data.otFlags = allOn ? '' : ids.join(',');
+  C.stamp(); C.render();
+});
+$('retest').addEventListener('click', function(){
+  var b = $('retest'), old = b.textContent;
+  b.disabled = true; b.textContent = 'Re-testing…';
+  setTimeout(function(){
+    b.disabled = false; b.textContent = old;
+    C.flash($('score')); C.render();
+  }, 700);
+});
+
+/* 每条改动默认的「要不要 OT」来自它本身；点一下可以翻转，
+   翻转过的记在 otFlags 里 —— 这样它就是医护的判断，不是系统的。 */
+function isOT(id){
+  var c = buildChanges().filter(function(x){ return x.id === id; })[0];
+  var flipped = C.listHas('otFlags', id);
+  return c ? (flipped ? !c.ot : c.ot) : false;
+}
+
+var LABEL = { en:{ undo:'that change', flag:'the OT flag' } };
+
+C.boot({
+  usesExtract: false,
+  verb: { en:'Done —' },
+
+  parse: function(text){
+    var p = {};
+    if (/undo|revert|take (it|that) back|撤销|撤掉|退回|去掉/i.test(text)) p.act = 'undo';
+    else if (/flag|needs? the ot|send to the ot|标记|要 ?OT|给 ?OT/i.test(text)) p.act = 'flag';
+    else if (/re-?test|re-?run|重测|重新测|再算/i.test(text)) p.act = 'retest';
+    return p;
+  },
+
+  apply: function(patch){
+    var names = LABEL.en, hit = [];
+    if (patch.act === 'undo'){
+      var L = live();
+      if (L.kept.length){ C.listToggle('undone', L.kept[L.kept.length-1].id); hit.push(names.undo); }
+    } else if (patch.act === 'flag'){
+      var K = live().kept.map(function(c){ return c.id; });
+      data.otFlags = K.join(','); hit.push(names.flag);
+    } else if (patch.act === 'retest'){
+      C.flash($('score')); hit.push('the room test');
+    }
+    if (hit.length){ C.stamp(); C.render(); }
+    return hit;
+  },
+
+  question: function(){
+    return 'Anything you want changed in this version?';
+  },
+
+  ctx: function(){
+    var L = live(), o = opt();
+    var b = ['Step 4 of 5: a care worker is previewing the chosen layout and can undo changes'];
+    if (data.name) b.push('resident: ' + data.name);
+    b.push('layout: Option ' + (data.layout || 'C') + ' — ' + o.desc);
+    b.push('live room score: ' + L.score.toFixed(1) + ' (base ' + o.base + ')');
+    b.push('changes kept: ' + L.kept.map(function(c){ return c.w.en; }).join(', '));
+    if (L.lost.length) b.push('changes undone: ' + L.lost.map(function(c){ return c.w.en; }).join(', '));
+    b.push('nothing is filed until the care worker signs at step 5');
+    return b.join('; ');
+  },
+
+  tail: function(){
+    return 'Every change in this version is listed on the right. Undo one and the score drops on the spot.';
+  },
+
+  miss: function(){
+    return 'On this screen I can undo, flag for the OT, or re-run the test. Changing the layout means going back a step.';
+  },
+
+  render: function(){
+    var L = live(), o = opt();
+
+    /* 分数 + 那行结论：撤掉的改动会让某条规则不再满足，要说出来 */
+    $('score').textContent = L.score.toFixed(1);
+    var broken = L.lost.filter(function(c){ return c.rule; });
+    var sn = $('snote');
+    if (broken.length){
+      sn.textContent = (broken.length + ' rule' + (broken.length>1?'s':'') + ' no longer met — ' +
+           broken.map(function(c){ return c.rule; }).join(', '));
+      sn.classList.add('bad'); $('score').classList.add('bad');
+    } else {
+      sn.textContent = ('passes · Ø1500 turning · ' + o.door + ' mm doorways');
+      sn.classList.remove('bad'); $('score').classList.remove('bad');
+    }
+    sn.style.left = (24 + $('score').offsetWidth + 16) + 'px';
+
+    $('vhint').textContent = 'Option ' + (data.layout || 'C') + ' · ' + (data.homeStd || 'Type A');
+    paintView();
+
+    /* 日志 */
+    var rows = $('rows');
+    rows.innerHTML = '';
+    if (!L.kept.length){
+      var e = document.createElement('p');
+      e.className = 'empty';
+      e.textContent = 'Nothing changed in this version. The score is back to the layout as generated.';
+      $('log').appendChild(e);
+    }
+    L.kept.forEach(function(c, i){
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'lrow';
+      b.style.top = (i * 50) + 'px';
+      b.dataset.ot = isOT(c.id) ? '1' : '0';
+      b.innerHTML =
+        '<span class="t">' + c.t + '</span>' +
+        '<span class="w"></span><span class="b"></span>' +
+        '<span class="tag"></span>' +
+        (i < L.kept.length - 1 ? '<span class="rh"></span>' : '');
+      b.querySelector('.w').textContent = c.w.en;
+      b.querySelector('.b').textContent = c.by.en;
+      b.querySelector('.tag').textContent = isOT(c.id)
+        ? ('needs OT')
+        : ('no OT');
+      b.title = 'Click to change whether the OT must sign this off';
+      b.addEventListener('click', function(){ C.listToggle('otFlags', c.id); C.stamp(); C.render(); });
+      rows.appendChild(b);
+    });
+
+    var need = L.kept.filter(function(c){ return isOT(c.id); }).length;
+    $('lsub').textContent = (L.kept.length + ' change' + (L.kept.length === 1 ? '' : 's') + ', ' +
+         need + (need === 1 ? ' of them needs ' : ' of them need ') + 'the OT first.');
+
+    var allOn = L.kept.length && L.kept.every(function(c){ return isOT(c.id); });
+    $('flagall').textContent = allOn
+      ? ('Clear all OT flags')
+      : ('Flag all for the OT');
+    $('undo').disabled = !L.kept.length;
+
+    $('when').innerHTML = (data.name || 'New file') +
+      ' &nbsp;·&nbsp; ' + (data.homeStd || 'Type A') +
+      ' &nbsp;·&nbsp; Option ' + (data.layout || 'C');
+  },
+
+  next: { href:'./flow-carer-5.html', label:'Step 5' }
+});
+})();
+</script>
+</body>
+</html>

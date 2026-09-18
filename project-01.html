@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MNEMOSYNE — Mrs. Ying's Home</title>
+
+<style>
+@font-face{ font-family:'InterLocal'; src:url('assets/fonts/inter-var.woff2') format('woff2-variations');
+  font-weight:100 900; font-style:normal; font-display:block }
+@font-face{ font-family:'SpaceMonoLocal'; src:url('assets/fonts/space-mono-700.woff2') format('woff2');
+  font-weight:700; font-style:normal; font-display:block }
+</style>
+
+<style>
+/* ============================================================
+   MNEMOSYNE · Project / Persona 01 — Mrs. Ying（行动不便）
+   对应 Figma frame 537:97 —— 1440 × 2386
+   坐标 / 字号 / 字距 / 色值全部取自该 frame 的实测值。
+
+   写法和 project.html 一致：常规响应式（--stage / --pad + 媒体查询），
+   不用 research 那套整体缩放 —— 这一页是「一段文字 + 一张大图」反复堆叠，
+   天然能重排。
+   ============================================================ */
+:root{
+  --bg:#EFECE6;
+  --nav:#141414;
+  --crumb:#8C8780;
+  --title:#1C1A17;
+  --body:#6B6661;
+  --accent:#ED7119;
+  --caps:#F5F3EF;
+  --nav-dim:#9E9991;
+  --meta:#8C8780;
+
+  --chip-bg:#E5E2DA; --chip-tx:#4D4A45;
+  --card:#F6F4EE;    --card-bd:#D6D1C7;
+  --track:#DBD7CF;                 /* 评分条的底槽 */
+  --note-bg:#ECE8E1;               /* WHY THESE WEIGHTS 那块 */
+  --note-tx:#524F4A;
+  --cap:#807A73;                   /* LAYOUT SCORE 小字 */
+
+  --sans:'InterLocal','Inter',system-ui,-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+  --mono:'SpaceMonoLocal','Space Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+
+  --stage:1440px;
+  --pad:152px;
+  --nav-h:76px;
+}
+*{ box-sizing:border-box }
+html{ background:var(--bg); scroll-behavior:smooth; scroll-padding-top:var(--nav-h) }
+body{
+  margin:0; background:var(--bg); color:var(--body);
+  font-family:var(--sans); -webkit-font-smoothing:antialiased; overflow-x:clip;
+}
+.wrap{ width:min(100%, var(--stage)); margin-inline:auto; padding-inline:var(--pad) }
+
+/* ---------- 导航（全站同一套） ---------- */
+.nav{ position:fixed; top:0; left:0; right:0; z-index:60; height:var(--nav-h); background:var(--nav) }
+.nav-in{ width:min(100%, var(--stage)); margin-inline:auto; height:100%;
+  padding-inline:56px; display:flex; align-items:center; justify-content:space-between }
+.brand{ display:block; line-height:0 }
+.brand img{ display:block; width:92.9px; height:36px; object-fit:contain }
+.nav-r{ display:flex; align-items:center; gap:32px }
+.contact{ font-size:13px; font-weight:500; color:var(--nav-dim); text-decoration:none;
+          transition:color .22s ease }
+.contact:hover{ color:var(--caps) }
+.burger{ width:24px; height:18px; padding:0; background:none; border:0; cursor:pointer;
+         display:flex; flex-direction:column; justify-content:space-between }
+.burger i{ display:block; height:2px; border-radius:1px; background:var(--caps);
+           transition:transform .26s ease, opacity .2s ease }
+.burger[aria-expanded="true"] i:nth-child(1){ transform:translateY(8px) rotate(45deg) }
+.burger[aria-expanded="true"] i:nth-child(2){ opacity:0 }
+.burger[aria-expanded="true"] i:nth-child(3){ transform:translateY(-8px) rotate(-45deg) }
+
+.menu{ position:fixed; inset:0; z-index:55; display:flex; align-items:center;
+  background:rgba(14,13,15,.32);
+  -webkit-backdrop-filter:blur(22px) saturate(1.25); backdrop-filter:blur(22px) saturate(1.25);
+  opacity:0; visibility:hidden; transition:opacity .5s ease, visibility 0s linear .5s }
+.menu[data-open="true"]{ opacity:1; visibility:visible;
+  transition:opacity .5s ease, visibility 0s linear 0s }
+.menu ul{ width:min(100%, var(--stage)); margin-inline:auto; padding:0 56px; list-style:none }
+.menu a{ display:flex; align-items:baseline; gap:22px; padding:7px 0; text-decoration:none;
+  font-size:clamp(30px, 4.6vw, 56px); font-weight:700; letter-spacing:-.02em; line-height:1.28;
+  color:var(--caps); width:max-content; opacity:0; transform:translateY(26px);
+  transition:opacity .5s ease, transform .6s cubic-bezier(.2,.6,.2,1), color .25s ease }
+.menu[data-open="true"] a{ opacity:1; transform:none }
+.menu[data-open="true"] li:nth-child(1) a{ transition-delay:.10s }
+.menu[data-open="true"] li:nth-child(2) a{ transition-delay:.16s }
+.menu[data-open="true"] li:nth-child(3) a{ transition-delay:.22s }
+.menu[data-open="true"] li:nth-child(4) a{ transition-delay:.28s }
+.menu[data-open="true"] li:nth-child(5) a{ transition-delay:.34s }
+.menu[data-open="true"] li:nth-child(6) a{ transition-delay:.40s }
+.menu[data-open="true"] li:nth-child(7) a{ transition-delay:.46s }
+.menu a:hover{ color:var(--accent) }
+.menu a[aria-disabled="true"]{ color:rgba(245,243,239,.34); pointer-events:none }
+.menu a[aria-current="page"]{ color:var(--accent) }
+.menu .no{ flex:none; width:46px; font-family:var(--mono); font-weight:700;
+           font-size:12px; letter-spacing:1.2px; color:var(--meta) }
+
+main{ padding-top:var(--nav-h); padding-bottom:43px }   /* 2343 → 2386 */
+
+/* ---------- 页头 ---------- */
+.head{ padding-top:46px }                               /* 76 + 46 → 面包屑 y=122 */
+.crumb{
+  /* ⚠ 这里是 flex 不是 inline-flex：inline-flex 会参与父级的行盒，
+     行盒按 line-height:normal 算，比这一行的 15px 高出 4px，
+     面包屑整体往下掉 4，后面每一段都跟着错位。
+     width:max-content 保证它仍然只占文字那么宽、hover 区域不会铺满整行。 */
+  display:flex; width:max-content; align-items:center; gap:9px;
+  margin:0; font-size:12px; font-weight:600; line-height:15px;
+  letter-spacing:1.68px; color:var(--crumb); text-decoration:none;
+  transition:color .2s ease;
+}
+.crumb:hover{ color:var(--title) }
+.crumb .arw{ transition:transform .22s ease }
+.crumb:hover .arw{ transform:translateX(-3px) }
+.h1{
+  margin:31px 0 0;                                      /* 137 → 168 */
+  font-size:48px; font-weight:700; line-height:118%; color:var(--title);
+}
+/* 四个属性标签。Figma 实测：高 28、圆角 14（正好是胶囊）、左右内边距 16、间距 12 */
+.chips{ display:flex; flex-wrap:wrap; gap:12px; margin-top:24px }   /* 282 → 306 */
+.chip{
+  height:28px; padding:0 16px; border-radius:14px;
+  background:var(--chip-bg);
+  display:inline-flex; align-items:center;
+  font-size:11px; font-weight:600; letter-spacing:1.54px; color:var(--chip-tx);
+  white-space:nowrap;
+}
+.intro{
+  margin:26px 0 0;                                      /* 334 → 360 */
+  font-size:15px; font-weight:400; line-height:178%; color:var(--body);
+  /* 和 project.html 的 lede 同一个道理：断行由 <br> 定死，
+     照 Figma 写 max-width:617px 会被本地 Inter 挤断多一行 */
+}
+
+/* ---------- 大图 ---------- */
+/* Figma 里这张图是 1136×583，而源图是 4544×2332 —— 正好 4 倍，比例一致，
+   所以是整张图铺满，没有裁切。 */
+.hero-shot{ margin-top:24px; width:100%; aspect-ratio:1136 / 583; display:block }  /* 441 → 465 */
+
+/* ---------- 小标题 ---------- */
+.h2{ margin:0; font-size:28px; font-weight:700; line-height:34px; color:var(--title) }
+
+/* ---------- 改了什么：三张卡 ---------- */
+.changed{ margin-top:68px }                             /* 1048 → 1116 */
+.ch-cards{
+  margin-top:22px;                                      /* 1150 → 1172 */
+  display:grid; grid-template-columns:repeat(3, 1fr); gap:25px;
+}
+.ch{
+  background:var(--card); border-radius:8px; overflow:hidden;
+  /* 和 project.html 的卡一样：Figma 这条描边是 INSIDE 对齐，
+     用 inset 阴影才不会把内容框挤小 2px */
+  box-shadow:inset 0 0 0 1px var(--card-bd);
+}
+/* 顶上那条 66px 的色带。
+   ⚠ Figma 里这三条现在就是**纯色矩形**，不是图片 —— 照实做。
+   以后要换成实拍/渲染图，把 .ch-band 换成 <img> 就行，高度不用动。 */
+.ch-band{ height:66px }
+#ch-robot .ch-band{ background:#DBD3CC }
+#ch-sofa  .ch-band{ background:#DCD3C6 }
+#ch-cont  .ch-band{ background:#B69B82 }
+.ch-in{ padding:14px 18px 26px }        /* 图带底 1238 → 标题 1252；卡底留 26 → 卡高正好 168 */
+.ch-nm{ margin:0; font-size:12.5px; font-weight:600; line-height:15px;
+        letter-spacing:1.25px; color:var(--title) }
+.ch-bd{ margin:9px 0 0; font-size:12px; font-weight:400; line-height:160%; color:var(--body) }
+
+/* ---------- 评分 ---------- */
+.scores{ margin-top:112px }                             /* 1340 → 1452 */
+.sc-grid{
+  margin-top:32px;                                      /* 1486 → 1518 */
+  display:grid; grid-template-columns:738fr 398fr;      /* 152→890, 890→1288 */
+  align-items:start;
+}
+.sc-rows{ display:flex; flex-direction:column; gap:24px }   /* 行距 40 = 16 + 24 */
+.sc-row{
+  display:grid; grid-template-columns:138px minmax(0, 420px) 1fr; align-items:center;
+}
+.sc-lb{ margin:0; font-size:13px; font-weight:600; line-height:16px; color:var(--chip-tx) }
+.sc-track{ position:relative; height:8px; border-radius:4px; background:var(--track) }
+.sc-fill{ position:absolute; left:0; top:0; height:8px; border-radius:4px; background:var(--accent) }
+.sc-v{ margin:0; padding-left:16px; font-size:13px; font-weight:700; line-height:16px;
+       color:var(--title) }
+.sc-big{ margin:0; font-size:64px; font-weight:700; line-height:77px; color:var(--accent) }
+.sc-cap{
+  margin:2px 0 0;                                     /* 不写 max-width：断行由 <br> 定死，
+                                                         照 Figma 的 269 会被挤出第 5 行 */
+  font-size:11px; font-weight:600; letter-spacing:.88px; color:var(--cap);
+  line-height:18px;   /* Figma 是 165%（18.15），写死 18 才刚好 4 行 = 72 */
+}
+
+/* 为什么是这个权重 */
+.why{
+  margin-top:13px;   /* 参照的是**右边小字**的底 1669（比四根条低 15），不是条的底 1654 */
+  border-radius:8px; background:var(--note-bg);
+  padding:20px 22px;                                    /* 1682→1702、152→174 */
+  /* 描边同样是 INSIDE：#ED7119 透明度 50% */
+  box-shadow:inset 0 0 0 1px rgba(237,113,25,.5);
+}
+.why-k{ margin:0; font-size:11px; font-weight:600; line-height:13px;
+        letter-spacing:1.98px; color:var(--accent) }
+.why-b{ margin:9px 0 0;
+        font-size:12.5px; font-weight:400; color:var(--note-tx);
+        line-height:20px }
+        /* 同样不写 max-width：Figma 量到的 563 / 568 会被本地 Inter 挤出第 5 行，
+           整块从 142 撑到 162，后面每一段都往下掉。断行由 <br> 定死。
+           行高 Figma 是 162%（20.25），写死 20 才刚好 4 行 = 80。 */
+.built{ margin:17px 0 0; font-size:13.5px; font-weight:400; line-height:16px; color:var(--body) }
+
+/* ---------- 底部三张图 ---------- */
+/* 左边一张大的（738×411），右边上下两张小的（339×171 / 339×155）。
+   右列整体比左列低 40，两张之间隔 43 —— 都是 Figma 实测值。 */
+.plates{
+  margin-top:17px;                                      /* 1857 → 1874 */
+  display:grid; grid-template-columns:minmax(0,738fr) minmax(0,339fr);
+  column-gap:59px; align-items:start;                   /* 890 → 949 */
+}
+.plates img{ display:block; width:100%; height:auto }
+.pl-right{ padding-top:40px }                           /* 1874 → 1914 */
+.pl-right img + img{ margin-top:43px }                  /* 2085 → 2128 */
+
+/* ---------- 下一位 ---------- */
+.nextrow{ margin-top:41px; display:flex; justify-content:flex-end }   /* 2285 → 2326 */
+.nextlink{
+  display:inline-flex; align-items:center; gap:8px;
+  font-size:14px; font-weight:600; line-height:17px; letter-spacing:1.68px;
+  color:var(--accent); text-decoration:none;
+}
+.nextlink svg{ transition:transform .22s ease }
+.nextlink:hover svg{ transform:translateX(4px) }
+/* Persona 02 详情页还没做（Figma 539:68）。在那之前这里是 <span>，不是 <a> ——
+   做好之后把 <span> 换成 <a href="./project-02.html">、删掉 is-off 就行。 */
+.nextlink.is-off{ opacity:.45; cursor:default }
+
+/* ---------- 滚动淡入 ---------- */
+.rv{ opacity:0; transform:translateY(14px);
+     transition:opacity .6s ease, transform .6s cubic-bezier(.2,.6,.2,1) }
+.rv.in{ opacity:1; transform:none }
+@media (prefers-reduced-motion:reduce){ .rv{ opacity:1; transform:none; transition:none } }
+
+/* ---------- 窄屏 ---------- */
+@media (max-width:1300px){ :root{ --pad:56px } }
+@media (max-width:1040px){
+  .h1{ font-size:38px }
+  .ch-cards{ grid-template-columns:repeat(2, 1fr) }
+  /* 评分那一块两列挤不下：大分数挪到条形图下面 */
+  .sc-grid{ grid-template-columns:1fr; gap:32px }
+  .sc-row{ grid-template-columns:120px minmax(0, 1fr) 60px }
+}
+@media (max-width:760px){
+  :root{ --pad:24px }
+  .h1{ font-size:30px }
+  .ch-cards{ grid-template-columns:1fr }
+  .plates{ grid-template-columns:1fr; row-gap:24px }
+  .pl-right{ padding-top:0 }
+  .pl-right img + img{ margin-top:24px }
+  .sc-row{ grid-template-columns:100px minmax(0, 1fr) 52px }
+  /* 放开 Figma 里那些硬换行，窄屏会断在很怪的地方 */
+  .intro br, .ch-bd br, .why-b br, .sc-cap br{ display:none }
+}
+</style>
+</head>
+
+<body>
+
+<header class="nav">
+  <div class="nav-in">
+    <a class="brand" href="./index.html" aria-label="MNEMOSYNE">
+      <img src="assets/logo-dark.png" alt="MNEMOSYNE">
+    </a>
+    <div class="nav-r">
+      <a class="contact" href="mailto:zhoushichen0311@gmail.com">Contact</a>
+      <button class="burger" id="burger" aria-expanded="false" aria-controls="menu" aria-label="Menu">
+        <i></i><i></i><i></i>
+      </button>
+    </div>
+  </div>
+  <nav class="menu" id="menu" data-open="false" aria-label="Sections">
+    <ul>
+      <li><a href="./index.html#about"><span class="no">01</span>About</a></li>
+      <li><a href="./research.html"><span class="no">02</span>Research</a></li>
+      <li><a href="./project.html" aria-current="page"><span class="no">03</span>Project</a></li>
+      <li><a href="./library.html"><span class="no">04</span>Library</a></li>
+      <li><a href="./cube-system.html"><span class="no">05</span>Cube System</a></li>
+      <li><a href="./core-system.html"><span class="no">06</span>Core System</a></li>
+      <li><a href="./home-file-empty.html"><span class="no">07</span>Home File</a></li>
+    </ul>
+  </nav>
+</header>
+
+<main>
+  <div class="wrap">
+
+    <div class="head">
+      <a class="crumb" href="./project.html">
+        <svg class="arw" width="11" height="9" viewBox="0 0 11 9" fill="none" aria-hidden="true">
+          <path d="M11 4.5H1M4 1 .5 4.5 4 8" stroke="currentColor" stroke-width="1.6"
+                stroke-linecap="round" stroke-linejoin="round"/></svg>
+        WORKS&nbsp;&nbsp;/&nbsp;&nbsp;PERSONA 01 — MOBILITY DECLINE
+      </a>
+      <h1 class="h1">Mrs. Ying&rsquo;s Home,<br>Rebuilt for Moving Safely.</h1>
+      <div class="chips">
+        <span class="chip">AGE 72</span>
+        <span class="chip">LIVES ALONE</span>
+        <span class="chip">MOBILITY LEVEL 2</span>
+        <span class="chip">USES A CANE</span>
+      </div>
+      <p class="intro">Reduced muscle strength in the lower limbs. Occasional balance loss, especially when<br>
+        turning. Rising from a seat is hard without support, and walking more than five minutes<br>
+        brings fatigue. She is independent-minded, set in her routines, and does not want help.</p>
+    </div>
+
+    <img class="hero-shot rv" src="assets/project/p1-room.webp" width="1136" height="583"
+         alt="Mrs. Ying's room after the rebuild" decoding="async">
+
+    <!-- ── 改了什么 ── -->
+    <section class="changed">
+      <h2 class="h2">What Changed in the Room</h2>
+      <div class="ch-cards">
+        <article class="ch rv" id="ch-robot">
+          <div class="ch-band"></div>
+          <div class="ch-in">
+            <h3 class="ch-nm">MNEMO ROBOT</h3>
+            <p class="ch-bd">The robot guides her around the room, carries small<br>
+              things, and keeps her company.</p>
+          </div>
+        </article>
+        <article class="ch rv" id="ch-sofa">
+          <div class="ch-band"></div>
+          <div class="ch-in">
+            <h3 class="ch-nm">SOFA WHEELCHAIR</h3>
+            <p class="ch-bd">When she approaches the sofa, the wheelchair docks<br>
+              and becomes part of the seating.</p>
+          </div>
+        </article>
+        <article class="ch rv" id="ch-cont">
+          <div class="ch-band"></div>
+          <div class="ch-in">
+            <h3 class="ch-nm">CONTINUOUS FURNITURE</h3>
+            <p class="ch-bd">Furniture edges line up into one continuous support<br>
+              surface she can lean on while moving.</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- ── 评分 ── -->
+    <section class="scores">
+      <h2 class="h2">How the New Layout Scores</h2>
+
+      <div class="sc-grid">
+        <div class="sc-rows">
+          <div class="sc-row">
+            <p class="sc-lb">Connectivity</p>
+            <div class="sc-track"><span class="sc-fill" style="width:90%"></span></div>
+            <p class="sc-v">9.0</p>
+          </div>
+          <div class="sc-row">
+            <p class="sc-lb">Daylight</p>
+            <div class="sc-track"><span class="sc-fill" style="width:75%"></span></div>
+            <p class="sc-v">7.5</p>
+          </div>
+          <div class="sc-row">
+            <p class="sc-lb">Visual</p>
+            <div class="sc-track"><span class="sc-fill" style="width:75%"></span></div>
+            <p class="sc-v">7.5</p>
+          </div>
+          <div class="sc-row">
+            <p class="sc-lb">Airflow</p>
+            <div class="sc-track"><span class="sc-fill" style="width:70%"></span></div>
+            <p class="sc-v">7.0</p>
+          </div>
+        </div>
+
+        <div class="sc-side">
+          <p class="sc-big">8.2</p>
+          <p class="sc-cap">LAYOUT SCORE (FULL = 10)<br>
+            weighted: connectivity 50% · daylight 24% ·<br>
+            visual 16% · airflow 10%; valid only when<br>
+            every furniture gap is at least 0.9 m</p>
+        </div>
+      </div>
+
+      <div class="why">
+        <p class="why-k">WHY THESE WEIGHTS</p>
+        <p class="why-b">The four universal metrics stay the same across every home, but their weights are re-tuned per<br>
+          person. For mobility loss, connectivity carries half the score: safe, continuous circulation is the<br>
+          whole point. The layout only counts if every furniture gap is at least 0.9 m. Below that, the room<br>
+          leaves no minimum corridor for a cane or a turn, so the score drops to zero.</p>
+      </div>
+
+      <p class="built">Built on the three mobility rules from Research: furniture standards, clear circulation, handrail generation.</p>
+
+      <div class="plates rv">
+        <img src="assets/project/p1-plan.webp" width="738" height="411"
+             alt="Six layout diagrams: daylight, connectivity, visual, airflow, walk spacing, aisle spacing"
+             loading="lazy" decoding="async">
+        <div class="pl-right">
+          <img src="assets/project/p1-score.webp" width="339" height="171"
+               alt="Layout score panel" loading="lazy" decoding="async">
+          <img src="assets/project/p1-formula.webp" width="339" height="155"
+               alt="Scoring formula" loading="lazy" decoding="async">
+        </div>
+      </div>
+    </section>
+
+    <div class="nextrow">
+      <a class="nextlink" href="./project-02.html">NEXT — PERSONA 02 · MRS. LI
+        <svg width="16" height="11" viewBox="0 0 16 11" fill="none" aria-hidden="true">
+          <path d="M0 5.5h13.5M10.5 1l4 4.5-4 4.5" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+    </div>
+
+  </div>
+</main>
+
+<script>
+/* 汉堡菜单 */
+(function(){
+  var b = document.getElementById('burger'), m = document.getElementById('menu'), open = false;
+  function set(v){
+    open = v;
+    b.setAttribute('aria-expanded', open ? 'true' : 'false');
+    m.dataset.open = open ? 'true' : 'false';
+    document.body.style.overflow = open ? 'hidden' : '';
+  }
+  b.addEventListener('click', function(e){ e.stopPropagation(); set(!open); });
+  m.addEventListener('click', function(){ set(false); });
+  document.addEventListener('click', function(e){ if (!e.target.closest('.nav')) set(false); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') set(false); });
+})();
+
+/* 滚动淡入 */
+(function(){
+  var items = document.querySelectorAll('.rv');
+  if (!('IntersectionObserver' in window)){
+    items.forEach(function(el){ el.classList.add('in'); });
+    return;
+  }
+  var io = new IntersectionObserver(function(en){
+    en.forEach(function(e){
+      if (!e.isIntersecting) return;
+      e.target.classList.add('in'); io.unobserve(e.target);
+    });
+  }, { rootMargin:'0px 0px -10% 0px', threshold:.1 });
+  items.forEach(function(el){ io.observe(el); });
+})();
+</script>
+
+</body>
+</html>

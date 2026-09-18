@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<!-- ────────────────────────────────────────────────────────────
+     v3/index-v2.html
+     这是 v2/index.html 的副本（原件一字未动），放进 v3 目录，
+     好处是 assets/ 这些相对路径直接落到 v3/assets/，不用改一行。
+     和 v2 的差别只有两处链接：
+       · START A HOME FILE / 菜单 06 Home File
+         → ./home-file-empty.html（在 v3 里就是身份选择页）
+         → 再由它带着 ?who=… 进 v3/flow.html
+       · 菜单 04 Library → ../v2/library.html（v3 还没有 library）
+     ──────────────────────────────────────────────────────────── -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MNEMOSYNE — An Adaptive System for Elder Living</title>
+
+<style>
+/* 本地字体：与 flow / home-file 三页共用，不依赖网络 */
+@font-face{
+  font-family:'InterLocal';
+  src:url('assets/fonts/inter-var.woff2') format('woff2-variations');
+  font-weight:100 900; font-style:normal; font-display:block;
+}
+@font-face{
+  font-family:'SpaceMonoLocal';
+  src:url('assets/fonts/space-mono-700.woff2') format('woff2');
+  font-weight:700; font-style:normal; font-display:block;
+}
+</style>
+
+<style>
+/* ============================================================
+   MNEMOSYNE · 首页（视频背景版）
+   对应 Figma frame 521:65 — 1440 × 810（与视频同为 16:9）
+   所有尺寸 / 颜色 / 字号 / 字距均取自该 frame 的实测值
+   ============================================================ */
+
+:root{
+  --ink:#0E0D0F;          /* frame 底色 */
+  --shade:#0A090B;        /* left-shade 渐变色 */
+  --orange:#ED7119;       /* 主强调色 */
+  --title:#F9F4E9;        /* 大标题 */
+  --caps:#F5F3EF;         /* 全大写标签 */
+  --body:#B8B2AB;         /* 正文 */
+  --dim:#8F8B85;          /* 次级说明 / 页脚 */
+  --nav-dim:#9E9991;      /* Contact */
+  --btn-ink:#FFFBF5;      /* 按钮字 */
+
+  --sans:'InterLocal','Inter',system-ui,-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+  --mono:'SpaceMonoLocal','Space Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+
+  --stage:1440px;         /* Figma 画板宽 */
+  /* Figma 里 nav 用 56、正文用 90，两条左边界差 34px。
+     换成体量更大的 logo 锁定组后这个错位很明显，统一收到 56：
+     logo / Contact / kicker / 标题 / 正文 / 按钮 / 四列 / 页脚 共用一条左线 */
+  --pad:56px;
+
+  /* ---- About 区（Figma 523:65，浅色）---- */
+  --a-bg:#EFECE6;         /* 区块底色 */
+  --a-nav:#141414;        /* 吸顶导航条 */
+  --a-eyebrow:#8C8780;    /* ABOUT */
+  --a-title:#1C1A17;      /* 大标题 / 支柱标题 / 数字 */
+  --a-body:#6B6661;       /* 段落 */
+  --a-num:#99948C;        /* 01 — MOBILITY */
+  --a-p-body:#736E69;     /* 支柱说明 */
+  --a-stat-k:#948F87;     /* UNIFIED GRID */
+  --a-rule:#C7C2B8;       /* 支柱顶细线 */
+  --a-div:#CCC7BD;        /* stats 上方分隔线 */
+  --a-pad:152px;          /* Figma 里 About 正文内缩 152（左右对称） */
+  --nav-h:76px;           /* Figma 523:65 的 nav-in-about 高度 */
+}
+
+*{ box-sizing:border-box }
+
+html{
+  background:var(--ink);          /* 防首帧白闪 */
+  scroll-behavior:smooth;
+  scroll-padding-top:var(--nav-h);  /* 锚点跳转不被固定导航压住 */
+}
+body{
+  margin:0;
+  min-height:100dvh;
+  background:var(--ink);
+  color:var(--body);
+  font-family:var(--sans);
+  -webkit-font-smoothing:antialiased;
+  /* 用 clip 而不是 hidden —— hidden 会把 body 变成滚动容器，
+     干扰固定定位与滚动锚点；clip 只裁切，不产生滚动容器 */
+  overflow-x:clip;
+  scrollbar-gutter:stable;
+}
+
+/* ---------- 背景层：真实视频 + left-shade ---------- */
+.bg{ position:fixed; inset:0; z-index:0; overflow:hidden; background:var(--ink) }
+
+.bg video{
+  position:absolute; inset:0;
+  width:100%; height:100%;
+  object-fit:cover;
+  object-position:50% 50%;
+  display:block;
+  /* 视频末帧偏亮，压一点让左侧文字层次更稳 */
+  filter:saturate(1.02) brightness(.96);
+}
+
+/* Figma: left-shade 900×810，横向线性渐变
+   #0A090B  0% → a.97   |  55% → a.82  |  100% → a.00
+   宽度按画板 900/1440 = 62.5% 折算，并补上画板居中时左侧留白 */
+.shade{
+  position:absolute; left:0; top:0; bottom:0;
+  width:calc((100vw - min(100vw, var(--stage))) / 2 + min(100vw, var(--stage)) * .625);
+  background:linear-gradient(90deg,
+    rgba(10,9,11,.97) 0%,
+    rgba(10,9,11,.82) 55%,
+    rgba(10,9,11,0)  100%);
+  pointer-events:none;
+}
+
+/* ---------- 画板 ---------- */
+.stage{
+  position:relative; z-index:1;
+  width:min(100%, var(--stage));
+  margin-inline:auto;
+  min-height:100dvh;
+  padding:var(--nav-h) 0 37px;   /* 顶部让出固定导航条的高度 */
+  display:flex;
+  flex-direction:column;
+}
+
+/* 压暗层：把视频从亮部收到纯 #0E0D0F，同时给页脚两行小字一个稳定的底。
+   底边贴住首屏下沿。
+   用 100vw 满幅 —— .stage 限宽 1440，只用 left/right:0 会在宽屏留下竖直硬边。 */
+.stage::after{
+  content:'';
+  position:absolute; bottom:0; left:50%;
+  transform:translateX(-50%);
+  width:100vw; height:320px;
+  background:linear-gradient(to bottom,
+    rgba(14,13,15,0)    0%,
+    rgba(14,13,15,.22) 26%,
+    rgba(14,13,15,.62) 56%,
+    rgba(14,13,15,.90) 80%,
+    rgba(14,13,15,1)  100%);
+  pointer-events:none;
+  z-index:-1;              /* .stage 有 z-index:1 形成层叠上下文 →
+                              压在正文之下、但仍盖住 z-index:0 的视频层 */
+}
+
+
+/* 弹性留白：grow / shrink 权重按 Figma 的 120 : 34 分配
+   （kicker 仍落在画板 y=196：76 导航 + 120 留白）*/
+.sp-top{ flex:120 120 0; min-height:36px }
+.sp-bot{ flex:34 34 0;   min-height:12px }
+
+/* ============================================================
+   导航条 —— 全站唯一，固定在顶部
+   首屏透明（Figma 521:65 的 nav 无填充），
+   一滚动就变 Figma 523:65 的实底 #141414（高 76）
+   ============================================================ */
+.nav{
+  position:fixed; top:0; left:0; right:0; z-index:60;
+  height:var(--nav-h);
+  background:transparent;
+  transition:background .3s ease;
+}
+.nav.solid{
+  background:var(--a-nav);   /* Figma 没有下边框/投影，保持干净一条实底 */
+}
+.nav-in{
+  width:min(100%, var(--stage));
+  margin-inline:auto;
+  height:100%;
+  padding-inline:var(--pad);
+  display:flex; align-items:center; justify-content:space-between;
+}
+.nav-r{ display:flex; align-items:center; gap:32px }  /* Figma: Contact 右缘 1328 → 汉堡 1360 */
+
+.brand{ display:block; text-decoration:none; line-height:0; }
+/* 深色版 logo 锁定组（mark + MNEMOSYNE 字标已含在图内）
+   原图内容区 444×172；取 36px 高使图内 wordmark 的 cap 高 ≈ 7.3px，
+   与 Figma 里 10.8px Space Mono 字标的视觉字号一致 */
+.brand img{
+  display:block;
+  width:92.9px; height:36px;
+  object-fit:contain;
+}
+.contact{
+  font-family:var(--sans); font-weight:500;
+  font-size:13px; line-height:16px;
+  color:var(--nav-dim); text-decoration:none;
+  transition:color .22s ease;
+}
+.contact:hover{ color:var(--caps) }
+
+/* ---------- hero ---------- */
+.hero{ flex:none; position:relative; padding-inline:var(--pad); }
+
+.kicker{
+  margin:0;
+  font-family:var(--mono); font-weight:700;
+  font-size:11.8px; line-height:17px; letter-spacing:1.43px;
+  color:var(--orange);
+}
+.hero h1{
+  margin:26px 0 0;                       /* 196+17 → 239 */
+  font-weight:700;
+  font-size:58px; line-height:118%; letter-spacing:-.58px;
+  color:var(--title);
+}
+.lede{
+  margin:26px 0 0;                       /* 239+136 → 401 */
+  /* 三行断点由 <br> 决定。不能用 Figma 量到的 max-width:516px —— 本地 Inter
+     比 Figma 渲染略宽几像素，会把第一行挤断成两行，多出一个孤字。
+     这里放开宽度，只保留防溢出上限 */
+  max-width:100%;
+  width:fit-content;
+  font-size:15px; line-height:175%;
+  color:var(--body);
+}
+
+/* Figma: btn-explore-system 220×46 r4，字 x=116（左内边距 26） */
+.cta{
+  margin-top:29px;                       /* 401+78 → 508 */
+  width:220px; height:46px;
+  border-radius:4px;
+  background:var(--orange);
+  display:flex; align-items:center;
+  padding-left:26px;
+  font-family:var(--mono); font-weight:700;
+  font-size:11.8px; line-height:17px; letter-spacing:.77px;
+  color:var(--btn-ink); text-decoration:none;
+  transition:background .2s ease, transform .2s ease, box-shadow .2s ease;
+}
+.cta:hover{
+  background:#F5801F;
+  box-shadow:0 8px 24px rgba(237,113,25,.28);
+}
+.cta:active{ transform:translateY(1px) }
+.cta .arw{ margin-left:21px; transition:transform .22s ease }   /* Figma 三个空格 ≈ 21px */
+.cta:hover .arw{ transform:translateX(3px) }
+
+/* ---------- features ---------- */
+.features{
+  flex:none;
+  padding-inline:var(--pad);
+  margin-bottom:65px;                    /* 693 → 758 */
+  display:flex; gap:44px;                /* Figma 四列间距实测 44 */
+}
+.feat{ flex:none }
+/* Figma 已把描边方框换成实心矢量图标。四个图标高度统一 30，
+   宽度各不相同（29 / 30 / 30 / 36），所以只锁高、宽度由 viewBox 决定 */
+.feat .icon{
+  display:block;
+  height:30px; width:auto;
+  fill:var(--orange);
+}
+.feat .lbl{
+  margin:10px 0 0;                       /* 618 → 628 */
+  font-family:var(--mono); font-weight:700;
+  font-size:11.8px; line-height:17px; letter-spacing:.77px;
+  color:var(--caps);
+}
+.feat .txt{
+  margin:10px 0 0;                       /* 645 → 655 */
+  font-size:12px; line-height:160%;
+  color:var(--dim);
+}
+
+/* ---------- footer ---------- */
+.foot{
+  flex:none;
+  padding-inline:var(--pad);
+  display:flex; justify-content:space-between;
+  font-family:var(--mono); font-weight:700;
+  font-size:9.8px; line-height:15px; letter-spacing:1.32px;
+  color:var(--dim);
+}
+
+/* ============================================================
+   About 区 —— Figma 523:65（1440 × 1040，紧接首屏下方）
+   ============================================================ */
+.about{
+  position:relative; z-index:1;
+  background:var(--a-bg);
+  color:var(--a-body);
+}
+
+/* Figma: hamburger 24×18，三条 24×2 圆角 1，间距 6 */
+.burger{
+  width:24px; height:18px; padding:0;
+  background:none; border:0; cursor:pointer;
+  display:flex; flex-direction:column; justify-content:space-between;
+}
+.burger i{ display:block; height:2px; border-radius:1px; background:var(--caps);
+           transition:transform .26s ease, opacity .2s ease }
+.burger[aria-expanded="true"] i:nth-child(1){ transform:translateY(8px) rotate(45deg) }
+.burger[aria-expanded="true"] i:nth-child(2){ opacity:0 }
+.burger[aria-expanded="true"] i:nth-child(3){ transform:translateY(-8px) rotate(-45deg) }
+
+/* ============================================================
+   全屏毛玻璃菜单（沿用 v1 hero4 的 Foster 风格面板）
+   盖满视口、透出背后的视频/页面并做高斯模糊；
+   z-index 55 压在导航条（60）之下，所以 logo 和汉堡始终可点。
+   ============================================================ */
+.menu{
+  position:fixed; inset:0; z-index:55;
+  display:flex; align-items:center;
+  background:rgba(14,13,15,.32);
+  -webkit-backdrop-filter:blur(22px) saturate(1.25);
+          backdrop-filter:blur(22px) saturate(1.25);
+  opacity:0; visibility:hidden;
+  transition:opacity .5s ease, visibility 0s linear .5s;
+}
+.menu[data-open="true"]{
+  opacity:1; visibility:visible;
+  transition:opacity .5s ease, visibility 0s linear 0s;
+}
+.menu ul{
+  width:min(100%, var(--stage));
+  margin-inline:auto;
+  padding:0 56px;            /* 与导航条同一条左线 */
+  list-style:none;
+}
+.menu a{
+  display:flex; align-items:baseline; gap:22px;
+  padding:7px 0; text-decoration:none;
+  font-size:clamp(30px, 4.6vw, 56px);
+  font-weight:700; letter-spacing:-.02em; line-height:1.28;
+  color:var(--caps);
+  width:max-content;
+  opacity:0; transform:translateY(26px);
+  transition:opacity .5s ease,
+             transform .6s cubic-bezier(.2,.6,.2,1),
+             color .25s ease;
+}
+.menu[data-open="true"] a{ opacity:1; transform:none }
+.menu[data-open="true"] li:nth-child(1) a{ transition-delay:.10s }
+.menu[data-open="true"] li:nth-child(2) a{ transition-delay:.16s }
+.menu[data-open="true"] li:nth-child(3) a{ transition-delay:.22s }
+.menu[data-open="true"] li:nth-child(4) a{ transition-delay:.28s }
+.menu[data-open="true"] li:nth-child(5) a{ transition-delay:.34s }
+.menu[data-open="true"] li:nth-child(6) a{ transition-delay:.40s }
+.menu[data-open="true"] li:nth-child(7) a{ transition-delay:.46s }
+.menu a:hover{ color:var(--orange) }
+.menu a[aria-disabled="true"]{ color:rgba(245,243,239,.34); pointer-events:none }
+.menu a[aria-current="page"]{ color:var(--orange) }
+.menu .no{
+  flex:none; width:46px;
+  font-family:var(--mono); font-weight:700;
+  font-size:12px; letter-spacing:1.2px; color:var(--dim);
+}
+
+/* ---------- About 正文 ---------- */
+.about-in{
+  width:min(100%, var(--stage));
+  margin-inline:auto;
+  /* Figma 523:65 里 ABOUT 在 y=150、画板底 1040（stats 结束于 936）。
+     导航条现在是全站固定层、不再占用本区流内高度，
+     所以 150 直接作为本区上内边距 */
+  padding:150px var(--a-pad) 104px;
+}
+
+.eyebrow{
+  margin:0;
+  font-size:13px; font-weight:600; line-height:16px; letter-spacing:3.64px;   /* 28% */
+  color:var(--a-eyebrow);
+}
+.about h2{
+  margin:30px 0 0;                      /* 150+16 → 196 */
+  font-size:56px; font-weight:700; line-height:116%; letter-spacing:-.56px;
+  color:var(--a-title);
+}
+.about-lede{
+  margin:34px 0 0;                      /* 196+130 → 360 */
+  width:fit-content; max-width:100%;    /* 四行由 <br> 决定，不硬限 Figma 的 671 */
+  font-size:16px; font-weight:400; line-height:180%;
+  color:var(--a-body);
+}
+
+/* Figma: pillars 1150 宽，三列各 346，列间距 56 */
+.pillars{
+  margin-top:84px;                      /* 360+116 → 560 */
+  display:flex; gap:56px;
+}
+/* Figma 自身在这里对不齐：pillars 量到 1150 宽，但下方分隔线只有 1136
+   （152 内缩左右对称）。以分隔线为准 —— 保住 Figma 的 56 列间距，
+   让三列均分剩余 1136−112 = 1024，即每列 341.3（Figma 标的 346）。
+   列内文字最宽 286，看不出差别，但整块能和分隔线严格对齐。 */
+.pillar{ flex:1 1 0; min-width:0 }
+.pillar .rule{ height:1px; background:var(--a-rule) }
+.pillar .no{
+  margin:12px 0 0;
+  font-size:12px; font-weight:600; line-height:15px; letter-spacing:2.16px;   /* 18% */
+  color:var(--a-num);
+}
+.pillar h3{
+  margin:12px 0 0;
+  font-size:22px; font-weight:700; line-height:27px; letter-spacing:0;
+  color:var(--a-title);
+}
+.pillar > p:not(.no){          /* 显式排除编号行，避免两条规则互相压制 */
+  margin:12px 0 0;
+  font-size:13.5px; font-weight:400; line-height:172%;
+  color:var(--a-p-body);
+}
+
+/* Figma: 分隔线 1136 宽 @y850；stats @y886，四项间距 96 */
+.stats-rule{
+  margin-top:142px;                     /* 708 → 850 */
+  height:1px; background:var(--a-div);
+}
+.stats{
+  margin-top:35px;                      /* 851 → 886 */
+  display:flex; gap:96px;
+}
+.stat{ flex:none }
+.stat .v{
+  display:block;
+  font-size:26px; font-weight:700; line-height:31px;
+  color:var(--a-title);
+}
+.stat .k{
+  display:block; margin-top:6px;
+  font-size:11px; font-weight:600; line-height:13px; letter-spacing:2.2px;    /* 20% */
+  color:var(--a-stat-k);
+}
+
+/* 滚动进入时只做透明度，不位移 —— 与流程页的消散语言一致 */
+.rv{ opacity:0; transition:opacity .7s ease }
+.rv.in{ opacity:1 }
+@media (prefers-reduced-motion:reduce){ .rv{ opacity:1; transition:none } }
+
+/* ---------- 入场：只做透明度，不位移 ---------- */
+/* to 必须写死 opacity:1 —— 只写 from 的话，to 会取元素自身的计算值，
+   而 .late 的基础值就是 opacity:0，动画会变成「从 0 淡到 0」，永远不显示。 */
+@keyframes rise{ from{ opacity:0 } to{ opacity:1 } }
+
+/* 导航条：加载即淡入，先让页面有反馈，不至于看着像没加载出来 */
+.anim{ animation:rise .9s ease both }
+.d1{ animation-delay:.10s }
+
+/* 首屏文案：不跟着加载走，等视频放到片尾前 LEAD 秒才由 JS 加 .revealed 触发。
+   默认 opacity:0 —— 万一 JS 没跑起来，下面的兜底计时器仍会补上。 */
+.late{ opacity:0 }
+/* 同时写 opacity:1 作为保险：动画的 both 填充在延迟期间仍会盖住它（显示 from 的 0），
+   所以错峰照常；但万一动画被任何原因抑制，文案也不会卡在不可见 */
+body.revealed .late{ opacity:1; animation:rise 1.9s ease-out both }
+.L1{ animation-delay:0s }   .L2{ animation-delay:.5s }
+.L3{ animation-delay:1s }   .L4{ animation-delay:1.5s }
+.L5{ animation-delay:2s }   .L6{ animation-delay:2.5s }
+/* 整段 2.5 + 1.9 = 4.4s（原来 2.93s），配合 JS 里 LEAD=4.6 从 3.44s 起，
+   收尾 7.84s，仍落在视频 8.04s 停帧之前 */
+
+@media (prefers-reduced-motion:reduce){
+  .anim{ animation:none }
+  .late{ opacity:1 }
+  body.revealed .late{ animation:none }
+}
+
+/* ---------- 窄屏兜底（论文展示为桌面，此处仅防溢出） ---------- */
+@media (max-width:1300px){
+  :root{ --a-pad:var(--pad) }            /* 空间不够时 About 正文退回 56 */
+}
+@media (max-width:1120px){
+  .pillars{ flex-wrap:wrap; gap:40px 56px }
+  .pillar{ flex:0 1 calc(50% - 28px) }
+  .stats{ flex-wrap:wrap; gap:32px 64px }
+}
+@media (max-width:920px){
+  :root{ --pad:32px }
+  .hero h1{ font-size:40px }
+  .about h2{ font-size:38px }
+  .lede br, .feat .txt br,
+  .about-lede br, .pillar > p br{ display:none }
+  .features{ flex-wrap:wrap; gap:28px 44px }
+  .feat{ width:calc(50% - 22px) }
+  .pillar{ width:100% }
+  .about-in{ padding-top:56px; padding-bottom:64px }
+  .pillars{ margin-top:56px }
+  .stats-rule{ margin-top:64px }
+}
+</style>
+</head>
+
+<body>
+
+<!-- ============ 背景：kling 分镜（8s，播完停在末帧） ============ -->
+<div class="bg">
+  <video id="bgv"
+         autoplay muted playsinline
+         preload="auto"
+         poster="assets/hero-poster.jpg">
+    <source src="assets/hero-1080.mp4" type="video/mp4">
+    <source src="assets/hero.mp4" type="video/mp4">
+  </video>
+  <div class="shade"></div>
+</div>
+
+<!-- ============ 导航条：全站唯一，固定顶部 ============ -->
+<header class="nav" id="nav">
+  <div class="nav-in">
+    <a class="brand anim d1" href="#top" aria-label="MNEMOSYNE">
+      <img src="assets/logo-dark.png" alt="MNEMOSYNE">
+    </a>
+    <div class="nav-r anim d1">
+      <a class="contact" href="mailto:zhoushichen0311@gmail.com">Contact</a>
+      <button class="burger" id="burger" aria-expanded="false"
+              aria-controls="menu" aria-label="Menu">
+        <i></i><i></i><i></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- 条目取自 Figma 的导航清单（482:65 / 506:100–104） -->
+  <nav class="menu" id="menu" data-open="false" aria-label="Sections">
+    <ul>
+      <li><a href="#about"><span class="no">01</span>About</a></li>
+      <li><a href="#" aria-disabled="true"><span class="no">02</span>Research</a></li>
+      <li><a href="#" aria-disabled="true"><span class="no">03</span>Project</a></li>
+      <li><a href="../v2/library.html"><span class="no">04</span>Library</a></li>
+      <li><a href="#" aria-disabled="true"><span class="no">05</span>Cube System</a></li>
+      <li><a href="#" aria-disabled="true"><span class="no">06</span>Core System</a></li>
+      <li><a href="./home-file-empty.html"><span class="no">07</span>Home File</a></li>
+    </ul>
+  </nav>
+</header>
+
+<!-- ============ 画板 ============ -->
+<div class="stage" id="top">
+
+  <div class="sp-top"></div>
+
+  <main class="hero">
+    <p class="kicker late L1">AN ADAPTIVE SYSTEM FOR ELDER LIVING</p>
+
+    <h1 class="late L2">When People Change,<br>Homes Should Too.</h1>
+
+    <p class="lede late L3">Mnemosyne transforms existing homes into adaptive living environments<br>
+      that respond to changing physical, sensory and cognitive needs —<br>
+      built for older adults, and the families and caregivers who support them.</p>
+
+    <a class="cta late L4" href="./home-file-empty.html">START A HOME FILE<span class="arw">→</span></a>
+  </main>
+
+  <div class="sp-bot"></div>
+
+  <section class="features late L5">
+    <div class="feat">
+      <svg class="icon" viewBox="0 0 29 30" aria-hidden="true"><path d="M 23.8 4.29 L 20.31 7.73 L 20.31 7.99 L 23.8 11.43 L 29 11.43 L 29 14.29 L 22.61 14.29 L 20.31 12.01 L 20.31 15.71 L 18.86 15.71 C 18.09 15.71 17.35 15.41 16.81 14.88 C 16.27 14.34 15.96 13.61 15.96 12.86 L 15.96 9.29 L 11.41 9.29 C 11.28 9.81 11.06 10.31 10.77 10.79 L 19.12 25.71 L 26.1 25.71 C 26.87 25.71 27.61 26.02 28.15 26.55 C 28.69 27.09 29 27.81 29 28.57 L 29 30 L 0.02 30 L 0.02 28.57 C 0.02 27.81 0.33 27.09 0.87 26.55 C 1.41 26.02 2.15 25.71 2.92 25.71 L 12.5 25.71 L 5.7 13.57 C 4.43 13.55 3.21 13.12 2.21 12.35 C 1.21 11.57 0.5 10.5 0.18 9.29 C -0.01 8.56 -0.05 7.8 0.06 7.06 C 0.17 6.31 0.42 5.6 0.81 4.95 C 1.2 4.3 1.71 3.74 2.33 3.29 C 2.94 2.84 3.63 2.51 4.37 2.33 C 7.45 1.54 10.61 3.37 11.41 6.43 L 15.96 6.43 L 15.96 2.86 C 15.96 2.1 16.27 1.37 16.81 0.84 C 17.35 0.3 18.09 0 18.86 0 L 20.31 0 L 20.31 3.7 L 22.61 1.43 L 29 1.43 L 29 4.29 L 23.8 4.29 Z M 5.82 5 C 5.05 5 4.31 5.3 3.77 5.84 C 3.23 6.37 2.92 7.1 2.92 7.86 C 2.92 8.61 3.23 9.34 3.77 9.88 C 4.31 10.41 5.05 10.71 5.82 10.71 C 6.59 10.71 7.32 10.41 7.87 9.88 C 8.41 9.34 8.72 8.61 8.72 7.86 C 8.72 7.1 8.41 6.37 7.87 5.84 C 7.32 5.3 6.59 5 5.82 5 Z"/></svg>
+      <p class="lbl">FLEXIBLE</p>
+      <p class="txt">Modular design<br>for diverse needs</p>
+    </div>
+    <div class="feat">
+      <svg class="icon" viewBox="0 0 30 30" aria-hidden="true"><path d="M 15.07 25.5 L 19.35 21.26 L 15.07 17.02 L 13.5 18.6 L 15.11 20.21 C 14.41 20.24 13.73 20.12 13.07 19.87 C 12.41 19.62 11.81 19.24 11.29 18.71 C 10.79 18.21 10.41 17.64 10.14 16.99 C 9.88 16.34 9.75 15.69 9.75 15.04 C 9.75 14.61 9.81 14.19 9.92 13.76 C 10.03 13.34 10.19 12.92 10.39 12.52 L 8.74 10.87 C 8.31 11.5 8 12.16 7.8 12.86 C 7.6 13.56 7.5 14.27 7.5 15 C 7.5 15.95 7.69 16.89 8.06 17.81 C 8.44 18.74 8.99 19.56 9.71 20.29 C 10.44 21.01 11.25 21.56 12.15 21.92 C 13.05 22.28 13.97 22.48 14.92 22.5 L 13.5 23.92 L 15.07 25.5 Z M 21.26 19.12 C 21.69 18.5 22 17.84 22.2 17.14 C 22.4 16.44 22.5 15.72 22.5 15 C 22.5 14.05 22.32 13.11 21.96 12.17 C 21.59 11.23 21.05 10.4 20.32 9.67 C 19.6 8.95 18.78 8.41 17.87 8.06 C 16.95 7.71 16.02 7.54 15.07 7.54 L 16.5 6.07 L 14.92 4.5 L 10.65 8.74 L 14.92 12.97 L 16.5 11.4 L 14.85 9.75 C 15.52 9.75 16.21 9.88 16.91 10.14 C 17.61 10.41 18.21 10.79 18.71 11.29 C 19.21 11.79 19.59 12.36 19.86 13.01 C 20.12 13.66 20.25 14.31 20.25 14.96 C 20.25 15.39 20.19 15.81 20.08 16.24 C 19.97 16.66 19.81 17.07 19.61 17.47 L 21.26 19.12 Z M 15 30 C 12.92 30 10.97 29.61 9.15 28.82 C 7.32 28.03 5.74 26.96 4.39 25.61 C 3.04 24.26 1.97 22.68 1.18 20.85 C 0.4 19.02 0 17.07 0 15 C 0 12.93 0.39 10.98 1.18 9.15 C 1.97 7.32 3.04 5.74 4.39 4.39 C 5.74 3.04 7.32 1.97 9.15 1.18 C 10.98 0.39 12.93 0 15 0 C 17.07 0 19.02 0.39 20.85 1.18 C 22.68 1.97 24.26 3.04 25.61 4.39 C 26.96 5.74 28.03 7.32 28.82 9.15 C 29.61 10.98 30 12.93 30 15 C 30 17.07 29.6 19.02 28.82 20.85 C 28.03 22.68 26.96 24.26 25.61 25.61 C 24.26 26.96 22.67 28.03 20.85 28.82 C 19.03 29.61 17.08 30 15 30 Z M 15 27 C 18.35 27 21.19 25.84 23.51 23.51 C 25.84 21.19 27 18.35 27 15 C 27 11.65 25.84 8.81 23.51 6.49 C 21.19 4.16 18.35 3 15 3 C 11.65 3 8.81 4.16 6.49 6.49 C 4.16 8.81 3 11.65 3 15 C 3 18.35 4.16 21.19 6.49 23.51 C 8.81 25.84 11.65 27 15 27 Z"/></svg>
+      <p class="lbl">ADAPTIVE</p>
+      <p class="txt">Responds to changing<br>abilities over time</p>
+    </div>
+    <div class="feat">
+      <svg class="icon" viewBox="0 0 30 30" aria-hidden="true"><path d="M 9.7 12.8 C 8.23 11.33 7.5 9.56 7.5 7.5 C 7.5 5.44 8.23 3.67 9.7 2.2 C 11.17 0.73 12.94 0 15 0 C 17.06 0 18.83 0.73 20.3 2.2 C 21.77 3.67 22.5 5.44 22.5 7.5 C 22.5 9.56 21.77 11.33 20.3 12.8 C 18.83 14.27 17.06 15 15 15 C 12.94 15 11.17 14.27 9.7 12.8 Z M 0 30 L 0 24.75 C 0 23.69 0.27 22.71 0.82 21.82 C 1.37 20.93 2.09 20.25 3 19.78 C 4.94 18.81 6.91 18.09 8.91 17.6 C 10.91 17.12 12.94 16.88 15 16.88 C 17.06 16.87 19.09 17.12 21.09 17.6 C 23.09 18.09 25.06 18.82 27 19.78 C 27.91 20.25 28.63 20.93 29.18 21.82 C 29.73 22.71 30 23.69 30 24.75 L 30 30 L 0 30 Z"/></svg>
+      <p class="lbl">PERSONAL</p>
+      <p class="txt">Tailored to individual<br>lifestyles and habits</p>
+    </div>
+    <div class="feat">
+      <svg class="icon" viewBox="0 0 36 30" aria-hidden="true"><path d="M 7.65 0 C 6.81 0 6.01 0.33 5.42 0.9 C 4.83 1.48 4.5 2.27 4.5 3.09 L 4.5 7.5 C 4.5 9.2 5.91 10.59 7.65 10.59 L 12.15 10.59 C 12.99 10.59 13.79 10.26 14.38 9.68 C 14.97 9.1 15.3 8.32 15.3 7.5 L 15.3 3.09 C 15.3 2.27 14.97 1.48 14.38 0.9 C 13.79 0.33 12.99 0 12.15 0 L 7.65 0 Z M 20.7 3.09 C 20.7 1.38 22.11 0 23.85 0 L 28.35 0 C 30.09 0 31.5 1.38 31.5 3.09 L 31.5 7.5 C 31.5 8.32 31.17 9.1 30.58 9.68 C 29.99 10.26 29.19 10.59 28.35 10.59 L 23.85 10.59 C 23.01 10.59 22.21 10.26 21.62 9.68 C 21.03 9.1 20.7 8.32 20.7 7.5 L 20.7 3.09 Z M 23.85 2.65 C 23.73 2.65 23.62 2.69 23.53 2.78 C 23.45 2.86 23.4 2.97 23.4 3.09 L 23.4 7.5 C 23.4 7.74 23.6 7.94 23.85 7.94 L 28.35 7.94 C 28.47 7.94 28.58 7.89 28.67 7.81 C 28.75 7.73 28.8 7.62 28.8 7.5 L 28.8 3.09 C 28.8 2.97 28.75 2.86 28.67 2.78 C 28.58 2.69 28.47 2.65 28.35 2.65 L 23.85 2.65 Z M 9 24.71 C 9.72 24.71 10.4 24.43 10.91 23.93 C 11.42 23.43 11.7 22.76 11.7 22.06 C 11.7 21.36 11.42 20.68 10.91 20.19 C 10.4 19.69 9.72 19.41 9 19.41 C 8.28 19.41 7.6 19.69 7.09 20.19 C 6.58 20.68 6.3 21.36 6.3 22.06 C 6.3 22.76 6.58 23.43 7.09 23.93 C 7.6 24.43 8.28 24.71 9 24.71 Z M 20.7 22.06 C 20.7 22.76 20.42 23.43 19.91 23.93 C 19.4 24.43 18.72 24.71 18 24.71 C 17.28 24.71 16.6 24.43 16.09 23.93 C 15.58 23.43 15.3 22.76 15.3 22.06 C 15.3 21.36 15.58 20.68 16.09 20.19 C 16.6 19.69 17.28 19.41 18 19.41 C 18.72 19.41 19.4 19.69 19.91 20.19 C 20.42 20.68 20.7 21.36 20.7 22.06 Z M 27 24.71 C 27.72 24.71 28.4 24.43 28.91 23.93 C 29.42 23.43 29.7 22.76 29.7 22.06 C 29.7 21.36 29.42 20.68 28.91 20.19 C 28.4 19.69 27.72 19.41 27 19.41 C 26.28 19.41 25.6 19.69 25.09 20.19 C 24.58 20.68 24.3 21.36 24.3 22.06 C 24.3 22.76 24.58 23.43 25.09 23.93 C 25.6 24.43 26.28 24.71 27 24.71 Z M 0 22.06 C 0 19.95 0.85 17.93 2.37 16.44 C 3.89 14.95 5.95 14.12 8.1 14.12 L 27.9 14.12 C 30.05 14.12 32.11 14.95 33.63 16.44 C 35.15 17.93 36 19.95 36 22.06 C 36 24.16 35.15 26.18 33.63 27.67 C 32.11 29.16 30.05 30 27.9 30 L 8.1 30 C 5.95 30 3.89 29.16 2.37 27.67 C 0.85 26.18 0 24.16 0 22.06 Z M 8.1 16.76 C 6.67 16.76 5.29 17.32 4.28 18.32 C 3.27 19.31 2.7 20.65 2.7 22.06 C 2.7 23.46 3.27 24.81 4.28 25.8 C 5.29 26.8 6.67 27.35 8.1 27.35 L 27.9 27.35 C 29.33 27.35 30.71 26.8 31.72 25.8 C 32.73 24.81 33.3 23.46 33.3 22.06 C 33.3 20.65 32.73 19.31 31.72 18.32 C 30.71 17.32 29.33 16.76 27.9 16.76 L 8.1 16.76 Z"/></svg>
+      <p class="lbl">SCALABLE</p>
+      <p class="txt">Efficient production<br>and easy installation</p>
+    </div>
+  </section>
+
+  <footer class="foot late L6">
+    <span>ADAPTIVE BY DESIGN</span>
+    <span>300MM CUBE SYSTEM</span>
+  </footer>
+
+</div>
+
+
+<!-- ============ About 区（Figma 523:65） ============ -->
+<section class="about" id="about">
+  <div class="about-in">
+
+    <p class="eyebrow rv">ABOUT</p>
+
+    <h2 class="rv">Homes That Change<br>With You.</h2>
+
+    <p class="about-lede rv">Mnemosyne transforms existing homes into adaptive living environments that respond to<br>
+      changing physical, sensory, and cognitive needs. Through flexible spatial planning and<br>
+      modular design, the home evolves over time to support greater independence, comfort,<br>
+      and confidence in everyday life.</p>
+
+    <div class="pillars">
+      <article class="pillar rv">
+        <div class="rule"></div>
+        <p class="no">01 — MOBILITY</p>
+        <h3>Room to move</h3>
+        <p>When wheels replace steps, corridors widen,<br>
+          thresholds flatten and storage sinks to<br>
+          reachable heights — without moving house.</p>
+      </article>
+      <article class="pillar rv">
+        <div class="rule"></div>
+        <p class="no">02 — VISION</p>
+        <h3>Edges that glow</h3>
+        <p>For fading eyesight: luminous frames,<br>
+          high-contrast surfaces and glare-free light.<br>
+          A home you navigate by its own outlines.</p>
+      </article>
+      <article class="pillar rv">
+        <div class="rule"></div>
+        <p class="no">03 — MEMORY</p>
+        <h3>A layout that stays</h3>
+        <p>Familiar arrangements are preserved and<br>
+          quietly restored. The home keeps its shape<br>
+          in mind — so its resident doesn&rsquo;t have to.</p>
+      </article>
+    </div>
+
+    <div class="stats-rule rv"></div>
+
+    <div class="stats rv">
+      <div class="stat"><span class="v">300 mm</span><span class="k">UNIFIED GRID</span></div>
+      <div class="stat"><span class="v">Tool-free</span><span class="k">REASSEMBLY</span></div>
+      <div class="stat"><span class="v">AI-assisted</span><span class="k">LAYOUT PLANNING</span></div>
+      <div class="stat"><span class="v">1 cube</span><span class="k">EVERY ROOM</span></div>
+    </div>
+
+  </div>
+</section>
+
+<script>
+(function(){
+  var v = document.getElementById('bgv');
+
+  /* 静音播放一次，播完停在末帧（<video> 无 loop 时的默认行为），无任何控件。
+     少数浏览器会拦截自动播放，这里在首次交互时补一次 play()。
+     判断 !v.ended 很关键 —— 否则播完之后随便一次点击都会把片子重头放一遍。 */
+  function kick(){ if (v.paused && !v.ended) v.play().catch(function(){}); }
+  var p = v.play();
+  if (p && p.catch) p.catch(function(){
+    ['pointerdown','keydown','wheel','touchstart'].forEach(function(ev){
+      document.addEventListener(ev, kick, { once:true, passive:true });
+    });
+  });
+
+  /* 末帧定格：显式暂停并把时间轴钉在最后一帧，
+     避免个别浏览器在 ended 后把画面回退到首帧或转黑 */
+  v.addEventListener('ended', function(){
+    v.pause();
+    if (v.duration && isFinite(v.duration)){
+      v.currentTime = Math.max(0, v.duration - 1 / 24);   // 片源 24fps
+    }
+  });
+
+  /* ---------- 文案随视频尾声浮现 ----------
+     片尾前 LEAD 秒开始，六条依次淡入。整段 4.4s（延迟 2.5 + 时长 1.9），
+     收尾 7.84s，落在视频 8.04s 停帧之前。
+     跟 currentTime 走而不是 setTimeout，这样缓冲、掉帧、
+     手动补播都不会让字和画面脱节。
+     想更早/更晚开始改 LEAD；想更慢/更快改上面的 1.9s 与 .5s 步距。 */
+  var LEAD = 4.6, revealed = false, playing = false;
+  function reveal(){
+    if (revealed) return;
+    revealed = true;
+    document.body.classList.add('revealed');
+  }
+  v.addEventListener('timeupdate', function(){
+    if (!isFinite(v.duration) || v.duration <= 0) return;
+    if (v.currentTime >= v.duration - LEAD) reveal();
+  });
+  v.addEventListener('ended', reveal);
+  v.addEventListener('playing', function(){ playing = true; });
+
+  /* 三重兜底 —— 文案默认 opacity:0，任何一条路径断了都不能让首屏空着：
+     1) 视频报错 → 立即显示
+     2) 1.8s 内没真正播起来（自动播放被拦、片源缺失）→ 立即显示
+     3) 无论如何 9s 后必显示 */
+  v.addEventListener('error', reveal);
+  setTimeout(function(){ if (!playing) reveal(); }, 1800);
+  setTimeout(reveal, 9000);
+  if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) reveal();
+
+  /* 从 flow / home-file 返回首页时，清掉上一轮的临时会话数据 */
+  try{
+    sessionStorage.removeItem('mnemo:thread');
+    sessionStorage.removeItem('mnemo:file');
+  }catch(e){}
+})();
+
+/* ---------- 固定导航条：滚动变实底 + 汉堡菜单 ---------- */
+(function(){
+  var nav = document.getElementById('nav');
+  var b   = document.getElementById('burger');
+  var m   = document.getElementById('menu');
+  var open = false;
+
+  /* 首屏顶部保持透明（Figma 521:65 的 nav 无填充），
+     一离开顶部就换成 Figma 523:65 的实底 #141414。
+     菜单展开时反而要透明 —— 全屏毛玻璃面板自己就是背景，
+     再压一条实底会把玻璃从中间切断。 */
+  function paint(){
+    nav.classList.toggle('solid', !open && window.scrollY > 8);
+  }
+  var ticking = false;
+  window.addEventListener('scroll', function(){
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(function(){ paint(); ticking = false; });
+  }, { passive:true });
+
+  function set(v){
+    open = v;
+    b.setAttribute('aria-expanded', open ? 'true' : 'false');
+    m.dataset.open = open ? 'true' : 'false';
+    document.body.style.overflow = open ? 'hidden' : '';   /* 全屏面板期间锁滚动 */
+    paint();
+  }
+  b.addEventListener('click', function(e){ e.stopPropagation(); set(!open); });
+  /* 面板铺满视口后，点空白处关闭是最自然的关法；点条目也一并关掉 */
+  m.addEventListener('click', function(){ set(false); });
+  document.addEventListener('click', function(e){
+    if (!e.target.closest('.nav')) set(false);
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') set(false);
+  });
+
+  /* 滚到 About 时把菜单里的 about 标为当前项 */
+  var about = document.getElementById('about');
+  if (about && 'IntersectionObserver' in window){
+    var link = m.querySelector('a[href="#about"]');
+    new IntersectionObserver(function(en){
+      if (en[0].isIntersecting) link.setAttribute('aria-current','page');
+      else link.removeAttribute('aria-current');
+    }, { threshold:.25 }).observe(about);
+  }
+
+  paint();
+})();
+
+/* ---------- About 区：滚动进入时淡入（只做透明度） ---------- */
+(function(){
+  var items = document.querySelectorAll('.rv');
+  if (!('IntersectionObserver' in window)){
+    items.forEach(function(el){ el.classList.add('in'); });
+    return;
+  }
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(en){
+      if (!en.isIntersecting) return;
+      var el = en.target;
+      /* 同组元素按顺序错开，读起来是一段一段浮现，而不是整屏一起亮 */
+      el.style.transitionDelay = (el.dataset.delay || 0) + 'ms';
+      el.classList.add('in');
+      io.unobserve(el);
+    });
+  }, { rootMargin:'0px 0px -12% 0px', threshold:.15 });
+
+  /* 给三根支柱和 stats 排一个小的递进延迟 */
+  document.querySelectorAll('.pillar').forEach(function(el,i){ el.dataset.delay = i*110; });
+  items.forEach(function(el){ io.observe(el); });
+})();
+</script>
+
+</body>
+</html>
