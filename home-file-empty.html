@@ -485,6 +485,51 @@ body[data-mode="carer"] .carer-note{ display:flex; }
   .blob-q{ display:none; }
 }
 
+/* ── 窄屏（≤900）：身份卡压在空卡上面（2026-09-23）─────────────────
+   电脑上这五张灰色虚线空卡是垫在身份卡**后面**的背景 ——「这是你的档案，现在还空着」，
+   身份卡浮在上面、带阴影，主次一眼就清楚。
+   原来窄屏上两者是**先后排**的：身份卡排完，下面再拖一长串空卡，
+   看起来像页面没加载完。
+   现在窄屏也做成同一种层次：空卡照旧一张张排成一列做底，
+   身份卡叠在它们上面 —— 顶上露出第一张空卡的一截（HER CONDITION），
+   左右各露出一条灰框，身份卡下面再露出后面几张。
+   做法：顶栏之后的那一格里，空卡和身份卡放在同一个网格格子里重叠，
+   身份卡在上层；页面高度取两者里高的那个，不会再是「两段加起来」。
+   写在上面 ≤900 / ≤620 两段后面，同名规则以这里为准。电脑端（>900）不经过这里。 */
+@media (max-width:900px){
+  .main{ display:grid; grid-template-columns:minmax(0,1fr); align-items:start }
+  .topbar{ grid-row:1; grid-column:1 }
+  .ghost-grid{ grid-row:2; grid-column:1; order:0; margin-top:28px }
+  .overlay-wrap{ grid-row:2; grid-column:1; position:relative; z-index:2;
+    display:block; margin-top:28px; padding:40px 12px 0; pointer-events:none }
+  .card{ width:auto; max-width:660px; margin-inline:auto }
+
+  /* 灰框露出来的长度由身份卡决定（2026-09-23 追加）：
+     原来整列空卡多高，这一格就多高 —— 393 宽时身份卡下面还拖着 233px 的虚线框，
+     平板上更是拖出 800px。现在让空卡这一列**不参与**撑高（height:0 + min-height:100%：
+     量尺寸时算 0，排版时再铺满这一格），这一格的高度只看身份卡；
+     身份卡底下只多露 96px，空卡超出的部分裁掉，最后 64px 渐隐掉，不是一刀切。
+     老人模式字变大、身份卡变高时，露出来的长度照样是 96px。
+     （min-height 要减掉上面那 28px 的 margin-top，不然空卡会比这一格多出 28px。） */
+  .ghost-grid{ align-self:stretch; height:0; min-height:calc(100% - 28px); overflow:hidden;
+    -webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 64px),transparent);
+            mask-image:linear-gradient(to bottom,#000 calc(100% - 64px),transparent) }
+  .overlay-wrap{ padding-bottom:96px }
+
+  /* 「Her circle」里那三条灰色长条：电脑上每条分四栏（44 / 自适应 / 104 / 130），
+     最窄也要 358px；手机上卡片里只有 300 左右，长条就顶出右边、贴着虚线框被裁掉。
+     四栏都允许收窄，长条跟着卡片宽度走 */
+  .rows{ grid-template-columns:minmax(0,1fr) }
+  .grow{ grid-template-columns:44px minmax(0,1fr) minmax(0,104px) minmax(0,130px) }
+}
+/* 更窄的屏（≤360，比如 320 宽的小手机）：顶上那条 logo + 两组按钮 + 头像
+   比屏幕宽 14px，整页能左右晃。左右留白和按钮再收一点（按钮仍有 36px） */
+@media (max-width:360px){
+  :root{ --gutter:16px; }
+  .rail, .rail-nav{ gap:8px; }
+  .nav-btn{ width:36px; height:36px; }
+}
+
 /* ── 尊重系统减弱动效设置 ───────────────────────────────── */
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{

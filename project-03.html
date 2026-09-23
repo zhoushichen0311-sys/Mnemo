@@ -148,7 +148,15 @@ main{ padding-top:var(--nav-h); padding-bottom:42px }   /* 2495 → 2537 */
 /* ---------- 大图 ---------- */
 /* Figma 里这张图是 1137×585，源图 4548×2340 正好是它的 4 倍 —— 整张图铺满，没有裁切。
    （Figma 里这个矩形从 x=151 起、比 1136 的正文栏宽 1px，那 1px 忽略，按栏宽走。）*/
-.hero-shot{ margin-top:24px; width:100%; aspect-ratio:1137 / 585; display:block }  /* 441 → 465 */
+/* ⚠ height:auto 不能省（2026-09-22 补）：
+     <img> 标签上的 width / height 属性会被浏览器当成「表现层提示」，
+     等价于给它写了 height:585px。上面只写了 width:100%，没写 height，
+     那条提示就一直生效 —— 桌面端容器正好 1137 宽、算出来也是 585，
+     所以一直没露馅；一到手机宽度收到 345，高度却还钉在 585，
+     图就被竖着拉长了 70%。
+     aspect-ratio 这时候也救不了：宽高都是确定值，它根本不参与计算。
+     写上 height:auto，宽高比才会交给 aspect-ratio 去算。 */
+.hero-shot{ margin-top:24px; width:100%; height:auto; aspect-ratio:1137 / 585; display:block }  /* 441 → 465 */
 
 /* ---------- 小标题 ---------- */
 .h2{ margin:0; font-size:28px; font-weight:700; line-height:34px; color:var(--title) }
@@ -269,6 +277,12 @@ main{ padding-top:var(--nav-h); padding-bottom:42px }   /* 2495 → 2537 */
   .pl-right{ padding-top:0 }
   .pl-right img + img{ margin-top:24px }
   .sc-row{ grid-template-columns:100px minmax(0, 1fr) 52px }
+  /* 面包屑（2026-09-22）：它是 width:max-content、词之间是不换行空格，
+     整行「← WORKS / PERSONA 01 — MOBILITY DECLINE」约 350px 宽，
+     360 的手机上冲出屏幕右边，整页能左右拖。窄屏允许折行、两行尽量等长，
+     箭头对齐第一行。 */
+  .crumb{ width:auto; max-width:100%; align-items:flex-start; line-height:18px; text-wrap:balance }
+  .crumb .arw{ flex:none; margin-top:4.5px }
   /* 放开 Figma 里那些硬换行，窄屏会断在很怪的地方 */
   .intro br, .ch-bd br, .why-b br, .sc-cap br{ display:none }
 }

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-mobile="stack">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -339,7 +339,52 @@ p.sub{ position:absolute; left:140px; top:94px; margin:0; width:700px; font-size
 .lockbar{ position:absolute; left:121px; top:884px; width:900px;
   font-size:9px; line-height:13px; color:#B0570F; letter-spacing:.06em;
   text-transform:none; }
+
+/* ── 窄屏（≤1023）：第 2 步的户型面板 ─────────────────────────
+   外壳的一栏排法在 assets/carer-mobile.css，这里只管这一页左边：
+   · 三张户型卡改成一张一行的横卡：平面在左，名字 / 房间 / 门洞在右，
+     下面一行是它和她的需要对不对得上；
+   · 「None of these」和实测四项都占满一行，输入框放宽、字 16px；
+   · 开头那个「两种方式」的岔路口：电脑上是盖在面板上的一层，
+     手机上面板跟内容长，改成放在最上面、并把面板里其余内容先藏起来。 */
+@media (max-width:1023px){
+  .stage > .panel{ display:flex; flex-direction:column }
+  .stage > .panel > *{ position:relative !important; left:auto !important; top:auto !important;
+    right:auto !important; width:auto !important }
+  .stage > .panel > .tracknote{ margin-top:6px; max-width:none; text-align:left }
+  .stage > .panel > .tcard{ height:auto; margin-top:12px; padding:14px;
+    display:grid; grid-template-columns:136px minmax(0,1fr) auto; column-gap:14px; row-gap:5px;
+    align-items:start }
+  .stage > .panel > .tcard:first-of-type{ margin-top:16px }
+  .tcard .plan{ position:relative; left:auto; top:auto; grid-column:1; grid-row:1 / span 3;
+    width:136px; height:96px }
+  .tcard .plan svg{ width:136px; height:96px }
+  .tcard .radio{ position:relative; left:auto; top:auto; grid-column:3; grid-row:1 }
+  .tcard .tname{ position:static; grid-column:2; grid-row:1; padding-top:3px }
+  .tcard .rooms{ position:static; grid-column:2 / span 2; grid-row:2; line-height:17px }
+  .tcard .door { position:static; grid-column:2 / span 2; grid-row:3; line-height:17px }
+  .tcard .mark { position:static; grid-column:1 / -1; grid-row:4; width:auto; margin-top:6px }
+  .stage > .panel > .none{ height:auto; margin-top:12px; padding:13px 16px 14px }
+  .none .nt, .none .ns, .none .ng{ position:static; display:block }
+  .none .ns{ margin-top:3px; line-height:17px }
+  .none .ng{ margin-top:8px }
+  .stage > .panel > .mrow{ margin-top:12px; display:grid; grid-template-columns:1fr; gap:8px }
+  .mchip{ height:42px; border-radius:21px; padding:0 16px }
+  .mchip > span{ flex:none; min-width:96px; font-size:13.5px }
+  .mchip{ min-width:0 }
+  /* 行内 width:34px 这类是按 12.5px 字量的；16px 下装不下四位数，改成吃掉剩下的宽度 */
+  .mchip input{ width:1px !important; flex:1 1 auto; min-width:0; font-size:16px; text-align:right }
+  .mchip > b{ font-size:13px }
+  .stage > .panel > .fits{ margin-top:14px; line-height:18px }
+  /* 岔路口 */
+  .stage > .panel > .gate2{ position:relative !important; inset:auto; order:-1; padding:0; overflow:visible;
+    background:transparent }
+  .stage > .panel:has(> .gate2) > :not(.gate2){ display:none }
+  .g2row{ grid-template-columns:1fr; gap:10px; margin-top:16px }
+  .g2go{ width:100%; padding:12px 18px }
+}
 </style>
+<link rel="stylesheet" href="assets/carer-mobile.css?v=20260922">
 </head>
 
 <body>
@@ -466,7 +511,7 @@ p.sub{ position:absolute; left:140px; top:94px; margin:0; width:700px; font-size
 
 <script src="assets/llm.js?v=20260917"></script>
 <script src="assets/nlu-rules.js"></script>
-<script src="assets/carer-core.js?v=20260917"></script>
+<script src="assets/carer-core.js?v=20260922"></script>
 <script>
 (function(){
 'use strict';

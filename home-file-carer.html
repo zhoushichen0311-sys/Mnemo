@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-mobile="stack">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -323,6 +323,144 @@ h1.who.empty{ color:var(--hint); font-weight:400 }
 #hist .foot{ left:30px; top:330px }
 
 @media (prefers-reduced-motion:reduce){ *{ animation-duration:.001ms !important; transition-duration:.001ms !important } }
+
+/* ── 窄屏（≤1023）：档案页一栏重排（2026-09-22）───────────────
+   电脑上是 1440×1480 的仪表盘，整体缩放；窄于 1024 时改成一栏、只上下滑：
+     logo ··················· + Record a visit
+     ← Back to the visit / 名字 / 一行概要
+     搜索框
+     四个 KPI（两两一排）
+     分数趋势 → 本次改动 → 房间 → 还没记录 → 档案上还有谁 → 访视记录
+   · 左边那两条白色竖栏（田字格 / 记录 / 通知 / 设置）和头像在手机上收起：
+     「Record a visit」右上角已经有了，通知和设置现在只会弹一句说明；
+   · 卡片里原来按坐标摆的东西都放回文档流；访视记录的表头在手机上不要，
+     每一条改成一张两三行的小条目；
+   · 趋势图在窄屏换一个更窄的坐标系重画（见 chartX1()）。
+   ≥1024 的电脑端不经过这里。 */
+@media (max-width:1023px){
+  #panhint{ display:none !important }
+  .stagewrap{ display:block !important; overflow:visible !important; height:auto !important }
+  .stage, #stage.is-demo{
+    transform:none !important; width:auto !important; height:auto !important; border-top:0 !important;
+    max-width:680px; margin:0 auto; padding:16px 16px calc(34px + env(safe-area-inset-bottom));
+    display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); column-gap:12px; align-items:start;
+    grid-template-areas:
+      "logo    rec"
+      "demo    demo"
+      "back    back"
+      "whoh    whoh"
+      "meta    meta"
+      "find    find"
+      "fnote   fnote"
+      "k0      k1"
+      "k2      k3"
+      "trend   trend"
+      "changed changed"
+      "room    room"
+      "gaps    gaps"
+      "whoc    whoc"
+      "hist    hist";
+  }
+  .stage > *{ position:relative !important; left:auto !important; top:auto !important;
+    right:auto !important; width:auto !important }
+  .stage > .rail, .stage > .avatar{ display:none }
+
+  .stage > .logo-a{ grid-area:logo; width:44px !important; height:44px; align-self:center }
+  .stage > .rec{ grid-area:rec; justify-self:end; align-self:center; height:42px; padding:0 18px; font-size:13px }
+  .stage > .demobar{ grid-area:demo; height:auto; margin-top:14px; padding:12px 14px; flex-wrap:wrap; gap:8px 12px }
+  .demobar a{ margin-left:0 }
+  .stage > .back{ grid-area:back; margin-top:18px; justify-self:start; padding:4px 0 }
+  .stage > h1.who{ grid-area:whoh; margin-top:6px; font-size:28px }
+  .stage > .meta{ grid-area:meta; margin-top:6px; font-size:14px; line-height:20px }
+  .stage > .search{ grid-area:find; margin-top:16px; height:46px; font-size:16px }
+  .stage > .findnote{ grid-area:fnote; margin-top:6px }
+
+  .stage > .kpi{ height:auto; min-height:108px; margin-top:12px; padding:14px 16px 14px }
+  .stage > #k0{ grid-area:k0 } .stage > #k1{ grid-area:k1 }
+  .stage > #k2{ grid-area:k2 } .stage > #k3{ grid-area:k3 }
+  .kpi .k, .kpi .v, .kpi .s{ position:static; width:auto }
+  .kpi .v{ margin-top:4px; font-size:26px; line-height:34px }
+  .kpi .s{ margin-top:2px }
+
+  /* 卡片：跟内容长，里面一律回到文档流 */
+  /* 各卡的高度写在 #trend / #hist 这类 id 规则上（权重比类高），所以要 !important */
+  .stage > .card, .stage > #changed{ height:auto !important; margin-top:14px; padding:18px 18px 18px }
+  .stage > .card > *, .stage > #changed > *{ position:relative !important; left:auto !important;
+    top:auto !important; right:auto !important; bottom:auto !important; width:auto !important }
+  .card > .t{ font-size:18px }
+  .card > .st{ margin-top:4px; line-height:17px }
+  .card .hair{ margin:14px 0 }
+  .card .foot{ display:block; margin-top:0; line-height:13px }
+
+  /* 分数趋势 */
+  .stage > #trend{ grid-area:trend }
+  #trend .rng{ margin-top:6px }
+  #trend .expill{ position:absolute !important; right:18px !important; top:16px !important; height:30px; padding:0 12px }
+  #trend > .t{ padding-right:120px }
+  #trend .exlink{ display:inline-flex; margin-top:10px }
+  #trend svg#chart{ display:block; width:100% !important; height:auto; margin-top:12px; overflow:visible }
+  #trend .cap{ margin-top:6px; line-height:13px }
+
+  /* 本次改动（深色卡） */
+  .stage > #changed{ grid-area:changed }
+  #changed .pill{ position:absolute !important; right:18px !important; top:18px !important }
+  #changed > .t{ padding-right:120px }
+  #changed .st{ margin-top:4px }
+  #changed .hr{ margin:14px 0 }
+  #changed li{ height:auto; min-height:0; padding:0 70px 12px 18px }
+  #changed li .d{ left:0; top:5px }
+  #changed li .tm, #changed li .w, #changed li .b{ position:static; display:block; width:auto }
+  #changed li .w{ margin-top:3px }
+  #changed li .ot{ top:0 }
+  #changed .empty{ position:static; width:auto }
+  #changed .lk{ display:inline-block; margin-top:12px }
+
+  /* 房间 */
+  .stage > #room{ grid-area:room; display:grid; grid-template-columns:120px minmax(0,1fr); column-gap:16px }
+  #room > .t, #room > .st{ grid-column:1 / -1 }
+  #room .thumb{ grid-column:1; grid-row:3 / span 4; margin-top:14px; width:120px !important }
+  #room .spec, #room .l1, #room .l2, #room .go{ grid-column:2 }
+  #room .spec{ margin-top:14px }
+  #room .l1{ margin-top:4px }
+  #room .go{ justify-self:start; margin-top:10px }
+
+  /* 还没记录 */
+  .stage > #gaps{ grid-area:gaps }
+  #gaps ul{ margin-top:10px }
+  #gaps li{ height:auto; padding-bottom:6px }
+  #gaps .none{ margin-top:10px }
+
+  /* 档案上还有谁 */
+  .stage > #who{ grid-area:whoc }
+  #who .row{ height:auto; margin-top:10px; padding:12px 14px 12px 64px; min-height:62px }
+  #who .row:empty{ display:none }      /* 只有三个人时，第四行是空的 */
+  #who .row .av{ position:absolute; left:14px; top:12px }
+  #who .row .n, #who .row .r, #who .row .p{ position:static; display:block; width:auto; padding-right:80px }
+  #who .row .p{ padding-right:0; margin-top:6px }
+  #who .row .g{ position:absolute; right:12px; top:14px }
+  #who .foot{ margin-top:14px }
+
+  /* 访视记录：表头不要，一条一块 */
+  .stage > #hist{ grid-area:hist }
+  #hist .filter{ position:absolute !important; right:18px !important; top:18px !important; height:30px }
+  #hist > .t{ padding-right:110px }
+  #hist #thead{ display:none }
+  #hist .rh{ display:none }
+  #hist #rows{ margin-top:4px }
+  #hist .tr{ position:relative !important; top:auto !important; left:auto; width:auto; height:auto;
+    display:grid; grid-template-columns:minmax(0,1fr) auto; column-gap:12px; row-gap:2px;
+    padding:12px 0; border-top:1px solid var(--hair-2) }
+  #hist .tr:first-child{ border-top:0 }
+  #hist .tr .c, #hist .tr .stt{ position:static !important; left:auto !important; top:auto }
+  #hist .tr .date{ grid-column:1; grid-row:1 }
+  #hist .tr .stt{ grid-column:2; grid-row:1 / span 2; align-self:start }
+  #hist .tr .wt{ grid-column:1; grid-row:2 }
+  #hist .tr .wb{ grid-column:1 / -1; grid-row:3 }
+  #hist .tr .nm{ grid-column:1 / -1; grid-row:4; margin-top:6px }
+  #hist .tr .rl{ grid-column:1 / -1; grid-row:5 }
+  #hist .tr .bs{ grid-column:1 / -1; grid-row:6; margin-top:4px }
+  #hist .empty{ width:auto; margin-top:8px; line-height:18px }
+}
 </style>
 </head>
 
@@ -351,7 +489,9 @@ h1.who.empty{ color:var(--hint); font-weight:400 }
         <rect x="2" y="12" width="8" height="8" rx="2" fill="#F2B82F"/><rect x="12" y="12" width="8" height="8" rx="2" fill="#ED7119"/>
       </svg>
     </button>
-    <a class="rb tuck" href="./flow-carer.html" aria-label="Record a visit" style="top:82px">
+    <!-- 2026-09-22：两个「+ Record a visit」都带 ?new=1 —— 到了第 1 步，
+         如果这份档案已经签字，就开一份空白的给下一位（原因写在 flow-carer.html 那段脚本上） -->
+    <a class="rb tuck" href="./flow-carer.html?new=1" aria-label="Record a visit" style="top:82px">
       <svg width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true">
         <path d="M13 5v16M5 13h16" stroke="#1A1917" stroke-width="3.4" stroke-linecap="round"/>
       </svg>
@@ -384,7 +524,7 @@ h1.who.empty{ color:var(--hint); font-weight:400 }
   <input class="search" id="find" type="search" autocomplete="off"
          placeholder="Search this file" aria-label="Search this file">
   <p class="findnote mono" id="findnote" hidden></p>
-  <a class="rec" href="./flow-carer.html"><b>+</b>Record a visit</a>
+  <a class="rec" href="./flow-carer.html?new=1"><b>+</b>Record a visit</a>
 
   <!-- ══ KPI（全部来自这次访视） ═══════════════════════════ -->
   <div class="kpi" id="k0" style="left:121px"></div>
@@ -474,7 +614,7 @@ h1.who.empty{ color:var(--hint); font-weight:400 }
 <script src="assets/personas.js?v=20260917"></script>
 <script src="assets/nlu-rules.js"></script>
 <script src="assets/toast.js"></script>
-<script src="assets/carer-core.js?v=20260917"></script>
+<script src="assets/carer-core.js?v=20260922"></script>
 <script>
 (function(){
 'use strict';
@@ -609,10 +749,22 @@ fetch('assets/carer-layouts.html')
   })
   .catch(function(){});
 
+/* ── 趋势图的横向宽度（2026-09-22）──────────────────────────
+   电脑上是 719 宽的坐标系，图表 1:1 画。手机一栏里卡片只有 ~317 宽，
+   同一张图整体缩下去，8.5px 的刻度字会变成 3.7px、点只剩 3px。
+   所以窄屏（C.stacked()）换一个 360 宽的坐标系重画：竖向不变，横向收短，
+   缩放只剩 0.88，字和点都还看得清。电脑端返回的还是原来那组数。 */
+function chartX1(){
+  var narrow = window.MNEMO_CARER && window.MNEMO_CARER.stacked && window.MNEMO_CARER.stacked();
+  var el = $('chart'), W = narrow ? 360 : 719;
+  el.setAttribute('viewBox', '0 0 ' + W + ' 216');
+  el.setAttribute('width', W);
+  return narrow ? 331 : 690;
+}
 /* ── 趋势图：一次访视只有一个点，别假装有曲线 ───────────── */
 function paintChart(score){
   /* 9.0 那条线不能贴着 svg 顶边，否则标签的上半截被裁掉 */
-  var X0 = 54, X1 = 690, Y = function(v){ return 172 - (v - 7.0) * 80; };
+  var X0 = 54, X1 = chartX1(), Y = function(v){ return 172 - (v - 7.0) * 80; };
   var g = ['<rect x="' + X0 + '" y="0" width="' + (X1-X0) + '" height="0" fill="none"/>'];
   [9.0, 8.5, 8.0, 7.5, 7.0].forEach(function(v){
     var y = Y(v);
@@ -980,7 +1132,7 @@ if (DEMO){
   function chart7(){
     /* 坐标系和 paintChart() 完全一致，只是点从 1 个变成 7 个。
        抄一遍而不是改 paintChart，是为了不动真实那条路径一行代码。 */
-    var X0 = 54, X1 = 690, Y = function(v){ return 172 - (v - 7.0) * 80; };
+    var X0 = 54, X1 = chartX1(), Y = function(v){ return 172 - (v - 7.0) * 80; };
     var g = [];
     [9.0, 8.5, 8.0, 7.5, 7.0].forEach(function(v){
       var y = Y(v);

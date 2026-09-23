@@ -214,6 +214,22 @@ body{margin:0;min-height:100vh;color:var(--color-ink);
     padding-left:0;padding-top:var(--space-xl);margin-top:var(--space-xl)}
   .resultrow{grid-template-columns:minmax(0,1fr)}
 }
+/* 手机（≤560，2026-09-22）：和 flow-resident.html 同一档处理。
+   原来底部「Show me the layouts →」不换行、和「← Back」挤在一行，冲出屏幕右边；
+   四条路的卡片里，52px 的圆图标 + 右边的箭头把中间的字挤到 126px 宽。 */
+@media (max-width:560px){
+  :root{--text-display:2.125rem;--text-lede:1.375rem}
+  .page{padding:var(--space-xl) var(--space-lg)}
+  .way{gap:var(--space-md);padding:var(--space-md)}
+  .way .ic{width:44px;height:44px}
+  .foot{flex-direction:column;align-items:stretch}
+  .go{width:100%}
+}
+/* 更窄的屏（≤380，比如 320 宽的小手机）：右边那个 → 收起来，整张卡本来就能点，
+   把宽度让给字 */
+@media (max-width:380px){
+  .way .arw{display:none}
+}
 @media (prefers-reduced-motion:reduce){
   *{transition:none !important}
 }

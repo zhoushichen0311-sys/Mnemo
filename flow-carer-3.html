@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-mobile="stack">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -280,11 +280,97 @@ p.sub{ position:absolute; left:140px; top:94px; margin:0; width:760px; font-size
 .czoomplan.miss::after{ content:'plan not loaded — open through the local server';
   font-size:12px; color:var(--hint) }
 
+/* ── 放大版：窄屏整屏卡（2026-09-22）──────────────────────
+   窄于 1024 时整块舞台进「横向拖动」模式（见 carer-core.js 的 fitStage），
+   浮层原来是舞台里的 absolute，于是居中在 1440 宽的舞台上、不是屏幕上：
+   393 宽的手机上整张卡在屏幕左边外面 365px，800 宽时右边出去 14px。
+   现在打开时由 JS 把浮层挪到 <body> 下面、加 .is-sheet，下面这些规则才生效；
+   关掉就放回舞台原位、去掉 .is-sheet。电脑端（≥1024）从来不加这个类，
+   所以电脑版一条规则都不经过这里。 */
+.czoom.is-sheet{
+  position:fixed; inset:0; z-index:200;
+  overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch;
+  padding:14px 12px calc(28px + env(safe-area-inset-bottom));
+  background:rgba(26,25,23,.32);
+  /* 桌面版的 place-items:center 在新版 Chrome 里对普通块也生效（卡片会缩成内容宽），
+     Safari 不会 —— 清掉，两边都按「占满一行」排 */
+  place-items:normal;
+  /* 不要毛玻璃：backdrop-filter 会让里面 position:fixed 的关闭键改成跟着浮层滚 */
+  backdrop-filter:none; -webkit-backdrop-filter:none;
+}
+.czoom.is-sheet.on{ display:block }
+.czoom.is-sheet .czoomcard{
+  width:auto; height:auto; max-width:820px; margin:0 auto;
+  padding:22px 18px 18px; border-radius:20px;
+}
+.czoom.is-sheet .czoomcard .zlab,
+.czoom.is-sheet .czoomcard .zmeta{ position:static; text-align:left; padding-right:52px; line-height:16px }
+.czoom.is-sheet .czoomcard .zlab{ font-size:12px }
+.czoom.is-sheet .czoomcard .zmeta{ margin-top:4px; font-size:10.5px }
+/* 平面占满卡片宽，高度跟平面自己的比例走；太高就封顶 70vh，
+   SVG 默认 preserveAspectRatio=meet，封顶时等比缩、居中，不会压扁 */
+.czoom.is-sheet .czoomplan{
+  position:relative; left:auto; top:auto; width:auto; height:auto;
+  margin-top:16px; padding:14px; display:block; place-items:normal;
+}
+.czoom.is-sheet .czoomplan.bleed{ padding:0 }
+.czoom.is-sheet .czoomplan svg{ width:100%; height:auto; max-height:70vh }
+.czoom.is-sheet .czoomplan.miss{ min-height:120px; display:grid; place-items:center }
+/* 关闭键钉在屏幕右上角（屏比卡宽时跟着卡的右上角），内容滚到哪都点得到 */
+.czoom.is-sheet .czoomclose{
+  position:fixed; top:calc(22px + env(safe-area-inset-top));
+  right:max(24px, calc((100vw - 820px) / 2 + 12px));
+  width:40px; height:40px; font-size:17px;
+  background:var(--white); box-shadow:0 2px 10px rgba(60,48,34,.12);
+}
+
 /* 签完字之后的横幅。位置在录入面板正上方，和「上下文带」同一行高度 */
 .lockbar{ position:absolute; left:121px; top:884px; width:900px;
   font-size:9px; line-height:13px; color:#B0570F; letter-spacing:.06em;
   text-transform:none; }
+
+/* ── 窄屏（≤1023）：第 3 步的三个方案 + 规则对账 ─────────────
+   外壳的一栏排法在 assets/carer-mobile.css，这里只管这一页：
+   · 三张方案卡一张一行：平面在左，方案名 / 分数 / 一句话在右，四条指标在下面整行；
+   · ENLARGE 原来是面板的直接子元素、按卡的 left 算坐标。现在面板是网格，
+     让它和对应的卡占同一个格子（网格允许叠放），再用边距落到平面右上角；
+   · 「MNEMO IS WORKING」那层照旧盖住面板，内容放到靠上的位置，一进来就看得到；
+   · 右边的规则对账：外框跟内容长，每条规则那一行内部坐标不动
+     （第二行的数值位置是 JS 按文字宽度现算的）。 */
+@media (max-width:1023px){
+  .stage > .panel{ display:grid; grid-template-columns:minmax(0,1fr); align-items:start }
+  .stage > .panel > :not(.think){ position:relative !important; left:auto !important;
+    top:auto !important; right:auto !important }
+  .stage > .panel > .gtitle{ grid-row:1 }
+  .stage > .panel > #o-A, .stage > .panel > .enl[data-k="A"]{ grid-row:2 }
+  .stage > .panel > #o-B, .stage > .panel > .enl[data-k="B"]{ grid-row:3 }
+  .stage > .panel > #o-C, .stage > .panel > .enl[data-k="C"]{ grid-row:4 }
+  .stage > .panel > .opt{ grid-column:1; width:auto; height:auto; margin-top:14px; padding:14px 14px 16px;
+    display:grid; grid-template-columns:132px minmax(0,1fr); column-gap:14px; align-content:start }
+  .opt .plan{ position:relative; left:auto; top:auto; width:132px; height:132px; grid-column:1; grid-row:1 / span 4 }
+  .opt .plan svg{ width:120px; height:120px }
+  .opt .ok   { position:static; grid-column:2; grid-row:1; padding-top:4px }
+  .opt .score{ position:static; grid-column:2; grid-row:2; margin-top:6px }
+  .opt .desc { position:static; grid-column:2; grid-row:3; width:auto; margin-top:4px }
+  .opt .m{ position:relative; left:auto; top:auto !important; width:auto; height:14px;
+    grid-column:1 / -1; margin-top:10px }
+  .opt .m:nth-of-type(1){ margin-top:14px }
+  .opt .m u{ width:auto; right:0 }
+  /* 平面右上角：卡片内边距 14 + 平面 132 − 按钮 68 − 6 */
+  .stage > .panel > .enl{ grid-column:1; align-self:start; justify-self:start;
+    margin:34px 0 0 72px; height:24px }
+  .stage > .panel > .think{ justify-content:flex-start; padding:96px 24px 40px }
+
+  .stage > aside.rules > *{ position:relative !important; left:auto !important; top:auto !important;
+    width:auto !important }
+  .stage > aside.rules .sub2{ margin-top:6px; line-height:18px }
+  .stage > aside.rules .hair{ margin:16px 0 }
+  .stage > aside.rules .rowhair{ margin:10px 0 }
+  .stage > aside.rules .rrow{ height:46px; margin-top:4px }
+  .stage > aside.rules .foot{ margin-top:0 }
+}
 </style>
+<link rel="stylesheet" href="assets/carer-mobile.css?v=20260922">
 </head>
 
 <body>
@@ -414,7 +500,7 @@ p.sub{ position:absolute; left:140px; top:94px; margin:0; width:760px; font-size
 <script src="assets/llm.js?v=20260917"></script>
 <script src="assets/nlu-rules.js"></script>
 <script src="assets/thinking.js?v=20260917"></script>
-<script src="assets/carer-core.js?v=20260917"></script>
+<script src="assets/carer-core.js?v=20260922"></script>
 <script>
 (function(){
 'use strict';
@@ -493,9 +579,40 @@ function paintZoom(o){
   var lab = C.TRACK_LABEL[C.track()]['en'];
   $('zmeta').textContent = ('TYPE ') + typeKey() + '  ·  ' + lab.toUpperCase();
 }
+/* 2026-09-22：窄屏（舞台在「横向拖动」模式，即窗口窄于 1024）时，浮层不能留在舞台里 ——
+   舞台被 transform 缩放过，里面的东西只能相对舞台定位，浮层就居中在 1440 宽的舞台上，
+   手机上整张卡跑到屏幕外面。所以这时把它挪到 <body> 下面、加 .is-sheet（CSS 见
+   「放大版：窄屏整屏卡」），关掉再放回原位。
+   判断条件和 carer-core.js 的 fitStage() 完全一样；电脑端（≥1024）这里永远是 false，
+   浮层一直待在舞台里，行为一行不变。 */
+var zoomHome = null;
+function zoomSheet(){
+  /* 2026-09-22：窄屏一栏重排（C.stacked()）以后，舞台不再缩放，
+     浮层留在舞台里会跟着页面一起长 —— 一律改用整屏卡。 */
+  if (C.stacked && C.stacked()) return true;
+  return window.innerWidth < C.PAN_MAX && Math.min(1, window.innerWidth / 1440) < C.MIN_K;
+}
+function placeZoom(){
+  var z = $('czoom'), sheet = !!zoomOpen && zoomSheet();
+  if (sheet === !!zoomHome) return;              /* 已经在该在的地方 */
+  if (sheet){
+    zoomHome = [z.parentNode, z.nextSibling];
+    document.body.appendChild(z);
+    document.body.style.overflow = 'hidden';     /* 后面的页面别跟着滑 */
+  } else {
+    zoomHome[0].insertBefore(z, zoomHome[1]);
+    zoomHome = null;
+    document.body.style.overflow = '';
+  }
+  z.classList.toggle('is-sheet', sheet);
+}
+window.addEventListener('resize', function(){ if (zoomOpen) placeZoom(); });   /* 手机转横竖屏 */
+
 function openZoom(o){
   zoomOpen = o;
   paintZoom(o);
+  placeZoom();
+  $('czoom').scrollTop = 0;
   $('czoom').classList.add('on');
   $('zclose').focus();
 }
@@ -504,6 +621,7 @@ function closeZoom(){
   var back = $('o-' + zoomOpen);
   zoomOpen = null;
   $('czoom').classList.remove('on');
+  placeZoom();
   if (back) back.focus();
 }
 Array.prototype.slice.call(document.querySelectorAll('.enl')).forEach(function(b){
@@ -605,7 +723,7 @@ C.boot({
   },
 
   miss: function(){
-    return 'I could not tell which option you meant. Clicking one of the three on the left is quicker.';
+    return 'I could not tell which option you meant. Clicking one of the three ' + C.where() + ' is quicker.';
   },
 
   render: function(){

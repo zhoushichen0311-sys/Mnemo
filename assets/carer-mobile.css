@@ -1,0 +1,136 @@
+/* ============================================================
+   医护版 · 窄屏一栏重排（2026-09-22）
+   ------------------------------------------------------------
+   医护版五步原来是 1440×960 的定尺画布，整体缩放；窄于 1024 时
+   缩放停在 0.72，改成左右拖着看。现在改成：窄于 1024（手机、平板竖屏）
+   整页重排成一栏，只上下滑，字保持正常大小，按钮手指点得到。
+
+   排列顺序（从上到下）：
+     logo ······················· STEP n OF 5
+     标题 / 副标题
+     五段进度条
+     FIRST FILE · 今天做了什么
+     自动保存 / 签字状态
+     （签完字的锁定提示）
+     左边的主面板（表单 / 户型 / 方案 / 3D / 签字）
+     右边那张卡（档案回显 / 规则对账 / 改动记录）
+     对话框
+     ← 返回        Continue →
+
+   · 只在 max-width:1023px 里生效；≥1024 的电脑端一条规则都不经过这里，
+     carer-core.js 的 fitStage() 在这个宽度下也照旧缩放。
+   · 这份样式是 <link> 进来的、排在每页自己的 <style> 后面，同权重时它赢。
+     每页主面板里各自不同的那部分，写在各页自己的 <style> 末尾。
+   · 行内 style="left:…;top:…" 优先级比样式表高，所以复位坐标要 !important。
+   ============================================================ */
+@media (max-width:1023px){
+
+  #panhint{ display:none !important }        /* 旧的「左右拖动」提示条 */
+
+  .stagewrap{ display:block !important; overflow:visible !important; height:auto !important }
+  .stage{
+    transform:none !important; width:auto !important; height:auto !important;
+    max-width:680px; margin:0 auto; border-top:0 !important;
+    padding:16px 16px calc(34px + env(safe-area-inset-bottom));
+    display:grid; grid-template-columns:auto minmax(0,1fr) auto; column-gap:12px;
+    grid-template-areas:
+      "logo  .     chip"
+      "title title title"
+      "sub   sub   sub"
+      "steps steps steps"
+      "visit when  when"
+      "saved saved saved"
+      "lock  lock  lock"
+      "panel panel panel"
+      "side  side  side"
+      "dock  dock  dock"
+      "exit  next  next"
+      "exitl note  note";
+  }
+
+  /* ── 页头 ── */
+  .stage > .logo{ grid-area:logo; position:relative !important; left:auto; top:auto;
+    width:44px; height:44px; align-self:center }
+  .stage > .stepchip{ grid-area:chip; position:relative !important; left:auto; top:auto;
+    width:auto; height:30px; padding:0 14px 0 13px; gap:8px; align-self:center }
+  .stage > .stepchip span{ font-size:10px }
+  .stage > h1.title{ grid-area:title; position:relative !important; left:auto; top:auto;
+    width:auto; margin-top:18px; font-size:26px; line-height:1.15 }
+  .stage > p.sub{ grid-area:sub; position:relative !important; left:auto; top:auto;
+    width:auto; margin-top:8px; font-size:14px; line-height:20px }
+
+  /* 五段进度条：等分一行，标签字小一号、允许折行 */
+  .stage > .steps{ grid-area:steps; position:relative !important; left:auto; top:auto;
+    width:auto; height:auto; margin-top:20px; display:flex; gap:6px }
+  .stage > .steps > div{ position:relative !important; left:auto !important; top:auto;
+    width:auto; height:auto; flex:1 1 0; min-width:0 }
+  .stage > .steps b{ position:relative; width:100%; top:auto; left:auto }
+  .stage > .steps s{ position:relative; top:auto; left:auto; display:block; margin-top:8px;
+    white-space:normal; font-size:8px; line-height:11px; letter-spacing:.05em }
+
+  .stage > .visit{ grid-area:visit; position:relative !important; left:auto; top:auto;
+    margin-top:18px; height:24px; padding:0 12px; align-self:start; width:max-content }
+  .stage > .when{ grid-area:when; position:relative !important; left:auto; top:auto;
+    margin-top:18px; min-height:24px; display:flex; align-items:center;
+    font-size:13px; line-height:17px }
+  .stage > .saved{ grid-area:saved; position:relative !important; left:auto; right:auto; top:auto;
+    margin-top:8px; text-align:left; font-size:9px; line-height:13px }
+  .stage > .lockbar{ grid-area:lock; position:relative !important; left:auto; top:auto;
+    width:auto; margin-top:12px }
+
+  /* ── 主面板 / 右卡 / 对话框：都变成跟内容长的块 ── */
+  .stage > .panel{ grid-area:panel; position:relative !important; left:auto; top:auto;
+    width:auto; height:auto !important; margin-top:16px; padding:20px 18px 18px }
+  .stage > aside{ grid-area:side; position:relative !important; left:auto; top:auto;
+    width:auto; height:auto !important; margin-top:14px; padding:18px 18px 18px }
+
+  /* 面板里的小标题和分隔线（每页都有） */
+  .stage > .panel .gtitle{ position:relative !important; left:auto !important; top:auto !important; right:auto }
+  .stage > .panel .divider{ position:relative !important; left:auto !important; top:auto !important;
+    width:auto !important; margin:18px 0 }
+
+  /* ── 右卡：档案回显（第 1、2、5 步同一个结构） ── */
+  .stage > aside.file > *{ position:relative !important; left:auto !important; top:auto !important;
+    right:auto; width:auto !important }
+  .stage > aside.file .state{ position:absolute !important; right:18px; top:14px; width:auto }
+  .stage > aside.file .who{ margin-top:12px; font-size:20px }
+  .stage > aside.file .meta{ margin-top:6px; line-height:18px }
+  .stage > aside.file .hair{ margin:14px 0 }
+  .stage > aside.file .row{ height:auto; display:flex; align-items:baseline;
+    justify-content:space-between; gap:14px; padding:5px 0 }
+  .stage > aside.file .row .k{ position:static; flex:none }
+  .stage > aside.file .row .v{ position:static; min-width:0; max-width:none; text-align:right }
+  .stage > aside.file .pct{ margin-top:0 }
+  .stage > aside.file .track{ margin-top:10px }
+
+  /* ── 对话框 ── */
+  .stage > .dock{ grid-area:dock; position:relative !important; left:auto; top:auto;
+    width:auto; height:auto; margin-top:14px; padding:16px 16px 16px }
+  .stage > .dock .av{ left:16px; top:18px }
+  .stage > .dock .msgs{ position:relative; left:auto; top:auto; width:auto !important;
+    height:auto; max-height:132px; margin:0 34px 0 46px; min-height:34px }
+  .stage > .dock .composer{ position:relative; left:auto; top:auto; width:auto; margin-top:14px; height:46px }
+  .stage > .dock .composer input{ font-size:16px }   /* 16 以下 iOS 一点输入框就会自动放大整页 */
+  .stage > .dock .dockzoom{ right:12px; top:14px; width:30px; height:30px }
+  /* 放大：电脑上是铺满右半栏；手机上铺满整屏，底部是输入框 */
+  .stage > .dock.is-big{ position:fixed !important; left:10px; right:10px; width:auto;
+    top:calc(10px + env(safe-area-inset-top)); bottom:calc(10px + env(safe-area-inset-bottom));
+    height:auto; margin:0; display:flex; flex-direction:column; padding:18px 16px 16px;
+    background:rgba(255,253,250,.94) }
+  .stage > .dock.is-big .msgs{ position:relative; left:auto; top:auto; width:auto !important;
+    height:auto; max-height:none; flex:1 1 auto; margin:0 36px 0 46px }
+  .stage > .dock.is-big .composer{ position:relative; left:auto; top:auto; width:auto; flex:none }
+
+  /* ── 底部：← 返回 + Continue ── */
+  .stage > .exit{ grid-area:exit; position:relative !important; left:auto; top:auto;
+    margin-top:22px; width:50px; height:50px }
+  .stage > .exit-label{ grid-area:exitl; position:relative !important; left:auto; top:auto;
+    margin-top:6px; text-align:center; width:50px }
+  .stage > .next{ grid-area:next; position:relative !important; left:auto; top:auto;
+    width:auto; height:50px; margin-top:22px; border-radius:25px }
+  .stage > .nextnote{ grid-area:note; position:relative !important; left:auto; top:auto;
+    width:auto; margin-top:8px; line-height:16px }
+
+  /* 录入控件在手机上至少 16px，否则 iOS 一聚焦就把整页放大 */
+  .stage input{ font-size:16px }
+}

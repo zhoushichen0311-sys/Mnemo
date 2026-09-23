@@ -578,6 +578,21 @@ body.revealed .late{ opacity:1; animation:rise 1.9s ease-out both }
     min-height:0;                      /* 不再需要撑满一屏 */
     padding-top:26px;
   }
+  /* ⚠ 上面这行 min-height:0 有个副作用（2026-09-22 修）：
+     .sp-top / .sp-bot 是两块**弹性**留白，桌面端靠 .stage 撑满一屏之后
+     按 120 : 34 去分剩余空间。竖屏不撑满了，就没有"剩余空间"可分，
+     两块直接塌到各自的 min-height —— sp-bot 只剩 12px。
+
+     而这一页的纵向节奏是很清楚的两档：
+       块  内：kicker→标题 26 · 标题→正文 26 · 正文→按钮 29
+       块之间：视频→kicker 62 · features→页脚 65
+     「按钮」是首屏文案的结尾，「四个特性」是下一块的开头，属于块之间，
+     却只有 12px —— 比块内的间距还小。结果就是按钮被读成 FLEXIBLE 那一栏
+     的一部分，层级整个倒过来了。
+
+     这里把它补回 62，和「视频→kicker」对齐，用的是同一档。
+     只写在竖屏这个 media 里，桌面端仍然走 flex 分配，一个像素都不动。 */
+  .sp-bot{ min-height:62px }
   .stage::after{ display:none }        /* 同理：底部那层压暗是给背景视频用的 */
 }
 
@@ -682,9 +697,10 @@ html.boot-done #boot:not(.is-gone){ display:none }
 <body>
 
 <script>
-/* 开场的开关。四种情况直接跳过：
+/* 开场的开关。五种情况直接跳过：
    已经看过（本次会话）· 用户要求减少动效 · 没有 WebGL · file:// 打开（ES 模块被禁）
-   加 ?intro=1 可以强制重播，调效果时用。 */
+   · 浏览器不认 import maps（见下面 impmap 那一段）
+   加 ?intro=1 可以强制重播，调效果时用 —— 但 impmap 这一条 ?intro=1 也绕不过去。 */
 (function(){
   var qs   = location.search;
   var force = /[?&]intro=1/.test(qs);
@@ -698,7 +714,27 @@ html.boot-done #boot:not(.is-gone){ display:none }
     catch(e){ return false; }
   })();
   var isFile = location.protocol === 'file:';
-  window.__playIntro = force || (!seen && !reduce && webgl && !isFile);
+
+  /* ── import maps 检测（2026-09-21 加） ──────────────────────────────
+     boot.js 里写的是 import * as THREE from 'three'。'three' 是**裸模块名**，
+     得靠上面那段 <script type="importmap"> 才能翻成 ./assets/three/... 这个真实路径。
+     这个能力要 Chrome/Edge 89+、Safari 16.4+、Firefox 108+。
+
+     老引擎上会抛 Failed to resolve module specifier "three"。
+     ⚠ 致命的地方在于：这个错**不会**触发 <script> 的 onerror ——
+        文件是成功下下来了，是解析阶段才失败的。所以页面最下面那段
+        「加载失败就把遮罩摘掉」的兜底根本摸不着，#boot 那层纯黑 (#0E0E0E)
+        就会永远盖在最上层，整页看上去完全是黑的、什么都点不了。
+        学校展览的三星 AU7100（2021 款，Tizen 6.0）就是这么黑掉的。
+
+     检测方式和 preview-3d.html 里那段保持一致。
+     HTMLScriptElement.supports 自己要 Chrome 106+，所以 Chrome 89–105 会被
+     误判成"不支持" —— 代价只是这批浏览器看不到开场动画，网站本身一切正常。
+     宁可少一段动画，也不能让任何人开出一片黑。 */
+  var impmap = !!(window.HTMLScriptElement && HTMLScriptElement.supports &&
+                  HTMLScriptElement.supports('importmap'));
+
+  window.__playIntro = impmap && (force || (!seen && !reduce && webgl && !isFile));
   document.documentElement.classList.add(window.__playIntro ? 'booting' : 'boot-done');
 })();
 </script>
@@ -1098,17 +1134,39 @@ window.MNEMO_FILM = /\.pages\.dev$/i.test(location.hostname)
 /* 要放就挂模块；不放就把遮罩整个摘掉，three.js 一个字节都不请求 */
 (function(){
   var boot = document.getElementById('boot');
+  if (!boot) return;
+
+  /* 摘遮罩。写成可以被重复调用而不出错的样子 —— 下面有两条路都会叫它。 */
+  function release(){
+    if (!boot.parentNode) return;              /* 已经摘过了 */
+    document.documentElement.classList.remove('booting');
+    document.documentElement.classList.add('boot-done');
+    boot.remove();
+    window.dispatchEvent(new CustomEvent('mnemo:intro-done'));
+  }
+
   if (window.__playIntro){
     var s = document.createElement('script');
     s.type = 'module';
     s.src  = './assets/boot.js';
-    s.onerror = function(){
-      document.documentElement.classList.remove('booting');
-      document.documentElement.classList.add('boot-done');
-      boot.remove();
-      window.dispatchEvent(new CustomEvent('mnemo:intro-done'));
-    };
+    s.onerror = release;          /* 只管得着"文件没下下来"这一种（404 / 断网） */
     document.body.appendChild(s);
+
+    /* ── 最后一道闸（2026-09-21 加） ─────────────────────────────────
+       boot.js 只要**执行到**，它内部自己有一个 14s 的 watchdog 会收尾。
+       所以 16s 之后遮罩还在，只可能是 boot.js 压根没跑起来：
+       模块解析失败、语法不认、顶层抛异常…… 这些**全都不触发 onerror**。
+       上面 impmap 那个能力检测已经挡掉了已知的那种（老电视浏览器），
+       这里再兜一次未知的 —— 首页宁可没有开场，也绝不能是一片黑。
+
+       18s 这个数是算出来的，不是拍的：boot.js 自己的 watchdog 是 14s，
+       它收尾时还要走 1.6s 的淡出才真正 remove，14 + 1.6 = 15.6s，留点余量。
+       再加一道 is-gone 判断 —— 那是 boot.js「正在淡出」的标志，
+       撞上了就别插手，否则会把它那段淡出硬生生切掉。 */
+    setTimeout(function(){
+      if (boot.classList.contains('is-gone')) return;
+      release();
+    }, 18000);
   } else {
     boot.remove();
   }

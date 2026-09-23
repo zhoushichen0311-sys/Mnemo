@@ -128,6 +128,86 @@ body{
 
 /* 只有 07 那两张照片有圆角，写在行内 style 里（Figma 实测 20） */
 </style>
+
+<style>
+/* ════════════════════════════════════════════════════════════════
+   手机版（≤760）—— 照 Figma 3482:65「Cube System · 手机版 393」（2026-09-22）
+   ----------------------------------------------------------------
+   和 research.html 同一个做法：
+     · 电脑端：.m-page 是 display:none，上面那张 1440 画布和以前完全一样
+     · 手机端：反过来，画布 .wrap 藏掉，只显示下面这块一栏排版 .m-page
+   选择器全部挂在 .m-page 下面（或是 m- 开头的新类名），
+   电脑版的 .h1 / .sec / .cap 这些类一个都不共用，两边互不影响。
+   数值取自 Figma 手机帧：字号 / 行高 / 字距 / 颜色 / 相邻两块的竖向距离。
+   图片沿用电脑版 assets/cube/ 里那 18 张，裁切和 Figma 手机帧一致，没有新图。
+   ════════════════════════════════════════════════════════════════ */
+.m-page{ display:none }
+
+@media (max-width:760px){
+  .wrap{ display:none }
+  .m-page{
+    display:block;
+    /* 102 = Figma 里 CUBE SYSTEM 那行小字的 y（导航条 76 高，下面留 26）；底部留 64 */
+    padding:102px 20px 64px;
+    background:var(--bg);            /* 正片叠底要拿它当底色，不能是透明 */
+    color:var(--body); font-family:var(--sans);
+  }
+  /* 393 的帧里正文栏宽 353。更宽的屏（平板竖屏）给栏宽封个顶 */
+  .m-in{ max-width:560px; margin:0 auto }
+  /* 清掉浏览器默认外边距。用 :where() 把权重压到 0，
+     这样下面 .m-h1 / .m-sec 这些单类名写的 margin-top 才能生效 */
+  :where(.m-page) :where(p, h1, h2, ol){ margin:0 }
+  :where(.m-page) :where(ol){ padding:0; list-style:none }
+
+  /* ---------- 页头 ---------- */
+  .m-eye { font-weight:600; font-size:13px; line-height:16px; letter-spacing:2.6px; color:var(--eyebrow) }
+  .m-h1  { margin-top:15px; font-weight:700; font-size:32px; line-height:38.4px; letter-spacing:-.4px; color:var(--ink) }
+  .m-lede{ margin-top:15px; font-size:17px; line-height:28.9px; color:var(--body) }
+
+  /* ---------- 分节：细线 + 橙色节号 ---------- */
+  .m-rule{ width:calc(338 / 353 * 100%); height:1px; margin-top:36px; background:var(--hair) }
+  .m-sec { margin-top:17px; font-weight:600; font-size:13px; line-height:16px;
+           letter-spacing:2.86px; color:var(--orange) }
+  .m-sec.l18{ line-height:18px }                         /* 06、07 两行在 Figma 里行高是 18 */
+  .m-sec.w338{ width:calc(338 / 353 * 100%) }            /* 07 在 Figma 里是 338 宽，所以在 3D-PRINTED 后面折行 */
+  .m-note{ margin-top:12px; font-size:13px; line-height:18px; color:var(--body) }
+
+  /* ---------- 01 WHY CUBE：左边大号数字，右边标题 + 正文 ---------- */
+  .m-why{ margin-top:24px; width:calc(338 / 353 * 100%) }
+  .m-why li{ display:grid; grid-template-columns:56px minmax(0,1fr); column-gap:8px; align-items:start }
+  .m-why li + li{ margin-top:22.6px }                   /* Figma：三条的 y 是 464 / 565 / 666，间隔 101 */
+  .m-num{ font-weight:700; font-size:40px; line-height:48px; color:var(--num) }
+  .m-wtt{ margin-top:4px; font-weight:700; font-size:18px; line-height:22px; letter-spacing:1.08px; color:var(--ink) }
+  .m-wbd{ margin-top:6px; font-size:13.5px; line-height:23.2px; color:var(--body) }
+
+  /* ---------- 图注 ---------- */
+  .m-cap{ font-weight:600; font-size:12px; line-height:16px; letter-spacing:1.2px; color:var(--cap); text-align:center }
+  .m-sub{ font-size:11.5px; line-height:16px; color:var(--body); text-align:center }
+  .m-arr{ font-weight:700; font-size:20px; line-height:24px; color:var(--orange); text-align:center }
+
+  /* ---------- 单张图 ----------
+     --x / --w 是 Figma 帧里的 x 和宽，换成相对正文栏（353）的百分比；
+     高度交给 <img> 自己的宽高比（标签上写了 width/height），不会变形。 */
+  .m-page .m-im{ display:block; max-width:none; height:auto;
+    margin-left:calc((var(--x, 20) - 20) / 353 * 100%); width:calc(var(--w, 338) / 353 * 100%) }
+  .m-page .m-im.r20{ border-radius:20px }               /* 07 三张照片，Figma 圆角 20 */
+  .m-page .m-cap.w338{ width:calc(338 / 353 * 100%) }
+
+  /* ---------- 错位摆放的图组（02 / 03 / 04） ----------
+     组本身按 Figma 里的宽高比缩放（--gh = 组在 393 帧里的高度），
+     里面每个元素用 --l / --t / --w（组内坐标）换成百分比摆放。
+     屏幕比 393 窄或宽时，图跟着组一起等比缩放，字号不变。 */
+  .m-grp{ position:relative; aspect-ratio:353 / var(--gh) }
+  .m-grp > *{ position:absolute; margin:0;
+    left:calc(var(--l, 0) / 353 * 100%); top:calc(var(--t, 0) / var(--gh) * 100%);
+    width:calc(var(--w) / 353 * 100%) }
+  .m-grp > img{ display:block; max-width:none; height:auto }
+  .m-grp > .m-cap{ white-space:nowrap }
+
+  .m-end{ margin-top:36px; width:calc(338 / 353 * 100%);
+          font-weight:700; font-size:20px; line-height:28px; color:var(--ink) }
+}
+</style>
 </head>
 
 <body>
@@ -229,6 +309,98 @@ body{
   </div>
 </div>
 
+<!-- ═══════════ 手机版（≤760 才显示；电脑端 display:none）· Figma 3482:65 ═══════════ -->
+<main class="m-page" aria-label="Cube System">
+  <div class="m-in">
+
+    <p class="m-eye">CUBE SYSTEM</p>
+    <h1 class="m-h1">One 300 mm Cube.<br>Every Room.</h1>
+    <p class="m-lede">The cube is not just a form. It is a construction system for adaptation, customisation and retrofit: one module that becomes walls, storage and furniture, and comes apart as easily as it goes together.</p>
+
+    <!-- 01 -->
+    <div class="m-rule"></div>
+    <h2 class="m-sec">01 — WHY CUBE</h2>
+    <ol class="m-why">
+      <li><span class="m-num">01</span><div><p class="m-wtt">ADAPTATION</p><p class="m-wbd">Rooms rebuild as needs change, without construction work.</p></div></li>
+      <li><span class="m-num">02</span><div><p class="m-wtt">CUSTOMISATION</p><p class="m-wbd">Panels, functions and sizes mix per person, not per catalogue.</p></div></li>
+      <li><span class="m-num">03</span><div><p class="m-wtt">RETROFIT</p><p class="m-wbd">Installs inside existing homes. No one has to move out.</p></div></li>
+    </ol>
+
+    <!-- 02：两行两列，Figma 组 353 × 384 -->
+    <div class="m-rule" style="margin-top:36.6px"></div>
+    <h2 class="m-sec">02 — BASIC CUBE</h2>
+    <div class="m-grp" style="--gh:384;margin-top:16px">
+      <img src="assets/cube/cube-a.webp" width="391" height="416" alt="Cube type A" loading="lazy" decoding="async" style="--l:7;--t:2;--w:156">
+      <img src="assets/cube/cube-b.webp" width="382" height="416" alt="Cube type B" loading="lazy" decoding="async" style="--l:178;--t:0;--w:157">
+      <img src="assets/cube/cube-c.webp" width="424" height="432" alt="Cube type C" loading="lazy" decoding="async" style="--l:2;--t:202.5;--w:162">
+      <img src="assets/cube/cube-d.webp" width="622" height="416" alt="Cube type D" loading="lazy" decoding="async" style="--l:170;--t:232;--w:173">
+      <p class="m-cap" style="--l:0;--t:168;--w:162">Type A</p>
+      <p class="m-cap" style="--l:176;--t:168;--w:162">Type B</p>
+      <p class="m-cap" style="--l:0;--t:368;--w:162">Type C</p>
+      <p class="m-cap" style="--l:176;--t:368;--w:162">Type D</p>
+    </div>
+
+    <!-- 03：框架 → 面板 / 功能条 → 成品，Figma 组 353 × 409 -->
+    <div class="m-rule"></div>
+    <h2 class="m-sec">03 — MODULE ASSEMBLY</h2>
+    <div class="m-grp" style="--gh:409;margin-top:31px">
+      <img src="assets/cube/asm-frame.webp" width="293" height="306" alt="Basic frame" loading="lazy" decoding="async" style="--l:31.9;--t:35;--w:83.1">
+      <img src="assets/cube/asm-panel.webp" width="518" height="536" alt="Panels clipping onto the frame" loading="lazy" decoding="async" style="--l:188;--t:0;--w:150">
+      <img src="assets/cube/asm-bar.webp" width="429" height="622" alt="Function bar" loading="lazy" decoding="async" style="--l:14;--t:208;--w:122.7">
+      <img src="assets/cube/asm-cube.webp" width="285" height="300" alt="Finished basic cube" loading="lazy" decoding="async" style="--l:219;--t:256;--w:81">
+      <p class="m-arr" style="--l:156;--t:66;--w:26" aria-hidden="true">&rarr;</p>
+      <p class="m-arr" style="--l:156;--t:286;--w:26" aria-hidden="true">&rarr;</p>
+      <p class="m-cap" style="--l:0;--t:173;--w:150">Basic Frame</p>
+      <p class="m-cap" style="--l:188;--t:173;--w:150">Panel</p>
+      <p class="m-cap" style="--l:0;--t:393;--w:150">Function Bar</p>
+      <p class="m-cap" style="--l:188;--t:393;--w:150">Basic Cube</p>
+    </div>
+
+    <!-- 04：四种尺寸，Figma 组 353 × 456 -->
+    <div class="m-rule"></div>
+    <h2 class="m-sec">04 — RANGE OF SIZES</h2>
+    <p class="m-note">Basic size &middot; interior structure &middot; deconstruction &middot; variants</p>
+    <div class="m-grp" style="--gh:456;margin-top:40px">
+      <img src="assets/cube/size-basic.webp" width="562" height="403" alt="Basic size with 300 mm dimension" loading="lazy" decoding="async" style="--l:0;--t:0;--w:181">
+      <img src="assets/cube/size-interior.webp" width="444" height="342" alt="Interior structure with 200 mm dimension" loading="lazy" decoding="async" style="--l:186;--t:17;--w:141">
+      <img src="assets/cube/size-decon.webp" width="464" height="558" alt="Deconstruction with 85 / 200 / 85 breakdown" loading="lazy" decoding="async" style="--l:11;--t:225;--w:140">
+      <img src="assets/cube/size-height.webp" width="474" height="474" alt="Height variant with 350 / 450 mm dimensions" loading="lazy" decoding="async" style="--l:184;--t:237;--w:144">
+      <p class="m-cap" style="--l:0;--t:162;--w:162">Basic Size</p>
+      <p class="m-sub" style="--l:0;--t:182;--w:162">Standard outer dimension</p>
+      <p class="m-cap" style="--l:176;--t:162;--w:162">Interior Structure</p>
+      <p class="m-sub" style="--l:176;--t:182;--w:162">Reduced internal height</p>
+      <p class="m-cap" style="--l:0;--t:404;--w:162">Deconstruction</p>
+      <p class="m-sub" style="--l:0;--t:424;--w:162">Component height<br>breakdown</p>
+      <p class="m-cap" style="--l:176;--t:404;--w:162">Height Variant</p>
+      <p class="m-sub" style="--l:176;--t:424;--w:162">Extended height assembly</p>
+    </div>
+
+    <!-- 05 -->
+    <div class="m-rule" style="margin-top:20px"></div>
+    <h2 class="m-sec">05 — MODULAR FURNITURE FAMILY</h2>
+    <img class="m-im mult" src="assets/cube/fam.webp" width="2306" height="1148" alt="The modular furniture family laid out on the cube grid" loading="lazy" decoding="async" style="--x:28;--w:338;margin-top:24px">
+
+    <!-- 06 -->
+    <div class="m-rule" style="margin-top:35px"></div>
+    <h2 class="m-sec l18">06 — MODULE-TO-MODULE ASSEMBLY</h2>
+    <img class="m-im mult" src="assets/cube/m2m-a.webp" width="604" height="716" alt="How two modules lock together" loading="lazy" decoding="async" style="--x:95;--w:204;margin-top:24px">
+    <img class="m-im mult" src="assets/cube/m2m-b.webp" width="1006" height="660" alt="Modules assembled into a corner" loading="lazy" decoding="async" style="--x:20;--w:338;margin-top:16px">
+
+    <!-- 07 -->
+    <div class="m-rule" style="margin-top:35px"></div>
+    <h2 class="m-sec l18 w338">07 — PHYSICAL MODEL · <span style="white-space:nowrap">3D-PRINTED</span> PROTOTYPE</h2>
+    <img class="m-im r20" src="assets/cube/proto-a.webp" width="616" height="478" alt="3D-printed prototype: assembly method" loading="lazy" decoding="async" style="--x:20;--w:338;margin-top:24px">
+    <p class="m-cap w338" style="margin-top:10px">Assembly method</p>
+    <img class="m-im r20" src="assets/cube/proto-panel.webp" width="676" height="480" alt="3D-printed prototype: the panel and connector parts" loading="lazy" decoding="async" style="--x:20;--w:338;margin-top:22px">
+    <p class="m-cap w338" style="margin-top:10px">Panel system</p>
+    <img class="m-im r20" src="assets/cube/proto-b.webp" width="704" height="480" alt="3D-printed prototype: module assembly" loading="lazy" decoding="async" style="--x:21;--w:352;margin-top:17px">
+    <p class="m-cap w338" style="margin-top:5px">Module assembly</p>
+
+    <p class="m-end">Printed, panelled and assembled by hand: the system holds physically, not only on screen.</p>
+
+  </div>
+</main>
+
 <script>
 /* 画布缩放：把 1440 的画布整体缩到视口宽度。
    和 research.html 逐字相同 —— 视口比 1440 窄时才缩，宽时不放大（免得图糊）。
@@ -239,18 +411,26 @@ body{
       wrap   = canvas.parentNode,
       W = 1440, H = 3564;
 
-  /* ⚠ 纯按宽度缩放在手机上会自己反过来咬人：
-     393 的屏幕算出来 k = 0.27，画布里 13px 的正文变成 3.5px ——
-     整张图还在，一个字都读不了，等于没有内容。
-     这一页是照着 Figma 1440 画板逐坐标转写的，重排成手机版等于重画整页，
-     所以退一步：给缩放一个**可读下限**，低于下限就不再缩，改成横向可以拖。
-     宁可一次看半张能读的，也不要一整张读不了的。
-     和医护版那几页（assets/carer-core.js）用的是同一套做法和同一组数。 */
-  var MIN_K = 0.72;    /* 13px → 9.4px。再低就不用看了 */
-  var PAN_MAX = 1024;  /* 只有窄过这个宽度才启用下限。
-                          1024 是最窄的常见笔记本宽度，它自己算出来的 k 是 0.711，
-                          正好压在下限边上 —— 不设这道闸，电脑端窗口一拖窄
-                          就会跳进"横向拖动"模式。 */
+  /* ── 缩放策略（2026-09-22 改：横向拖 → 只上下滑）──────────────────
+     这一页是照着 Figma 1440 画板逐坐标转写的固定画布，重排成真正的
+     手机版等于重画整页，所以只能整幅缩放。
+
+     以前给缩放设了个「可读下限」MIN_K = 0.72，低于下限就不再缩、改成横向拖。
+     但那样在 393 上画布画出来是 1440 × 0.72 = 1037 宽，比屏幕宽 644px，
+     读者得一边往下滚一边往右拖 —— 两个方向同时走，比字小更难受。
+     现在去掉下限：k 一律按屏宽算，整幅缩进屏幕，只剩上下一个方向。
+
+     字小交给系统：viewport 是 width=device-width, initial-scale=1，
+     没禁用缩放，双指放大是开着的。和实体展板一个读法。
+
+     ⚠ panned 不能跟着去掉 —— 它还管着 transform-origin。画布 1440 宽、
+       margin-inline:auto，原点默认在 top center（x=720）；缩到 0.27 之后
+       内容会落到可视区外面，被 .wrap 的 overflow:hidden 裁光，整页全白。
+       所以窄屏仍然走这条分支改原点，只是 overflowX 从 auto 换成 hidden。
+
+     ⚠ 医护版那几页（assets/carer-core.js）**没有**跟着改：
+       那是能点的工具界面，不是读的展板。实测缩到 0.273 之后，
+       15 个可点元素的中位尺寸只有 8.7px，最小 4.1px —— 点不中。 */
 
   /* 初值必须是 false，不能是 null：电脑端一进来 panned 就是 false，
      写 null 的话第一次 fit() 会走"状态变了"的分支，把 transform-origin /
@@ -259,10 +439,53 @@ body{
      （research.html 里同样的写法实测差了 32 万像素，肉眼看不出来但确实变了。） */
   var wasPanned = false;
 
+
+  /* ── 让画布避开固定导航条（2026-09-22 加）────────────────────────
+     导航条是 position:fixed、高 76px 的一条，压在页面最上层。
+     画布自己在画板坐标里是从 y=150 开始的（第一个元素是 "RESEARCH" 那行小字），
+     所以桌面端 k=1 时它落在 150 px，稳稳在导航下面 —— 一直没问题。
+
+     但缩放之后这个距离会跟着缩，导航条的 76px 却是**不缩的**：
+       k=1    → 画布顶 150 px，在导航下面 ✅
+       k=0.62 → 94 px，还够 ✅
+       k=0.42 → 63 px，开始被压 ❌
+       k=0.27 → 41 px，标题整行被导航吃掉 ❌
+     交界点在 k = 76/150 ≈ 0.507，也就是窗口宽约 730 px。
+     以前不会碰到，是因为 k 被 MIN_K 卡在 0.72、最矮也有 108 px；
+     这次把下限去掉之后手机上就撞上了。
+
+     解决：算一算差多少，用 padding 把画布顶下去，保证离导航底边至少留 16px。
+     k=1 时算出来是负数 → 取 0 → 桌面端一个像素都不动。
+     ⚠ 用 padding 而不是 margin：margin 会和 body 发生外边距折叠，
+       行为不好预测；而 * { box-sizing:border-box } 之下 padding 是算在
+       height 里面的，所以下面那行 height 要把它加回去，否则底部会被
+       .wrap 的 overflow:hidden 裁掉一截。 */
+  var navEl = document.querySelector('.nav');
+  var NAV_H = (navEl && navEl.offsetHeight) || 76;
+  /* ⚠ 名字不能叫 TOP0：research.html 里已经有一个 var TOP0 = 5445（第一条 track
+     的画板 y），同一个 IIFE 作用域里再声明一次会把它**改写成 150**，
+     于是 apply() 会把三条 track 从 y=150 开始排 —— 整段内容压到标题上面。
+     （这次就是这么翻车的，截图里 MOBILITY 那组直接盖在首屏上。） */
+  var CANVAS_TOP = (function(){
+    /* 画布子元素全是绝对定位、top 写在行内样式里，直接读行内值最准 ——
+       不受当前缩放影响，也不用等布局。 */
+    var min = Infinity;
+    for (var i = 0; i < canvas.children.length; i++){
+      var t = parseFloat(canvas.children[i].style.top);
+      if (!isNaN(t) && t < min) min = t;
+    }
+    return isFinite(min) ? min : 150;
+  })();
   function fit(){
     var raw = Math.min(1, window.innerWidth / W);
-    var panned = raw < MIN_K && window.innerWidth < PAN_MAX;
-    var k = panned ? MIN_K : raw;
+    /* 只要发生了缩放（raw < 1），就必须把原点挪到 top left。
+       以前这里还挂着 && innerWidth < PAN_MAX(1024)，那是"横向拖动模式"
+       时代留下的闸，它把改原点这件事一起挡在了 1024 以上 ——
+       结果 1024–1439 这一段（含 1280 这种常见笔记本宽度）原点仍在
+       top center，画布被画偏：1280 下左边空 80px、右边裁掉 80px。
+       这是改成竖向之前就有的问题，去掉那个条件一并修掉。 */
+    var panned = raw < 1;
+    var k = raw;
     document.documentElement.style.setProperty('--k', k);
 
     if (panned !== wasPanned){
@@ -270,7 +493,10 @@ body{
       wasPanned = panned;
     }
     if (panned) canvas.style.marginRight = (W * k - W) + 'px';
-    wrap.style.height = (H * k) + 'px';
+
+    var pad = Math.max(0, NAV_H + 16 - CANVAS_TOP * k);
+    wrap.style.paddingTop = pad + 'px';
+    wrap.style.height = (H * k + pad) + 'px';
     hint(panned);
   }
 
@@ -284,8 +510,7 @@ body{
               否则滚动条按 1440 算，右边多出一截滚不到东西的空白。 */
       canvas.style.transformOrigin = 'top left';
       canvas.style.marginLeft  = '0';
-      wrap.style.overflowX = 'auto';
-      wrap.style.webkitOverflowScrolling = 'touch';
+      wrap.style.overflowX = 'hidden';   /* 整幅已经缩进屏幕，没有东西可横拖了 */
     } else {
       canvas.style.transformOrigin = '';
       canvas.style.marginLeft  = '';
@@ -294,29 +519,13 @@ body{
     }
   }
 
-  /* 一行提示，只在被拖模式下出现。
-     ⚠ 不能插在 .wrap 前面：这一页的导航是 position:fixed，插进文档流的话
-     提示条正好被压在导航底下，一个字都看不见（第一版就是这样）。
-     改成钉在屏幕底部的一条，既不挤版面，滚到哪都看得见；
-     横向拖过一次就自己收起来 —— 它的任务完成了。 */
-  var hintGone = false;
-  function hint(on){
+  /* 底部那条 "Scroll as usual — drag sideways…" 的提示已经撤掉：
+     现在没有横向可拖，那句话是错的指引。
+     历史版本里它是一个 id="panhint" 的浮动按钮；万一某次导航残留了一个
+     （比如从别的页面 bfcache 回来），这里顺手清掉。 */
+  function hint(){
     var el = document.getElementById('panhint');
-    if (!on || hintGone){ if (el) el.remove(); return; }
-    if (el) return;
-    el = document.createElement('button');
-    el.id = 'panhint';
-    el.type = 'button';
-    el.textContent = 'Scroll as usual — drag sideways for the rest of the width';
-    el.style.cssText = 'position:fixed;left:12px;right:12px;bottom:12px;z-index:80;'
-      + 'margin:0;padding:11px 14px;border:0;border-radius:18px;'
-      + 'font:inherit;font-size:12px;line-height:1.4;text-align:center;'
-      + 'color:#F4F0E8;background:rgba(26,25,23,.88);cursor:pointer;'
-      + 'box-shadow:0 6px 20px rgba(0,0,0,.24)';
-    var go = function(){ hintGone = true; if (el.parentNode) el.remove(); };
-    el.addEventListener('click', go);
-    wrap.addEventListener('scroll', go, { once:true, passive:true });
-    document.body.appendChild(el);
+    if (el) el.remove();
   }
 
   fit();

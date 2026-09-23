@@ -808,6 +808,15 @@ body{
   position:fixed; inset:0; z-index:60;
   background:rgba(26,25,23,.22);
   display:grid; place-items:center;
+  /* 2026-09-22 修：轨道锁成「正好一屏」。
+     面板是 Figma 原尺寸（1300 / 1000 / 1200 宽，820 / 880 高），再用 transform:scale 缩进窗口。
+     不锁的话，窗口比面板小时 grid 的轨道会被面板撑大、从 0 开始排，
+     面板的中心就不在窗口中线上；再绕中心缩放，整块就偏出屏幕：
+       · 1024 宽：typeA 右边切掉 106px、typeC 切掉 56px，关闭键点不到；
+       · 矮屏笔记本：底下切掉一截（1366×768 的 typeC 切 24px，1280×720 三种户型都切）。
+     锁成 100% 后，面板在轨道里居中时四边对称溢出，缩放中心回到窗口正中。
+     面板本来就放得下的窗口（1440×900、1920×1080 等）位置一像素不变。 */
+  grid-template-columns:100%; grid-template-rows:100%;
   opacity:0; visibility:hidden; transition:opacity .28s ease, visibility .28s;
 }
 .zoom-scrim.is-open{ opacity:1; visibility:visible }
@@ -1011,6 +1020,15 @@ body{
 .fork-card:focus-visible{ outline:2px solid var(--accent); outline-offset:2px }
 .fork-card b{ display:block; font-size:13.5px; font-weight:600; color:var(--label) }
 .fork-card span{ display:block; margin-top:5px; font-size:11.5px; line-height:16px; color:var(--muted) }
+/* 手机（≤620）：第 2 步「Upload your own plan / Start from the closest plan」
+   两张卡原来左右并排，每张只剩 90–107px 宽，11.5px 的说明折成 3–5 行。
+   窄屏改成上下排，字也放大一档。一键填写那三张（.fork-3）本来就是一列，不受影响。
+   （2026-09-22，电脑端不经过这里） */
+@media (max-width:620px){
+  .fork:not(.fork-3){ grid-template-columns:minmax(0,1fr); gap:10px }
+  .fork:not(.fork-3) .fork-card b{ font-size:14.5px }
+  .fork:not(.fork-3) .fork-card span{ font-size:12.5px; line-height:18px }
+}
 
 .nb{ margin:14px 0 4px 44px; padding:18px 20px; border-radius:14px;
   background:#FEFBF6; border:1px solid var(--hair) }
@@ -1561,9 +1579,76 @@ body{
   .opt-thumb{
     flex:none; width:100%; aspect-ratio:1 / 1; min-height:0;
   }
-  .opt-zoom{ top:auto; bottom:14px; right:14px; opacity:1;
+  /* 放大键放回右上角（2026-09-22 改，原来是 bottom:14px 右下角）。
+     26 / 30 和桌面版同一组数：缩略图离卡片边都是 21px，
+     这样按钮正好压在缩略图右上角里面 9px，两端看起来是同一个位置。 */
+  .opt-zoom{ top:26px; bottom:auto; right:30px; opacity:1;
              transform:none; pointer-events:auto }
   .opt-wrap.is-picked .opt-card{ border-color:var(--accent) }
+  /* 放大浮层的居中修正原来写在这里（只管 ≤1000），2026-09-22 挪到上面
+     .zoom-scrim 的基础规则里了 —— 1024 宽的电脑和矮屏笔记本也有同一个问题。 */
+}
+
+/* ── 放大浮层：手机竖排（≤760 宽）──────────────────────────
+   393 宽时整体缩放只剩 0.25，平面 182px —— 比卡片上的缩略图（270）还小，
+   "放大"反而变小了。所以手机上不再缩放整块 Figma 面板，改成一张竖排的整屏卡：
+   标签 → 分数 → 一句话 → 平面（占满宽度）→ 四条指标 → 规则 → 提示，可以上下滑。
+   JS 那边 fitZoom() 在这个宽度下也不再写 transform。
+   全部写在这个 media 里，电脑端一条规则都不经过这里。 */
+@media (max-width:760px){
+  .zoom-scrim{
+    display:block; overflow-y:auto; -webkit-overflow-scrolling:touch;
+    padding:14px 12px calc(28px + env(safe-area-inset-bottom));
+    /* 桌面版这里是 grid + place-items:center。换成 block 后 place-items 还留着，
+       新版 Chrome 会把它用到普通块上（面板缩成内容宽再居中），Safari 不会 ——
+       两边长得不一样。这里清掉，两边都按「占满一行」来排。 */
+    place-items:normal;
+  }
+  .zoom-panel{
+    display:flex; flex-direction:column;
+    width:auto; height:auto; max-width:520px; margin:0 auto;
+    padding:22px 18px 22px; border-radius:20px;
+    transform:none !important;
+    /* 毛玻璃不要：backdrop-filter 会把 position:fixed 的子元素（下面的关闭键）
+       变成相对它定位，关闭键就跟着内容滚走了；而且手机上它本身也很吃性能。 */
+    background:#FBF9F5; backdrop-filter:none; -webkit-backdrop-filter:none;
+  }
+  /* 桌面版每一块都是按 Figma 坐标 absolute 定位的，这里一律放回文档流 */
+  .zoom-panel > *{ position:static; left:auto; top:auto; width:auto; height:auto }
+
+  .zoom-label{ order:1; font-size:12px; padding-right:52px }
+  .zoom-score{ order:2; margin-top:4px; font-size:56px; line-height:64px }
+  .zoom-desc { order:3; margin-top:2px; font-size:17px; line-height:23px }
+
+  /* 平面：宽度占满，高度跟着平面自己的比例走（竖长的 B 型、L 形的 C 型都不会被压扁），
+     太高时封顶 64vh，宽度按比例跟着收、居中。 */
+  .zoom-plan{ order:4; display:block; place-items:normal; margin-top:16px; padding:14px; border-radius:16px }
+  .zoom-plan.is-bleed{ padding:0 }
+  /* 平面 SVG 默认 preserveAspectRatio=meet：高度被 64vh 封顶时，图在框里等比缩、居中，不会变形 */
+  .zoom-stack{ width:auto; height:auto; max-width:100%; max-height:64vh; margin:0 auto }
+
+  .zoom-bars{ order:5; margin-top:20px; display:flex; flex-direction:column; gap:14px }
+  .zoom-bar{ position:relative; width:auto; height:18px; top:auto !important }
+  .zoom-bar .bt{ left:52px; right:0; width:auto }
+
+  .zoom-rules{ order:6; margin-top:20px; padding:16px 16px 14px }
+  .zoom-rules .rk{ position:static; display:block }
+  .zoom-rules ul{ margin-top:10px; display:flex; flex-direction:column; gap:9px }
+  .zoom-rules li{ position:relative; width:auto; height:auto; top:auto !important; left:auto;
+                  padding-left:24px; font-size:14px; line-height:19px }
+  .zoom-rules .ok{ position:absolute; left:0; top:0 }
+  .zoom-rules .tx{ position:static }
+
+  .zoom-hint{ order:7; margin-top:14px; font-size:13px }
+
+  /* 关闭键钉在屏幕右上角，内容滚到哪都点得到 */
+  .zoom-close{
+    position:fixed; left:auto; top:calc(22px + env(safe-area-inset-top));
+    /* 窄屏贴屏幕右边 24；屏比面板（520）宽时，跟着面板的右上角走，不飘到屏幕角上 */
+    right:max(24px, calc((100vw - 520px) / 2 + 12px));
+    width:40px; height:40px;   /* 上面 .zoom-panel > * 把宽高清成了 auto，这里补回 40×40 */
+    z-index:2; box-shadow:0 2px 10px rgba(60,48,34,.12);
+  }
 }
 
 @media (prefers-reduced-motion:reduce){
@@ -1709,8 +1794,36 @@ body{
 
   /* ── 3D：竖屏上给得比平板保守一点，免得推着下面的按钮出屏 ── */
   .pv-box:not(.is-zoom){ height:min(54vh, 420px) }
-  .pv-help{ left:10px; right:10px; width:auto }
   .pv-bar{ left:10px; right:10px; transform:none; width:auto; max-width:none }
+
+  /* ── 放大后的「How to use」（2026-09-22 改）──────────────────
+     原来是 left:10 / right:10 一整条横在顶上，z-index 6 又比右上角那排按钮（3）高，
+     于是收起的时候也是满宽一条，正好把 Close（和 Night）盖在底下 —— 放大了关不掉。
+       · 收起：只有「How to use ⌄」那么宽，和右边的按钮排在同一行，谁也不挡谁
+       · 展开：说明要地方，才铺满整宽；按钮提到它上面（z-index 7），浮在标题行右端
+     标题行的小箭头改成紧跟文字，不再推到最右边 —— 最右边留给按钮。 */
+  .pv-tools{ z-index:7 }
+  .pv-help{ left:10px; top:12px; right:auto; width:auto; max-width:calc(100% - 20px) }
+  .pv-help:not(.is-min){ right:10px }
+  .pv-help .ph-top{ justify-content:flex-start; padding:9px 12px }
+
+  /* ── 点中家具弹出的信息卡：原来固定 400 宽，比放大后的框（393 屏上 368）还宽，
+     右边一截被裁掉。改成框宽减两边各 22（和 pvPlacePop 里的 pad 一致）。 */
+  .pv-pop{ width:calc(100% - 44px) }
+
+  /* ── 材质 / 颜色色块：对话里的家具卡、信息卡、房间配色卡共用 ──────
+     「Material」标签原来在左边占 60px，剩下的宽度排不下 5 个 46px 的色块，
+     最后一格被挤出卡片（Driftwood、Terracotta 只露半截）。
+     手机上把标签提到色块上面，色块这一行就有整张卡的宽度；
+     色块跟着格子宽度走、最大还是 46。
+     名字：最长的是 Terracotta，选中变粗体后 10px 下宽 52px，而 360 屏上一格只有 47.6，
+     会被从中间折断（Terracott / a）。所以让名字左右各借 3px 格子间距（格距 4px），
+     可用宽度到 53.6，一行放得下；再窄的屏才会退到按英文规则断字。 */
+  .fc-sec{ flex-direction:column; gap:7px }
+  .fc-lab{ width:auto; margin-top:0 }
+  .fc-opts{ width:100%; grid-template-columns:repeat(5, minmax(0,1fr)); gap:6px 4px }
+  .mt-opt .sw{ width:100%; max-width:46px; height:auto; aspect-ratio:1 / 1 }
+  .mt-opt .nm{ margin-inline:-3px; font-size:10px; -webkit-hyphens:auto; hyphens:auto }
 }
 
 /* ============================================================
@@ -5336,8 +5449,12 @@ body{
   /* 面板是 Figma 原尺寸，整体缩放适配窗口。不做响应式重排 ——
      重排就不是「按 Figma 的样子」了。宽高都按户型变，所以这里读实际尺寸，
      不再写死 1300×820（面板 hidden 时 offset* 是 0，兜底回 typeA 的数）。 */
+  /* 手机（≤760）上面板是竖排整屏卡，不缩放 —— 见 CSS 里「放大浮层：手机竖排」。
+     和那条 media 用同一个断点；电脑端 matches 永远是 false，下面原来的逻辑一行不变。 */
+  var ZOOM_SHEET = window.matchMedia ? matchMedia('(max-width:760px)') : { matches:false };
   function fitZoom(){
     var el = $('zoom-panel');
+    if (ZOOM_SHEET.matches){ el.style.transform = ''; return; }
     var W  = el.offsetWidth  || 1300;
     var H  = el.offsetHeight || 820;
     var s  = Math.min(1, (innerWidth - 64) / W, (innerHeight - 64) / H);
@@ -5428,6 +5545,7 @@ body{
       + ' to compare';
 
     zoom.hidden = false;
+    if (ZOOM_SHEET.matches) zoom.scrollTop = 0;   /* 手机上每次打开都从顶部看起 */
     fitZoom();
     requestAnimationFrame(function(){ zoom.classList.add('is-open'); });
     document.body.style.overflow = 'hidden';
@@ -5999,11 +6117,21 @@ body{
        不算这一笔，卡片就会被说明面板整个盖住。 */
     var help = $('pv-help');
     var topL = pad, topR = pad + 40;
+    var narrow = window.matchMedia('(max-width:620px)').matches;
     if (help && !help.hidden){
       var hb = help.getBoundingClientRect(), bb = box.getBoundingClientRect();
       topL = Math.round(hb.bottom - bb.top) + 10;
+      /* 手机（≤620）上说明面板展开时是满宽的，右边也被它占着，
+         卡片两边都得从它下面开始。电脑上面板只有 238 宽，这条不会成立。 */
+      if (narrow && hb.right - bb.left > bw / 2) topR = Math.max(topR, topL);
     }
     var bot = bh - 76;                           /* 底部留给工具条 */
+    /* 手机上工具条会折成两三行（约 126 高），76 不够，按它实际的上沿来留 */
+    var bar = $('pv-bar');
+    if (narrow && bar && !bar.hidden){
+      var rb = bar.getBoundingClientRect(), bb2 = box.getBoundingClientRect();
+      bot = Math.min(bot, Math.round(rb.top - bb2.top) - 10);
+    }
     var fits = function(t){ return t + h <= bot; };
     var onLeft = px > bw / 2;                    /* 点在右边 → 卡片放左边 */
     /* 那一侧放不下就换到另一侧；两侧都挤就尽量往上挪，别掉出画面 */

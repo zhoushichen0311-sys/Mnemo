@@ -255,6 +255,141 @@ body{
 @media (prefers-reduced-motion:reduce){ *{ animation-duration:.001ms !important;
   transition-duration:.001ms !important } }
 </style>
+
+<style>
+/* ════════════════════════════════════════════════════════════════
+   手机版（≤760）—— 照 Figma 3461:65「Research · 手机版 393」（2026-09-22）
+   ----------------------------------------------------------------
+   以前手机上是 JS 把 1440 画布「拆平」成一栏（自动排序），现在有了
+   正式的手机版设计，改成一块独立的一栏排版 .m-page：
+     · 电脑端：.m-page 是 display:none，上面那张画布和以前完全一样
+     · 手机端：反过来，画布 .wrap 藏掉，只显示 .m-page
+   手机版的类名全部以 m- 开头、规则全部写在 ≤760 的 media 里，
+   电脑版的 .p / .h2 / .chip 这些类一个都不共用，两边互不影响。
+   数值全部取自 Figma 手机帧：字号 / 行高 / 字距 / 颜色 / 相邻两块的竖向间距。
+   ════════════════════════════════════════════════════════════════ */
+.m-page{ display:none }
+
+@media (max-width:760px){
+  .wrap{ display:none }
+  .m-page{
+    display:block;
+    /* 102 = Figma 里 RESEARCH 那行小字的 y（导航条 76 高，下面留 26） */
+    padding:102px 20px 56px;
+    background:var(--bg);          /* 正片叠底要拿它当底色，不能是透明 */
+    color:var(--body); font-family:var(--sans);
+  }
+  /* 393 的帧里正文栏宽 353。更宽的屏（平板竖屏）给行宽封个顶，一行不超过 ~70 个字符 */
+  .m-in{ max-width:560px; margin:0 auto }
+
+  .m-page p, .m-page h1, .m-page h2, .m-page h3, .m-page figure{ margin:0 }
+  /* 竖向节奏：Figma 里相邻两块之间最常见的距离是 15px，其余的写在行内 */
+  .m-page .m-flow > *{ margin-top:15px }
+  .m-page .m-flow > :first-child{ margin-top:0 }
+
+  /* ---------- 文字 ---------- */
+  .m-eye { font-weight:600; font-size:13px; line-height:16px; letter-spacing:2.6px; color:var(--eyebrow) }
+  .m-h1  { font-weight:700; font-size:32px; line-height:38.4px; letter-spacing:-.4px; color:var(--ink) }
+  .m-lede{ font-size:17px; line-height:28.9px; color:var(--body) }
+  .m-h2  { font-weight:700; font-size:21px; line-height:25px; color:var(--ink) }
+  .m-p   { font-size:16px; line-height:28.5px; color:var(--body) }
+  .m-p.prob{ color:#8A8378 }
+  .m-p b { font-weight:700; color:var(--orange) }
+  .m-key { font-weight:600; font-size:13px; line-height:16px; color:var(--deep) }
+  .m-note{ font-size:13px; line-height:20.8px; color:var(--eyebrow) }
+  .m-dr  { font-weight:600; font-size:16px; line-height:19px; letter-spacing:2.6px; color:var(--orange) }
+  .m-reye{ font-weight:600; font-size:11.5px; line-height:14px; letter-spacing:2.07px; color:var(--orange) }
+  .m-rttl{ font-weight:700; font-size:26px; line-height:31px; color:var(--ink) }
+  .m-rp  { font-size:13.5px; line-height:23.6px; color:var(--body) }
+  .m-stn { font-weight:700; font-size:15px; line-height:18px; color:var(--orange) }
+  .m-stt { font-weight:600; font-size:11.5px; line-height:14.9px; color:var(--ink) }
+  .m-stb { font-size:9.5px; line-height:14.7px; color:var(--body) }
+  .m-ns  { font-size:9.5px; line-height:15.2px; color:var(--body) }
+  .m-fnc { font-weight:600; font-size:12px; line-height:15px; color:var(--ink) }
+  .m-atl { font-weight:600; font-size:10.5px; line-height:13px; letter-spacing:1.2px; color:var(--chip-tx) }
+
+  /* ---------- 元件 ---------- */
+  .m-mark{ width:57px; height:3px; background:var(--orange) }
+  .m-bar { width:calc(338 / 353 * 100%); height:3px; background:var(--hair) }
+  .m-pill{ width:max-content; max-width:100%; padding:10px 14px; border-radius:10px;
+           background:#F1A169; color:#fff; font-weight:700; font-size:16px; line-height:19px }
+  /* 规格标签。Figma 手机帧里这几个 chip 只有 13px 高（自动布局没给上下内边距），
+     这里按电脑版同一个组件做：22 高、1px 描边；排法照手机帧，一个一行。 */
+  .m-chip{ display:flex; align-items:center; width:max-content; max-width:100%; height:22px;
+           padding:0 11px; border:1px solid var(--chip-bd); border-radius:12px; background:var(--chip-bg);
+           font-weight:600; font-size:10.5px; letter-spacing:.63px; color:var(--chip-tx); white-space:nowrap }
+  .m-page .m-flow > .m-chip + .m-chip{ margin-top:6px }
+  .m-card{ position:relative; margin-left:calc((var(--x, 20) - 20) / 353 * 100%); width:calc(350 / 353 * 100%);
+           min-height:111px; padding:8px 22px 10px; border:1px solid #fff; border-radius:8px;
+           background:linear-gradient(180deg, rgba(255,255,255,.52), rgba(239,236,230,.52)) }
+  .m-card .ce{ font-weight:600; font-size:11px; line-height:13px; letter-spacing:2.2px; color:var(--orange) }
+  .m-card .ct{ margin-top:8px; font-weight:600; font-size:15px; line-height:18px; color:var(--deep) }
+  .m-card .cb{ margin-top:8px; font-size:13px; line-height:1.7; color:var(--body) }
+  /* 工作流底板：和电脑版 .plate 同一套（圆角 20、渐变 .63、没有描边） */
+  .m-plate{ position:relative; width:calc(var(--w) / 353 * 100%); border-radius:20px;
+            background:linear-gradient(180deg, rgba(255,255,255,.63), rgba(239,236,230,.63)) }
+  .m-plate > .m-im{ position:absolute; margin:0 }
+
+  /* ---------- 图框 ----------
+     --x / --w 是 Figma 帧里的 x 和宽，换成相对正文栏（353）的百分比；高度交给 aspect-ratio。
+     框里的 img 默认铺满；裁切和电脑版素材不一样的那几张，在行内写 left/top/width/height。 */
+  .m-im{ position:relative; overflow:hidden; width:calc(var(--w, 353) / 353 * 100%) }
+  /* 左缩进单独写、带上 .m-page —— 上面那条 .m-page figure{margin:0} 的优先级更高，会把它清掉 */
+  .m-page .m-im{ margin-left:calc((var(--x, 20) - 20) / 353 * 100%) }
+  .m-im > img{ position:absolute; left:0; top:0; width:100%; height:100%; display:block; max-width:none }
+  /* 正片叠底：Figma 里这些图的填充混合模式是 MULTIPLY。
+     ⚠ 图的祖先上不能有 transform / opacity<1 / filter，否则会生成隔离组、叠底失效
+       （所以下面折叠只用 hidden 显隐，不做淡入动画）。 */
+  .m-im.mult > img{ mix-blend-mode:multiply }
+  /* 色彩图谱那五张：Figma 里是 0.29px 的黑色虚线描边（内描边） */
+  .m-atlas{ border:.29px dashed #000; border-radius:8.6px }
+  /* 2026-09-22：后两张（READING / KITCHEN）的框从 209、204 宽统一放到 216，和前面对齐。
+     素材本身是按原来的窄框裁的，框变宽以后不能拉伸，所以用 cover：
+     等比放大 3%～6%，上下各裁掉一点点，不变形。前面几张框和素材比例一致，cover 对它们没影响。 */
+  .m-atlas > img{ object-fit:cover }
+
+  /* 几张图并排 / 错位叠放的组：组本身按比例缩放，里面按百分比摆 */
+  .m-grp{ position:relative }
+  .m-grp > .m-im{ position:absolute; margin:0 }
+  /* 触感符号下面的名字：以图的中线为准居中 */
+  .m-labs{ position:relative; height:15px }
+  .m-labs span{ position:absolute; top:0; transform:translateX(-50%); white-space:nowrap;
+                font-weight:600; font-size:12px; line-height:15px; color:#000; text-transform:uppercase }
+
+  /* 四层灯光列表：左图右文。Figma 里这一段用的是 Arial */
+  .m-lrow{ display:grid; grid-template-columns:41.08% 1fr; column-gap:3.96%; align-items:start }
+  .m-lrow > .m-im{ width:100%; margin-left:0 }
+  .m-lt{ display:flex; align-items:center; gap:6px; min-height:17px;
+         font-family:Arial,'Helvetica Neue',Helvetica,sans-serif; font-weight:700; font-size:13px; line-height:15px; color:#000 }
+  /* 编号：Figma 是 17px 的橙色实心圆 + 3px 同色描边（居中描边，所以看上去是 20px） */
+  .m-lt i{ flex:none; display:grid; place-items:center; width:17px; height:17px; border-radius:50%;
+           background:var(--orange); box-shadow:0 0 0 1.5px var(--orange);
+           font-style:italic; font-weight:700; font-size:13px; line-height:1; color:#fff }
+  .m-lb{ padding-left:1px; font-family:Arial,'Helvetica Neue',Helvetica,sans-serif; font-size:12px; line-height:14px; color:#000 }
+
+  /* 色块说明：三栏；最后一格字长，占两栏 */
+  .m-sw{ display:grid; grid-template-columns:35.69% 32.01% 1fr; row-gap:15px }
+  .m-sw i{ display:block; width:24px; height:24px; border-radius:4px }
+  .m-sw p{ margin-top:15px; font-size:12px; line-height:16.8px; color:var(--chip-tx) }
+  .m-sw .w2{ grid-column:span 2 }
+
+  /* ---------- Design Rules 三组：可折叠（和电脑版一样，默认收起） ---------- */
+  .m-page .m-flow > .m-trk + .m-trk{ margin-top:0 }
+  .m-trk-h{ display:flex; align-items:center; gap:12px; width:100%; min-height:52px;
+            padding:14px 0 13px; border:0; border-bottom:1px solid var(--hair); background:none;
+            cursor:pointer; font:inherit; color:inherit; text-align:left; -webkit-tap-highlight-color:transparent }
+  .m-track{ font-weight:700; font-size:17px; line-height:21px; letter-spacing:2.4px; color:var(--orange) }
+  .m-trk-n{ font-weight:600; font-size:11px; letter-spacing:2px; color:var(--eyebrow); white-space:nowrap }
+  .m-trk-c{ flex:none; margin-left:auto; width:14px; height:8px; color:var(--orange);
+            transition:transform .3s cubic-bezier(.2,.6,.2,1) }
+  .m-trk[data-open="true"] .m-trk-c{ transform:rotate(180deg) }
+  .m-trk-h:focus-visible{ outline:2px solid var(--orange); outline-offset:4px; border-radius:2px }
+  .m-trk-b{ padding:22px 0 44px }
+  /* 最后一组展开时，下面紧跟的是结尾那段话，不需要再留组间距 */
+  .m-trk:last-of-type .m-trk-b{ padding-bottom:0 }
+}
+@media (max-width:760px) and (prefers-reduced-motion:reduce){ .m-trk-c{ transition:none } }
+</style>
 </head>
 <body>
 
@@ -541,6 +676,278 @@ body{
 </div>
 </div>
 
+<!-- ════════════════════════════════════════════════════════════════
+     手机版（≤760）：照 Figma 3461:65「Research · 手机版 393」做的一栏排版
+     ----------------------------------------------------------------
+     电脑版上面那张 1440 画布一个字没动；这一块在电脑上是 display:none，
+     手机上反过来把画布藏掉、显示这一块。
+     · 竖向间距 = Figma 里相邻两块的实测距离（默认 15px，不是 15 的写在行内）
+     · 图框宽度按 353（393 帧的正文栏宽）换成百分比，其他手机宽度等比缩放
+     · 图片全部用电脑版已有的素材；Figma 手机帧里裁切和电脑版不同的几张，
+       在行内用 left/top/width/height 百分比还原同一个裁切（数值由裁切矩阵算出）
+     · class="m-im mult" 的 14 张 = Figma 里填充混合模式为「正片叠底」的图
+     ════════════════════════════════════════════════════════════════ -->
+<main class="m-page" id="m-page" aria-label="Research">
+<div class="m-in m-flow">
+
+  <p class="m-eye">RESEARCH</p>
+  <h1 class="m-h1">From Ageing Crisis<br>to Design Rules.</h1>
+  <p class="m-lede">Mnemosyne starts from a global ageing crisis, looks at how China’s seniors actually live, and turns what it finds into three sets of design rules for mobility, vision and memory decline.</p>
+
+  <!-- ── The Global Aging Crisis ── -->
+  <div class="m-mark"></div>
+  <h2 class="m-h2">The Global Aging Crisis</h2>
+  <p class="m-p">Europe, North America and East Asia have already crossed into deep ageing, with more than 19% of people over 65. China is not there yet, but it is climbing fast, and will soon carry the largest and fastest-growing older population in the world.</p>
+  <p class="m-pill" style="margin-top:21px">Super-Aged Society<br>(21+% Seniors)</p>
+  <figure class="m-im mult" style="margin-top:21px;--w:351;aspect-ratio:351/243"><img src="assets/research/aging-map.webp" alt="Global distribution of aging population" loading="lazy"></figure>
+  <p class="m-p" style="margin-top:24px">The numbers hide the daily reality: weaker legs, dimmer eyesight, harder hearing, slipping memory, fewer people to talk to. Most seniors simply live with these at home.</p>
+
+  <!-- ── Where Ageing Shows Up at Home ── -->
+  <div class="m-mark" style="margin-top:23px"></div>
+  <h2 class="m-h2">Where Ageing Shows Up at Home</h2>
+  <p class="m-p" style="margin-top:11px">Ageing looks different for everyone. Some lose their sense of direction, some cannot see or hear as well, others move slowly or find it harder to remember.</p>
+  <div class="m-grp" style="margin-top:13px;aspect-ratio:353/112">
+    <figure class="m-im" style="left:0;top:0;width:28.32%;height:100%"><img src="assets/research/home-a.webp" alt="Ageing at home A" loading="lazy"></figure>
+    <figure class="m-im" style="left:33.99%;top:0;width:29.18%;height:100%"><img src="assets/research/home-b.webp" alt="Ageing at home B" loading="lazy"></figure>
+    <figure class="m-im" style="left:68.56%;top:0;width:28.6%;height:100%"><img src="assets/research/home-c.webp" alt="Ageing at home C" loading="lazy"></figure>
+  </div>
+  <p class="m-key" style="margin-top:13px">A - Navigation Difficulty</p>
+  <p class="m-key">C - Physical Assistance Needs</p>
+  <p class="m-key">E - Risk Level/ Fall Risk</p>
+  <p class="m-key">B - Sensory Support Needs</p>
+  <p class="m-key">D - Cognitive Load</p>
+  <p class="m-p" style="margin-top:14px">We narrowed our focus to the three declines that most affect whether a person can still manage their own home: mobility, vision and memory. Each one becomes a person the design has to answer for.</p>
+
+  <!-- ── Three Key Aging Types ── -->
+  <div class="m-mark" style="margin-top:10px"></div>
+  <h2 class="m-h2">Three Key Aging Types</h2>
+  <div class="m-card" style="margin-top:18px;--x:21"><p class="ce">MOBILITY DECLINE</p><p class="ct">Knee arthritis + balance loss</p><p class="cb">Difficulty standing, sitting and<br>moving independently</p></div>
+  <div class="m-card" style="margin-top:18px;--x:21"><p class="ce">VISION DECLINE</p><p class="ct">Reduced contrast + poor night vision</p><p class="cb">Difficulty recognising boundaries<br>and destinations</p></div>
+  <div class="m-card" style="margin-top:18px"><p class="ce">MEMORY DECLINE</p><p class="ct">Short-term memory loss + disorientation</p><p class="cb">Difficulty remembering tasks,<br>objects and routes</p></div>
+  <p class="m-note" style="margin-top:18px">→ The three people behind these types, and how we rebuilt their rooms, are shown in WORKS.</p>
+
+  <!-- ── Problem Statement ── -->
+  <div class="m-mark"></div>
+  <h2 class="m-h2">Problem Statement</h2>
+  <p class="m-p prob">Aging does not arrive as a single condition—it unfolds differently for every person. Some lose balance, some lose clarity of vision, some lose memory or social connection. Our research shows that these layered difficulties are widespread, yet the spaces seniors live in rarely change with them.</p>
+  <figure class="m-im" style="margin-top:0;--x:19;--w:337.886;aspect-ratio:337.886/445"><img src="assets/research/problem-collage.webp" alt="Demographic collage" loading="lazy"></figure>
+  <p class="m-p prob" style="margin-top:14px">The real problem is not aging itself, but the mismatch between the changing body and the unchanging home. We need a design system that adapts to people, instead of forcing people to adapt to space.</p>
+
+  <!-- ── Limitations Of Existing Assistive Products ── -->
+  <div class="m-mark"></div>
+  <h2 class="m-h2">Limitations Of Existing Assistive Products</h2>
+  <p class="m-p">Across the case studies, eight recurring limitations reveal a common gap: existing solutions respond to isolated needs, but rarely adapt as an integrated living environment.</p>
+  <figure class="m-im mult" style="--w:338;aspect-ratio:338/225"><img src="assets/research/limitations.webp" alt="Eight recurring limitations" loading="lazy"></figure>
+
+  <!-- ── Design Statement ── -->
+  <div class="m-mark"></div>
+  <h2 class="m-h2">Design Statement</h2>
+  <div class="m-p"><p>We propose an <b>adaptive modular living system for older adults</b> that translates diverse patterns of physical, sensory, and cognitive decline into <b>customizable furniture, spatial configurations, and supportive domestic environments.</b></p><p>Rather than treating ageing as a fixed condition, the system recognizes that individual abilities and everyday needs continuously change over time. Through a flexible modular framework, spatial components can be <b>reconfigured, replaced, or adapted</b> in response to different levels of mobility, perception, and cognition, allowing the home to evolve alongside the changing body.</p></div>
+  <figure class="m-im" style="margin-top:12px;--w:338;aspect-ratio:338/133"><img src="assets/research/design-statement.webp" alt="Design statement diagram" loading="lazy"></figure>
+  <div class="m-p" style="margin-top:12px"><p>By integrating accessibility, spatial guidance, continuous physical support, and personalized furniture into one coherent system, the design aims to reduce the mismatch between residents and their existing domestic environments. Instead of requiring older adults to constantly adapt themselves to rigid spaces, <b>the environment becomes capable of adapting to them.</b></p><p>Through this personalized and evolving approach, the project seeks to support <b>independent living, everyday autonomy, dignity, and a greater sense of control,</b> transforming the home from a static backdrop into an active framework of care that responds to age-related changes in everyday life.</p></div>
+
+  <!-- ── Mnemosyne Design Workflow ── -->
+  <div class="m-mark" style="margin-top:6px"></div>
+  <h2 class="m-h2">Mnemosyne Design Workflow</h2>
+  <div class="m-plate" style="--w:338;aspect-ratio:338/140">
+    <figure class="m-im" style="left:2.07%;top:5.71%;width:95.86%;height:87.14%"><img src="assets/research/workflow.webp" alt="Mnemosyne design workflow" loading="lazy"></figure>
+  </div>
+
+  <!-- ══ DESIGN RULES ══ -->
+  <div class="m-bar"></div>
+  <p class="m-dr">DESIGN RULES</p>
+  <p class="m-lede">Every spatial decision follows three sets of adaptive rules, one each for mobility, vision and memory decline.</p>
+
+  <!-- 三组规则：Figma 手机帧里没有组标题，这里按电脑版补上 MOBILITY / VISION / MEMORY，
+       并保留电脑版的折叠（默认收起，点标题展开）。 -->
+  <section class="m-trk" data-open="false" style="margin-top:22px">
+    <button class="m-trk-h" type="button" aria-expanded="false" aria-controls="m-trk-mob">
+      <span class="m-track">MOBILITY DECLINE</span><span class="m-trk-n">3 RULES</span>
+      <svg class="m-trk-c" viewBox="0 0 14 8" fill="none" aria-hidden="true"><path d="M1 1.5L7 6.5L13 1.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="m-trk-b m-flow" id="m-trk-mob" hidden>
+      <p class="m-reye">RULE 1 — FURNITURE &amp; RESTRICTION</p>
+      <h3 class="m-rttl">Sized to the Body</h3>
+      <p class="m-chip">≤1220 mm reach</p>
+      <p class="m-chip">430-480 mm seat</p>
+      <p class="m-chip">bed h 450 mm</p>
+      <figure class="m-im mult" style="margin-top:22px;--w:278;aspect-ratio:278/261"><img src="assets/research/mob-r1-side.webp" alt="Reach diagram" loading="lazy" style="left:0;top:-1.15%;width:100%;height:101.15%"></figure>
+      <p class="m-rp" style="margin-top:13px">Reach, seating and bed heights follow ADA and China’s GB/T 46015-2025. Nothing she needs sits higher than 1220 mm, seats hold 430-480 mm, and the bed edge supports a lateral transfer from a wheelchair.</p>
+      <figure class="m-im" style="margin-top:13px;--w:338;aspect-ratio:338/244;border-radius:20px"><img src="assets/research/mob-r1-main.webp" alt="Body-sized furniture" loading="lazy"></figure>
+
+      <p class="m-reye" style="margin-top:16px">RULE 2 — CLEAR CIRCULATION ZONE</p>
+      <h3 class="m-rttl">One Route, No Obstacles</h3>
+      <p class="m-chip">≥1200 mm width</p>
+      <p class="m-chip">Ø1500 turn</p>
+      <p class="m-rp">A continuous route links entrance, bed, bathroom, kitchen and living area. The path stays at least 1200 mm wide (1500 preferred), with Ø1500 mm turning pockets at every decision point.</p>
+      <figure class="m-im mult" style="--x:22;--w:272;aspect-ratio:272/229"><img src="assets/research/mob-r2-side.webp" alt="Turning pocket" loading="lazy"></figure>
+      <figure class="m-im" style="margin-top:16px;--w:338;aspect-ratio:338/254;border-radius:20px"><img src="assets/research/mob-r2-main.webp" alt="One route, no obstacles" loading="lazy"></figure>
+
+      <p class="m-reye" style="margin-top:16px">RULE 3 — HANDRAIL GENERATION</p>
+      <h3 class="m-rttl">Support, Grown from Furniture</h3>
+      <p class="m-chip">5-step generation</p>
+      <p class="m-rp">Furniture modules are decomposed, arranged along circulation, and joined by continuous handrail paths, producing a room where support is built in, not added on.</p>
+      <figure class="m-im" style="margin-top:14px;--w:199;aspect-ratio:199/149"><img src="assets/research/gen-1.webp" alt="Component extraction" loading="lazy" style="left:-0.78%;top:-3.82%;width:102.1%;height:105.89%"></figure>
+      <p class="m-stn" style="margin-top:8px">1</p>
+      <p class="m-stt">Component Extraction</p>
+      <p class="m-stb">Furniture elements are decomposed into modular units, forming the base spatial components.</p>
+      <figure class="m-im" style="margin-top:45px;--w:199;aspect-ratio:199/161"><img src="assets/research/gen-2.webp" alt="Spatial configuration" loading="lazy" style="left:-1.24%;top:0.7%;width:103.42%;height:102.54%"></figure>
+      <p class="m-stn" style="margin-top:8px">2</p>
+      <p class="m-stt">Spatial Configuration</p>
+      <p class="m-stb">Modules are arranged according to spatial layout, circulation paths, and user movement patterns.</p>
+      <figure class="m-im" style="margin-top:41px;--w:225;aspect-ratio:225/160"><img src="assets/research/gen-3.webp" alt="Handrail path generation" loading="lazy" style="left:0.22%;top:-2.26%;width:90.12%;height:102.75%"></figure>
+      <p class="m-stn" style="margin-top:8px">3</p>
+      <p class="m-stt">Handrail Path Generation</p>
+      <p class="m-stb">Continuous support paths are generated along key movement routes, linking furniture and spatial edges.</p>
+      <figure class="m-im" style="margin-top:36px;--w:196;aspect-ratio:196/203"><img src="assets/research/gen-4.webp" alt="Integrated support system" loading="lazy" style="left:-6.09%;top:-0.82%;width:111.52%;height:105.68%"></figure>
+      <p class="m-stn">4</p>
+      <p class="m-stt">Integrated Support System</p>
+      <p class="m-stb">Handrails are embedded into the furniture system, forming a continuous and accessible spatial interface.</p>
+      <figure class="m-im" style="margin-top:32px;--x:33;--w:199;aspect-ratio:199/206"><img src="assets/research/gen-room.webp" alt="Generated room prototype" loading="lazy" style="left:-1.17%;top:-0.87%;width:102.05%;height:102.32%"></figure>
+      <p class="m-stn" style="margin-top:0">5</p>
+      <p class="m-stt" style="margin-top:13px">Generated Room Prototype</p>
+      <p class="m-stb">From handrail generation rules to a complete domestic spatial prototype.</p>
+    </div>
+  </section>
+
+  <section class="m-trk" data-open="false">
+    <button class="m-trk-h" type="button" aria-expanded="false" aria-controls="m-trk-vis">
+      <span class="m-track">VISION DECLINE</span><span class="m-trk-n">4 RULES</span>
+      <svg class="m-trk-c" viewBox="0 0 14 8" fill="none" aria-hidden="true"><path d="M1 1.5L7 6.5L13 1.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="m-trk-b m-flow" id="m-trk-vis" hidden>
+      <p class="m-reye">ADAPTIVE NAVIGATION FRAMEWORK</p>
+      <h3 class="m-rttl">Guidance that Matches Sight</h3>
+      <p class="m-chip">4 guidance levels</p>
+      <p class="m-rp">Four escalating levels of guidance meet the resident wherever her eyesight is: colour first, then touch, then light, then the robot. The home never asks for more vision than she has.</p>
+      <figure class="m-im" style="--w:338;aspect-ratio:338/300"><img src="assets/research/vis-nav-2.webp" alt="Guidance levels" loading="lazy"></figure>
+      <figure class="m-im" style="--w:338;aspect-ratio:338/444;border-radius:20px"><img src="assets/research/vis-nav.webp" alt="Adaptive navigation framework" loading="lazy"></figure>
+
+      <p class="m-reye" style="margin-top:22px">RULE 1 — CONTRAST SURFACE</p>
+      <h3 class="m-rttl">Boundaries You Can See</h3>
+      <p class="m-chip">dH &gt;= 90 deg</p>
+      <p class="m-chip">CR &gt;= 3.0</p>
+      <p class="m-rp">Without brightness or hue difference, rooms blur into one surface. Pairing tones with a hue gap of at least 90 degrees and holding contrast above 3.0 keeps every boundary readable, even with similar lightness.</p>
+      <figure class="m-im" style="--w:338;aspect-ratio:338/301"><img src="assets/research/vis-contrast-b.webp" alt="Contrast pairs" loading="lazy"></figure>
+      <figure class="m-im" style="margin-top:12px;--w:338;aspect-ratio:338/428;border-radius:20px"><img src="assets/research/vis-contrast-a.webp" alt="Contrast surfaces" loading="lazy"></figure>
+
+      <p class="m-reye" style="margin-top:11px">RULE 2 — TACTILE WALL PANEL</p>
+      <h3 class="m-rttl">Routes Read by Hand</h3>
+      <p class="m-chip">15 cm grip</p>
+      <p class="m-chip">cube-mounted</p>
+      <p class="m-rp">A continuous tactile language runs along the walls: raised symbols name each destination, 15 cm grip rails hold her steady, and the soft-light modules glow at night. Panels click straight onto the cube grid.</p>
+      <figure class="m-im" style="margin-top:25px;--w:338;aspect-ratio:338/482"><img src="assets/research/m-panel-system.webp" alt="Tactile wall panel system" loading="lazy"></figure>
+      <p class="m-ns" style="margin-top:25px">Panel rails are compatible with cube modules for easy and quick installation and use.</p>
+      <figure class="m-im mult" style="margin-top:13px;--x:7;--w:256;aspect-ratio:256/218"><img src="assets/research/m-panel-grip.webp" alt="Grip rail, 15 cm grip width, and soft light module" loading="lazy"></figure>
+      <p class="m-ns" style="margin-top:13px">The soft light module can provide lighting guidance for the elderly at night.</p>
+      <p class="m-ns" style="margin-top:0">Tactile Wall Panel is a tactile wall-guidance system for elderly people with declining vision. Raised patterns and symbols help users identify routes, directions, and destinations through touch, enabling safer, more independent navigation in age-friendly indoor environments.</p>
+      <!-- 九个触感符号：图和字的配对照 Figma 手机帧（按图片内容 hash 对回素材文件） -->
+      <div class="m-grp" style="aspect-ratio:353/134">
+        <figure class="m-im mult" style="left:-1.7%;top:0;width:34.84%;height:100%"><img src="assets/research/tactile-6.webp" alt="" loading="lazy" style="left:-1.58%;top:0;width:99.71%;height:100%"></figure>
+        <figure class="m-im mult" style="left:32%;top:0;width:34.84%;height:100%"><img src="assets/research/tactile-5.webp" alt="" loading="lazy" style="left:-1.58%;top:0;width:99.71%;height:100%"></figure>
+        <figure class="m-im mult" style="left:66.57%;top:0;width:34.84%;height:100%"><img src="assets/research/tactile-9.webp" alt="" loading="lazy" style="left:-1.58%;top:0;width:99.71%;height:100%"></figure>
+      </div>
+      <div class="m-labs"><span style="left:15.86%">READING AREA</span><span style="left:49.43%">TURN LEFT</span><span style="left:84%">BATHROOM</span></div>
+      <div class="m-grp" style="aspect-ratio:353/134">
+        <figure class="m-im mult" style="left:-1.7%;top:0;width:34.84%;height:100%"><img src="assets/research/tactile-10.webp" alt="" loading="lazy" style="left:-1.58%;top:0;width:99.71%;height:100%"></figure>
+        <figure class="m-im mult" style="left:33.14%;top:0;width:34.84%;height:100%"><img src="assets/research/tactile-2.webp" alt="" loading="lazy" style="left:-1.58%;top:0;width:99.71%;height:100%"></figure>
+        <figure class="m-im mult" style="left:66.86%;top:0;width:34.56%;height:100%"><img src="assets/research/tactile-7.webp" alt="" loading="lazy" style="left:-2%;top:0;width:100.52%;height:100%"></figure>
+      </div>
+      <div class="m-labs"><span style="left:15.72%">ACTIVITY AREA</span><span style="left:50.71%">TURN RIGHT</span><span style="left:84%">LIVING ROOM</span></div>
+      <div class="m-grp" style="aspect-ratio:353/134">
+        <figure class="m-im mult" style="left:-1.7%;top:0;width:34.84%;height:100%"><img src="assets/research/tactile-1.webp" alt="" loading="lazy" style="left:-1.58%;top:0;width:99.71%;height:100%"></figure>
+        <figure class="m-im mult" style="left:33.14%;top:0;width:34.56%;height:100%"><img src="assets/research/tactile-3.webp" alt="" loading="lazy" style="left:-2%;top:0;width:100.52%;height:100%"></figure>
+        <figure class="m-im mult" style="left:66.86%;top:0;width:34.84%;height:100%"><img src="assets/research/tactile-8.webp" alt="" loading="lazy" style="left:-1.58%;top:0;width:99.71%;height:100%"></figure>
+      </div>
+      <div class="m-labs"><span style="left:15.86%">ENTRANCE/EXIT</span><span style="left:50.28%">BEDROOM</span><span style="left:84.28%">KITECHEN</span></div>
+
+      <p class="m-reye" style="margin-top:45px">RULE 3 — SMART PATH</p>
+      <h3 class="m-rttl">A Floor that Points the Way</h3>
+      <p class="m-chip">tactile dots</p>
+      <p class="m-chip">directional grooves</p>
+      <p class="m-rp">Two tactile surfaces guide her underfoot. Raised dots mark decision points and destinations; linear grooves keep her moving in the right direction between them.</p>
+      <figure class="m-im" style="--w:263;aspect-ratio:263/150"><img src="assets/research/m-floor-dots.webp" alt="Tactile alert surface: raised tactile dots indicate decision points, functional zones, and intersections. Navigation path, destination marker." loading="lazy"></figure>
+      <div class="m-grp" style="margin-top:0;aspect-ratio:353/161">
+        <figure class="m-im" style="left:0;top:6.21%;width:27.48%;height:93.79%"><img src="assets/research/m-floor-grooves.webp" alt="Directional guidance surface" loading="lazy" style="left:-3.51%;top:0;width:302.39%;height:100%"></figure>
+        <figure class="m-im" style="left:37.39%;top:0;width:35.13%;height:93.79%"><img src="assets/research/m-floor-grooves.webp" alt="Directional Guidance Surface: linear tactile grooves provide continuous directional guidance, supporting safe navigation and orientation throughout the home." loading="lazy" style="left:-106.1%;top:0;width:236.52%;height:100%"></figure>
+      </div>
+      <figure class="m-im" style="margin-top:14px;--w:339;aspect-ratio:339/170"><img src="assets/research/floor-plan.webp" alt="Smart path plan" loading="lazy"></figure>
+
+      <p class="m-reye" style="margin-top:44px">RULE 4 — ADAPTIVE LIGHT SYSTEM</p>
+      <h3 class="m-rttl">Four Layers of Light</h3>
+      <p class="m-chip">1800-6500 K</p>
+      <p class="m-chip">4 layers</p>
+      <p class="m-rp">Ceiling ambient, furniture edge, touch-panel and floor path lights work as one system, tunable from 1800 K to 6500 K so brightness and warmth follow the hour and the task.</p>
+      <figure class="m-im" style="margin-top:14px;--w:338;aspect-ratio:338/246;border-radius:8.47px"><img src="assets/research/light-room.webp" alt="Four layers of light" loading="lazy"></figure>
+      <div class="m-lrow" style="margin-top:20px">
+        <figure class="m-im" style="aspect-ratio:144.886/75.236;border-radius:4.56px"><img src="assets/research/light-1.webp" alt="Ceiling ambient light" loading="lazy"></figure>
+        <div><p class="m-lt"><i>1</i>Ceiling Ambient Light</p><p class="m-lb" style="margin-top:15px">Provides uniform ambient illumination for the entire space</p></div>
+      </div>
+      <div class="m-lrow" style="margin-top:15px">
+        <figure class="m-im" style="margin-top:7px;aspect-ratio:145.135/77.82;border-radius:4.56px"><img src="assets/research/light-2.webp" alt="Furniture edge light" loading="lazy"></figure>
+        <div><p class="m-lt"><i>2</i>Furniture Edge Light</p><p class="m-lt" style="margin-top:17px"><i>3</i>Touchable Panel Light</p><p class="m-lb" style="margin-top:13px">Integrated lighting along furniture enhances visibility and support</p></div>
+      </div>
+      <div class="m-lrow" style="margin-top:16px">
+        <figure class="m-im" style="aspect-ratio:145/78;border-radius:4.56px"><img src="assets/research/light-3.webp" alt="Navigation path light" loading="lazy"></figure>
+        <div><p class="m-lt"><i>4</i>Navigation Path Light</p><p class="m-lb" style="margin-top:11px">Floor-integrated guidance lighting supports safe movement and orientation</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="m-trk" data-open="false">
+    <button class="m-trk-h" type="button" aria-expanded="false" aria-controls="m-trk-mem">
+      <span class="m-track">MEMORY DECLINE</span><span class="m-trk-n">3 RULES</span>
+      <svg class="m-trk-c" viewBox="0 0 14 8" fill="none" aria-hidden="true"><path d="M1 1.5L7 6.5L13 1.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="m-trk-b m-flow" id="m-trk-mem" hidden>
+      <p class="m-reye">RULE 1 — LOOPED CIRCULATION</p>
+      <h3 class="m-rttl">One Loop, One Decision at a Time</h3>
+      <p class="m-chip">1 loop</p>
+      <p class="m-chip">0 dead ends</p>
+      <p class="m-rp">The plan closes into a single loop. No intersections, no dead ends: functional zones line up along one continuous route, so he only ever faces one destination at a time.</p>
+      <figure class="m-im" style="--w:338;aspect-ratio:338/143"><img src="assets/research/loop-1.webp" alt="Looped circulation 1" loading="lazy"></figure>
+      <figure class="m-im" style="--w:338;aspect-ratio:338/124"><img src="assets/research/loop-2.webp" alt="Looped circulation 2" loading="lazy"></figure>
+      <figure class="m-im" style="--w:338;aspect-ratio:338/313"><img src="assets/research/loop-3.webp" alt="Looped circulation plan" loading="lazy"></figure>
+
+      <p class="m-reye">RULE 2 — COLOUR AS MEMORY CUE</p>
+      <h3 class="m-rttl">One Function, One Colour</h3>
+      <p class="m-rp">Each zone keeps one fixed colour: yellow for cooking, purple for rest, blue for hygiene, green for nature, light blue for reading. The room states its purpose before he has to remember it.</p>
+      <p class="m-chip">1 function = 1 colour</p>
+      <figure class="m-im" style="margin-top:18px;--w:338;aspect-ratio:338/261;border-radius:20px"><img src="assets/research/colour-rooms.webp" alt="One function, one colour" loading="lazy"></figure>
+      <p class="m-fnc" style="margin-top:11px">One Function = One Colour</p>
+      <div class="m-sw">
+        <div><i style="background:#E9A11A"></i><p>Yellow —<br>Kitchen / Cooking</p></div>
+        <div><i style="background:#A9A2B5"></i><p>Purple —<br>Bedroom / Rest</p></div>
+        <div><i style="background:#8099AF"></i><p>Blue —<br>Bathroom / Hygiene</p></div>
+        <div><i style="background:#939C83"></i><p>Green —<br>Nature / Relaxation</p></div>
+        <div class="w2"><i style="background:#A7AFC2"></i><p>Light Blue —<br>Reading / Cognitive Activity</p></div>
+      </div>
+
+      <p class="m-reye">RULE 3 — COLOUR ATLAS</p>
+      <h3 class="m-rttl">The Palette that Holds the Plan</h3>
+      <p class="m-rp">Five rooms, five fixed hues. The atlas keeps the palette stable across every rebuild, so the home may change shape but never changes its colours.</p>
+      <p class="m-chip">5 zone colours</p>
+      <!-- 五张图谱：图在上、名字在下（照 Figma 手机帧）。
+           ⚠ 素材的文件名和画面错开了一位（atlas-bedroom.webp 画的是绿墙、
+           colour-kitchen.webp 画的是紫色卧室……），这里按**画面内容**配名字，别按文件名。 -->
+      <figure class="m-im m-atlas" style="--w:216;aspect-ratio:216/387"><img src="assets/research/colour-kitchen.webp" alt="Bedroom" loading="lazy"></figure>
+      <p class="m-atl">BEDROOM</p>
+      <figure class="m-im m-atlas" style="--w:216;aspect-ratio:216/387"><img src="assets/research/atlas-bedroom.webp" alt="Green wall" loading="lazy"></figure>
+      <p class="m-atl">GREEN WALL</p>
+      <figure class="m-im m-atlas" style="--w:220;aspect-ratio:220/387"><img src="assets/research/atlas-green.webp" alt="Bathroom" loading="lazy"></figure>
+      <p class="m-atl">BATHROOM</p>
+      <figure class="m-im m-atlas" style="--w:216;aspect-ratio:216/387"><img src="assets/research/atlas-bathroom.webp" alt="Reading" loading="lazy"></figure>
+      <p class="m-atl">READING</p>
+      <figure class="m-im m-atlas" style="--w:216;aspect-ratio:216/387"><img src="assets/research/atlas-reading.webp" alt="Kitchen" loading="lazy"></figure>
+      <p class="m-atl">KITCHEN</p>
+    </div>
+  </section>
+
+  <p class="m-p" style="margin-top:28px">Different needs call for a flexible furniture system. The Cube modules turn these rules into rooms that can be rebuilt as those needs change.</p>
+
+</div>
+</main>
+
 <script>
 /* ---------- 1440 画布缩到视口宽度（和 flow-carer 各页同一个做法）----------
    包裹层的高度要跟着算，否则缩小之后底下会多出一大截空白。 */
@@ -555,13 +962,31 @@ body{
   var endEl = document.getElementById('rules-end');
   var H = 13724, shrinkTo = 0, timer = null;
 
-  /* ⚠ 纯按宽度缩放在手机上会自己反过来咬人：
-     393 的屏幕算出来 k = 0.27，画布里 13px 的正文变成 3.5px ——
-     整张图还在，一个字都读不了。这一页是照着 Figma 1440 画板逐坐标转写的，
-     重排成手机版等于重画整页，所以退一步：给缩放一个**可读下限**，
-     低于下限就不再缩，改成横向可以拖。
-     和 cube-system / 医护版那几页用的是同一套做法和同一组数。 */
-  var MIN_K = 0.72, PAN_MAX = 1024, hintGone = false;
+  /* ── 缩放策略（2026-09-22 改：横向拖 → 只上下滑）──────────────────
+     这一页是照着 Figma 1440 画板逐坐标转写的固定画布（228 个绝对定位元素），
+     重排成真正的手机版等于重画整页，所以只能整幅缩放。
+
+     以前的做法是给缩放设一个「可读下限」MIN_K = 0.72，低于下限就不再缩、
+     改成横向可以拖 —— 理由是 393 的屏幕算出来 k = 0.27，20px 的正文会变成
+     5.5px，读不了。
+
+     但那样在 393 上画布画出来是 1440 × 0.72 = 1037 宽，比屏幕宽 644px：
+     读者得**一边往下滚一边往右拖**，两个方向同时走，比字小更难受。
+     现在去掉下限，k 一律按屏宽算，整幅缩进屏幕，只剩上下一个方向。
+     整页高度也从 9881px 收到 3746px，一路滑到底就看完了。
+
+     字小这件事交给系统解决：这一页的 viewport 是
+     width=device-width, initial-scale=1 —— 没有 user-scalable=no，
+     也没有 maximum-scale，所以双指放大是开着的。
+     和实体展板一个读法：先看全貌，想读就凑近。
+
+     ⚠ panned 这个开关**不能**跟着一起去掉。它控制的不只是"能不能横拖"，
+       更关键的是 transform-origin：.canvas 是 1440 宽、margin-inline:auto，
+       原点默认在 top center（也就是 x=720）。塞进 393 的容器后缩到 0.273，
+       内容会落在 523–917 这一段 —— 整个在可视区外面，被 .wrap 的
+       overflow:hidden 裁得一干二净，**整页全白**。（第一次改的时候就是
+       只动了 MIN_K，白屏白得莫名其妙。）
+       所以窄屏仍然要走这条分支去改原点，只是把 overflowX 从 auto 换成 hidden。 */
   /* 初值必须是 false，不能是 null：
      电脑端一进来 panned 就是 false，如果这里写 null，第一次 fit() 会走
      "状态变了"的分支，把 transform-origin / margin 这几个行内样式**清一遍**。
@@ -570,10 +995,67 @@ body{
      但那不是"没改动"。所以电脑端这几行一次都不要执行。 */
   var wasPanned = false;
 
+
+  /* ── 让画布避开固定导航条（2026-09-22 加）────────────────────────
+     导航条是 position:fixed、高 76px 的一条，压在页面最上层。
+     画布自己在画板坐标里是从 y=150 开始的（第一个元素是 "RESEARCH" 那行小字），
+     所以桌面端 k=1 时它落在 150 px，稳稳在导航下面 —— 一直没问题。
+
+     但缩放之后这个距离会跟着缩，导航条的 76px 却是**不缩的**：
+       k=1    → 画布顶 150 px，在导航下面 ✅
+       k=0.62 → 94 px，还够 ✅
+       k=0.42 → 63 px，开始被压 ❌
+       k=0.27 → 41 px，标题整行被导航吃掉 ❌
+     交界点在 k = 76/150 ≈ 0.507，也就是窗口宽约 730 px。
+     以前不会碰到，是因为 k 被 MIN_K 卡在 0.72、最矮也有 108 px；
+     这次把下限去掉之后手机上就撞上了。
+
+     解决：算一算差多少，用 padding 把画布顶下去，保证离导航底边至少留 16px。
+     k=1 时算出来是负数 → 取 0 → 桌面端一个像素都不动。
+     ⚠ 用 padding 而不是 margin：margin 会和 body 发生外边距折叠，
+       行为不好预测；而 * { box-sizing:border-box } 之下 padding 是算在
+       height 里面的，所以下面那行 height 要把它加回去，否则底部会被
+       .wrap 的 overflow:hidden 裁掉一截。 */
+  var navEl = document.querySelector('.nav');
+  var NAV_H = (navEl && navEl.offsetHeight) || 76;
+  /* ⚠ 名字不能叫 TOP0：research.html 里已经有一个 var TOP0 = 5445（第一条 track
+     的画板 y），同一个 IIFE 作用域里再声明一次会把它**改写成 150**，
+     于是 apply() 会把三条 track 从 y=150 开始排 —— 整段内容压到标题上面。
+     （这次就是这么翻车的，截图里 MOBILITY 那组直接盖在首屏上。） */
+  var CANVAS_TOP = (function(){
+    /* 画布子元素全是绝对定位、top 写在行内样式里，直接读行内值最准 ——
+       不受当前缩放影响，也不用等布局。 */
+    var min = Infinity;
+    for (var i = 0; i < cv.children.length; i++){
+      var t = parseFloat(cv.children[i].style.top);
+      if (!isNaN(t) && t < min) min = t;
+    }
+    return isFinite(min) ? min : 150;
+  })();
   function fit(){
+    /* 手机版（≤760）画布整个藏着（显示的是下面的 .m-page），不缩放：清掉行内样式。
+       wasPanned 也要复位 —— 否则窗口从手机宽拉回电脑宽时，下面那段"状态变了"的
+       分支不会再走，transform-origin 回不到 top left，画布会被画偏。 */
+    if (window.__MNEMO_LIN && window.__MNEMO_LIN()){
+      cv.style.removeProperty('--k');
+      cv.style.transformOrigin = ''; cv.style.marginLeft = ''; cv.style.marginRight = '';
+      wrap.style.overflowX = ''; wrap.style.height = ''; wrap.style.paddingTop = '';
+      wasPanned = false;
+      return;
+    }
     var raw = Math.min(1, window.innerWidth / 1440);
-    var panned = raw < MIN_K && window.innerWidth < PAN_MAX;
-    var k = panned ? MIN_K : raw;
+    /* 只要发生了缩放（raw < 1），就必须把原点挪到 top left。
+       ⚠ 这里以前还挂着一个 && innerWidth < PAN_MAX(1024) 的条件，
+         那是"横向拖动模式"时代留下的闸 —— 当时的目的是别让笔记本一拖窄
+         就跳进拖动模式。但它同时也把**改原点**这件事一起挡在了 1024 以上，
+         于是 1024–1439 这一段（1280 这种最常见的笔记本宽度正好在里面）
+         原点仍停在 top center，1440 的盒子在更窄的容器里被画偏：
+           1280 → 左边空 80px、右边被 .wrap 的 overflow:hidden 裁掉 80px
+           1100 → 各 170px
+           1024 → 各 208px
+         这是改成竖向之前就有的问题，量出来才发现。去掉那个条件一并修掉。 */
+    var panned = raw < 1;
+    var k = raw;
     cv.style.setProperty('--k', k);
 
     if (panned !== wasPanned){
@@ -583,8 +1065,7 @@ body{
            负的 margin-right 把布局宽度收回 1440*k，右边才不会多出滚不到的空白。 */
         cv.style.transformOrigin = 'top left';
         cv.style.marginLeft  = '0';
-        wrap.style.overflowX = 'auto';
-        wrap.style.webkitOverflowScrolling = 'touch';
+        wrap.style.overflowX = 'hidden';   /* 整幅已经缩进屏幕，没有东西可横拖了 */
       } else {
         cv.style.transformOrigin = '';
         cv.style.marginLeft  = '';
@@ -594,27 +1075,17 @@ body{
       wasPanned = panned;
     }
     if (panned) cv.style.marginRight = (1440 * k - 1440) + 'px';
-    wrap.style.height = (H * k) + 'px';
 
-    /* ⚠ 提示条不能插进文档流：这一页的导航是 position:fixed，
-       插在 .wrap 前面正好被压在导航底下，一个字看不见。
-       钉在屏幕底部，横向拖过一次或点一下就收起来。 */
+    var pad = Math.max(0, NAV_H + 16 - CANVAS_TOP * k);
+    wrap.style.paddingTop = pad + 'px';
+    wrap.style.height = (H * k + pad) + 'px';
+
+    /* 底部那条 "Scroll as usual — drag sideways…" 的提示已经撤掉：
+       现在没有横向可拖，那句话是错的指引。
+       历史版本里它是一个 id="panhint" 的浮动按钮；万一某次导航残留了一个
+       （比如从别的页面 bfcache 回来），这里顺手清掉。 */
     var el = document.getElementById('panhint');
-    if (!panned || hintGone){ if (el) el.remove(); return; }
-    if (el) return;
-    el = document.createElement('button');
-    el.id = 'panhint';
-    el.type = 'button';
-    el.textContent = 'Scroll as usual — drag sideways for the rest of the width';
-    el.style.cssText = 'position:fixed;left:12px;right:12px;bottom:12px;z-index:80;'
-      + 'margin:0;padding:11px 14px;border:0;border-radius:18px;'
-      + 'font:inherit;font-size:12px;line-height:1.4;text-align:center;'
-      + 'color:#F4F0E8;background:rgba(26,25,23,.88);cursor:pointer;'
-      + 'box-shadow:0 6px 20px rgba(0,0,0,.24)';
-    var go = function(){ hintGone = true; if (el.parentNode) el.remove(); };
-    el.addEventListener('click', go);
-    wrap.addEventListener('scroll', go, { once:true, passive:true });
-    document.body.appendChild(el);
+    if (el) el.remove();
   }
   function setH(h){ H = h; cv.style.height = h + 'px'; fit(); }
 
@@ -679,6 +1150,32 @@ body{
   });
   document.addEventListener('keydown', function(e){
     if (e.key === 'Escape') set(false);
+  });
+})();
+</script>
+
+<script>
+/* ════════════════════════════════════════════════════════════════
+   手机版（≤760）：Design Rules 三组的折叠
+   ----------------------------------------------------------------
+   以前这里是一大段「拆平」脚本 —— 在手机上把 1440 画布按坐标重新排序、
+   塞成一栏。现在手机版按 Figma 3461:65 单独排好了（上面的 .m-page），
+   那段自动排序就不需要了，只剩三组标题的点开 / 收起。
+   ════════════════════════════════════════════════════════════════ */
+(function(){
+  var MOBILE = window.matchMedia('(max-width:760px)');
+  /* 上面 fit() 靠这个判断「现在是不是手机版」：是的话画布整个藏着，不用去算缩放 */
+  window.__MNEMO_LIN = function(){ return MOBILE.matches; };
+
+  [].forEach.call(document.querySelectorAll('.m-trk'), function(t){
+    var h = t.querySelector('.m-trk-h'), b = t.querySelector('.m-trk-b');
+    h.addEventListener('click', function(){
+      var open = t.dataset.open !== 'true';
+      t.dataset.open = open ? 'true' : 'false';
+      h.setAttribute('aria-expanded', open ? 'true' : 'false');
+      /* 只用 hidden 显隐，不做淡入：opacity 动画会让组里正片叠底的图失效 */
+      b.hidden = !open;
+    });
   });
 })();
 </script>

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-mobile="stack">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -404,7 +404,33 @@ p.sub{
 .lockbar{ position:absolute; left:121px; top:884px; width:900px;
   font-size:9px; line-height:13px; color:#B0570F; letter-spacing:.06em;
   text-transform:none; }
+
+/* ── 窄屏（≤1023）：第 1 步的表单 ─────────────────────────────
+   外壳（页头、右卡、对话框、底部按钮）的一栏排法在 assets/carer-mobile.css，
+   这里只管这一页左边的表单：三列输入框改成一栏，Age/Gender、
+   Lives with/Home type 两两并排（class="half"，电脑端不认这个类）；
+   三组 chips 的标签提到上面，chips 整行换行，高度放到 34 好按。 */
+@media (max-width:1023px){
+  .stage > .panel{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); column-gap:16px }
+  .stage > .panel > *{ grid-column:1 / -1; position:relative !important; left:auto !important;
+    top:auto !important; right:auto !important; width:auto !important }
+  .stage > .panel > .half{ grid-column:auto }
+  .stage > .panel > .f{ margin-top:16px }
+  .stage > .panel > .f > input{ height:36px; padding-bottom:6px }
+  .stage > .panel > .useex{ position:absolute !important; right:18px !important; top:18px !important }
+  .stage > .panel > .expop{ position:absolute !important; left:12px !important; right:12px !important;
+    top:46px !important; width:auto !important }
+  .stage > .panel > .derive{ margin-top:6px; max-width:none; text-align:left }
+  .stage > .panel > .nrow{ height:auto; margin-top:16px }
+  .nrow .flab{ position:static; display:inline-block; width:auto; font-size:13px }
+  .nrow .bs{ position:static; display:inline-block; margin-left:10px; height:auto; padding:4px 2px }
+  .nrow .chiprow{ position:static; width:auto; margin-top:10px; gap:8px }
+  .nrow .chip{ height:34px; padding:0 14px; font-size:13px }
+  .stage > .panel > .count{ grid-column:1; align-self:center }
+  .stage > .panel > .skip{ grid-column:2; justify-self:end; padding:8px 0 }
+}
 </style>
+<link rel="stylesheet" href="assets/carer-mobile.css?v=20260922">
 </head>
 
 <body>
@@ -468,20 +494,20 @@ p.sub{
       <label for="k-pname">Name</label>
       <input id="k-pname" data-k="name" autocomplete="off" placeholder="Ying Zhang">
     </div>
-    <div class="f" style="left:396px;top:196px;width:100px">
+    <div class="f half" style="left:396px;top:196px;width:100px">
       <label for="k-age">Age</label>
       <input id="k-age" data-k="age" inputmode="numeric" autocomplete="off" placeholder="72">
     </div>
-    <div class="f" style="left:520px;top:196px;width:176px">
+    <div class="f half" style="left:520px;top:196px;width:176px">
       <label for="k-gender">Gender</label>
       <input id="k-gender" data-k="gender" autocomplete="off" placeholder="She / her">
     </div>
 
-    <div class="f" style="left:32px;top:276px;width:216px">
+    <div class="f half" style="left:32px;top:276px;width:216px">
       <label for="k-lives">Lives with</label>
       <input id="k-lives" data-k="lives" autocomplete="off" placeholder="Alone">
     </div>
-    <div class="f" style="left:272px;top:276px;width:216px">
+    <div class="f half" style="left:272px;top:276px;width:216px">
       <label for="k-home">Home type</label>
       <input id="k-home" data-k="home" autocomplete="off" placeholder="Ground-floor flat">
     </div>
@@ -579,20 +605,48 @@ p.sub{
 
      只有第 1 步这么做。第 2–5 步刷新也清的话，会卡在一个没有数据、
      什么都画不出来的页面上。
-     ⬆ 必须写在 carer-core.js **之前** —— 那个文件在文末就「立刻读档」了。 -->
+     ⬆ 必须写在 carer-core.js **之前** —— 那个文件在文末就「立刻读档」了。
+
+     ── ?new=1 = 从档案页「+ Record a visit」进来，开下一位（2026-09-22）──
+     问题：走完第一位（签了字）→ 档案页 → 点右上角「+ Record a visit」，
+     回到这一页看到的还是上一位的资料，而且整张表是锁着的改不了。
+     原因：那两个「+」按钮原来就是普通链接 ./flow-carer.html，
+     这一页一加载就把 sessionStorage 里那份**已签字**的档案读回来，
+     签过字的档案按规矩是只读的（carer-core.js 的 C.applyLock）。
+     「新建」这条路（home-file-empty.html 的 startFresh）会先清掉旧档案，
+     但档案页的这两个「+」没走那条路。
+
+     现在档案页的两个「+」改成 ./flow-carer.html?new=1，到这里判断：
+       · 旧档案**已签字** → 它已经是一份完成的记录，清掉，开一份空白的
+       · 旧档案**还没签字** → 是一份没做完的草稿，不清，接着填（不丢东西）
+     只在 'navigate'（真的点进来）时清；清完用 replaceState 把 ?new=1
+     从地址栏去掉 —— 否则第 2 步按浏览器「后退」回到这里，
+     地址还带着 new=1，会把正在填的这一位误清掉。 -->
 <script>
 (function(){
   try{
     var e = performance.getEntriesByType && performance.getEntriesByType('navigation')[0];
     var t = e ? e.type
           : (performance.navigation && performance.navigation.type === 1 ? 'reload' : 'navigate');
-    if (t !== 'reload') return;
+
+    var wipe = (t === 'reload');
+    var q = new URLSearchParams(location.search);
+    if (q.get('new') === '1'){
+      if (t === 'navigate'){
+        var old = JSON.parse(sessionStorage.getItem('mnemo:carer') || 'null');
+        if (old && old.signedAt) wipe = true;
+      }
+      q.delete('new');
+      var rest = q.toString();
+      history.replaceState(history.state, '', location.pathname + (rest ? '?' + rest : '') + location.hash);
+    }
+    if (!wipe) return;
     ['mnemo:carer', 'mnemo:carer:thought', 'mnemo:carer:forked']
       .forEach(function(k){ sessionStorage.removeItem(k); });
   }catch(err){}
 })();
 </script>
-<script src="assets/carer-core.js?v=20260917"></script>
+<script src="assets/carer-core.js?v=20260922"></script>
 <script>
 (function(){
 'use strict';
@@ -776,7 +830,7 @@ C.boot({
   },
 
   miss: function(){
-    return 'I could not place that. Type it straight into a field on the left — that always works.';
+    return 'I could not place that. Type it straight into a field ' + C.where() + ' — that always works.';
   },
 
   render: function(){
@@ -817,7 +871,7 @@ C.boot({
       if (!n){
         /* 刚进来，11 格一个都没填 —— 此时报「还差你的姓名、你的职位…」
            等于把左边表单又读了一遍，还会折成两行。这种时候只说一句。 */
-        note.textContent = 'Fill in the file on the left to continue.';
+        note.textContent = 'Fill in the file ' + C.where() + ' to continue.';
         note.classList.add('show');
       } else if (left.length){
         /* 填了一半，这时候「到底差哪几格」才是真的难找。只列前三个。 */
@@ -905,7 +959,7 @@ C.boot({
     });
     C.stamp(); C.render();
     C.push('Filled in from the example file for ' + p.name
-         + '. It is an example, not a real client — change anything on the left.');
+         + '. It is an example, not a real client — change anything ' + C.where() + '.');
   }
 })();
 })();

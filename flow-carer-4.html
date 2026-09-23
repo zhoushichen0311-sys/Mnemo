@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-mobile="stack">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -248,7 +248,45 @@ p.sub{ position:absolute; left:140px; top:94px; width:800px; font-size:14.5px; l
 .lockbar{ position:absolute; left:121px; top:884px; width:900px;
   font-size:9px; line-height:13px; color:#B0570F; letter-spacing:.06em;
   text-transform:none; }
+
+/* ── 窄屏（≤1023）：第 4 步的 3D 预览 + 改动记录 ──────────────
+   外壳的一栏排法在 assets/carer-mobile.css，这里只管这一页：
+   · 3D 框占满面板宽，高度按 4:3（手机竖着拿，比电脑上的 16:9 更看得清房间）；
+   · 分数和说明一行，三个操作按钮自动换行；说明文字的 left 是 JS 按分数宽度现算的，
+     手机上不用它，改成跟在分数后面；
+   · 右边改动记录：每一条原来按 50px 一格绝对摆放、外框固定高，
+     手机上改成跟内容长，一条一行，OT 标签在右。 */
+@media (max-width:1023px){
+  .stage > .panel{ display:grid; grid-template-columns:auto minmax(0,1fr); column-gap:14px; align-items:center }
+  .stage > .panel > *{ position:relative !important; left:auto !important; top:auto !important;
+    right:auto !important }
+  .stage > .panel > .view{ grid-column:1 / -1; width:auto; height:auto; aspect-ratio:4 / 3 }
+  .view > svg{ width:70%; height:auto; max-height:80% }
+  .stage > .panel > .slab{ grid-column:1 / -1; margin-top:18px }
+  .stage > .panel > .score{ grid-column:1; margin-top:4px }
+  .stage > .panel > .snote{ grid-column:2; margin-top:4px; line-height:18px }
+  .stage > .panel > .acts{ grid-column:1 / -1; margin-top:14px; flex-wrap:wrap; gap:8px }
+  .act{ height:38px; border-radius:19px }
+
+  .stage > aside.log > *{ position:relative !important; left:auto !important; top:auto !important;
+    width:auto !important }
+  .stage > aside.log .sub2{ margin-top:6px; line-height:18px }
+  .stage > aside.log .hair{ margin:16px 0 }
+  .stage > aside.log .rows{ height:auto; overflow:visible }
+  .stage > aside.log .empty{ font-size:13px; line-height:18px; margin:4px 0 }
+  .lrow{ position:relative !important; top:auto !important; left:auto; width:100%; height:auto;
+    display:grid; grid-template-columns:40px minmax(0,1fr) auto; column-gap:10px; row-gap:3px;
+    padding:9px 0 11px; align-items:start }
+  .lrow .t{ position:static; grid-column:1; grid-row:1; padding-top:3px }
+  .lrow .w{ position:static; grid-column:2; grid-row:1; width:auto }
+  .lrow .b{ position:static; grid-column:2; grid-row:2; width:auto }
+  .lrow .tag{ position:static; grid-column:3; grid-row:1 }
+  .lrow .rh{ position:absolute; left:0; right:0; top:auto; bottom:0; width:auto }
+  .stage > aside.log .foot{ margin-top:0 }
+  .stage > aside.log .undo{ margin-top:8px; padding:6px 0 }
+}
 </style>
+<link rel="stylesheet" href="assets/carer-mobile.css?v=20260922">
 </head>
 
 <body>
@@ -341,7 +379,7 @@ p.sub{ position:absolute; left:140px; top:94px; width:800px; font-size:14.5px; l
 
 <script src="assets/llm.js?v=20260917"></script>
 <script src="assets/nlu-rules.js"></script>
-<script src="assets/carer-core.js?v=20260917"></script>
+<script src="assets/carer-core.js?v=20260922"></script>
 <script>
 (function(){
 'use strict';

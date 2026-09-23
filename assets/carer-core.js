@@ -161,11 +161,33 @@ C.PAN_MAX = 1024;   /* 只有窄过这个宽度才启用下限。
                        正好压在下限边上 —— 不设这道闸，电脑端窗口一拖窄就会
                        跳进"横向拖动"模式，那不是这次要动的东西。 */
 
+/* ── 2026-09-22：窄屏改成一栏重排，只上下滑 ────────────────────
+   页面 <head> 里 link 了 assets/carer-mobile.css（并在 <html> 上标
+   data-mobile="stack"）的，窄于 1024 时整页按那份样式重排成一栏，
+   这里就**不再缩放**：把缩放留下的行内样式全部清掉，交给 CSS。
+   ≥1024 的电脑端走下面原来那段，一行没改。
+   没标 data-mobile 的页面（万一有）照旧走老的「缩到 0.72 + 左右拖」。 */
+C.STACK_MAX = 1023;
+C.stacked = function(){
+  return document.documentElement.getAttribute('data-mobile') === 'stack' &&
+         window.matchMedia('(max-width:' + C.STACK_MAX + 'px)').matches;
+};
+
+/* 文案里「左边的表单」在一栏排版里是「上面的表单」 */
+C.where = function(){ return C.stacked() ? 'above' : 'on the left'; };
+
 C.fitStage = function(){
   var stage = $('stage'), wrap = $('stagewrap');
   if (!stage || !wrap) return;
 
   function fit(){
+    if (C.stacked()){
+      stage.style.removeProperty('--k');
+      stage.style.transformOrigin = ''; stage.style.marginRight = '';
+      wrap.style.justifyContent = ''; wrap.style.overflowX = ''; wrap.style.height = '';
+      hint(false);
+      return;
+    }
     var raw = Math.min(1, window.innerWidth / 1440);
     var panned = raw < C.MIN_K && window.innerWidth < C.PAN_MAX;
     var k = panned ? C.MIN_K : raw;

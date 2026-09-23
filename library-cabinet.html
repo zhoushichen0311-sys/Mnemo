@@ -190,15 +190,22 @@ main{ padding-top:var(--nav-h) }
   object-fit:contain; object-position:center;
   filter:drop-shadow(0 10px 13px rgba(62,52,42,.15));
 }
+/* 左右留白必须对称（2026-09-22 改）：以前只写了左边 18，右边是 0，
+   桌面端卡片 269 宽、文字一行放得下，右边还剩 56px，看不出问题；
+   到了手机两栏，卡片只有 150 多宽，尺寸那行一折行就一路顶到右边框，
+   实测 375 宽下离边框只剩 1–2px。 */
 .card .nm{
-  margin:16px 0 0 18px; font-size:16px; font-weight:700; line-height:19px;
+  margin:16px 18px 0 18px; font-size:16px; font-weight:700; line-height:19px;
   color:var(--title);
 }
 .card .dim{
-  margin:9px 0 31px 18px; font-size:12px; font-weight:500; line-height:15px;
+  margin:9px 18px 31px 18px; font-size:12px; font-weight:500; line-height:15px;
   letter-spacing:.48px; color:var(--body);
 }
 .card .dim b{ font-weight:500; color:var(--meta); margin-right:10px }
+/* 数值整体不许拆开 —— 以前会从中间的 × 断开，变成
+   「2.1 × 1.5 ×」/「0.45 m」两截，读起来像两个数。 */
+.card .dim span{ white-space:nowrap }
 
 /* ============================================================
    点卡片展开 —— 沿用旧版 furniture-library 的交互时序，
@@ -312,11 +319,22 @@ footer.foot{
   .grid{ grid-template-columns:repeat(4, 1fr) }
   .card{ width:auto }
 }
-@media (max-width:1000px){ .grid{ grid-template-columns:repeat(3, 1fr) } }
+@media (max-width:1000px){
+  .grid{ grid-template-columns:repeat(3, 1fr) }
+  /* 卡片窄到放不下一整行时，标签单独一行、数值另起一行，
+     比让它随便在哪个 × 处折断整齐得多。 */
+  .card .dim b{ display:block; margin:0 0 3px }
+}
 @media (max-width:760px){
   :root{ --pad:24px }
   .grid{ grid-template-columns:repeat(2, 1fr) }
   .head h1{ font-size:32px; line-height:40px }
+  /* 两栏手机：卡片 146（360 宽）～163（393 宽）。最长的数值
+     「0.9 × 0.75 × 0.45 m」按桌面字号是 125px，360 宽下装不进。
+     字号 12→11.5、字距 .48→.2、左右留白 18→14 之后约 115px，
+     360 宽也有富余，而且数值不用折行。 */
+  .card .nm{ margin:14px 14px 0 14px }
+  .card .dim{ margin:8px 14px 24px 14px; font-size:11.5px; letter-spacing:.2px }
 }
 </style>
 </head>
@@ -449,7 +467,7 @@ document.getElementById('grid').innerHTML = CABINETS.map(function(s, i){
        +     ' loading="lazy" decoding="async">'
        +   '</div>'
        +   '<p class="nm">' + s.nm + '</p>'
-       +   '<p class="dim"><b>L × W × H</b>' + s.dim + '</p>'
+       +   '<p class="dim"><b>L × W × H</b><span>' + s.dim + '</span></p>'
        + '</button>';
 }).join('');
 

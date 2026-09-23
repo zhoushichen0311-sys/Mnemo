@@ -38,6 +38,15 @@ var CSS = [
   '  box-shadow:0 10px 30px rgba(0,0,0,.26);',
   '  transition:opacity .28s ease, transform .28s cubic-bezier(.22,.7,.3,1)}',
   '#mnemo-toast.is-on{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto}',
+  /* 手机（≤760）：上面那种 left:50% + translateX(-50%) 的居中，在 fixed 定位下
+     盒子最多只能有「屏幕宽的一半」那么宽 —— 393 的手机上只有 196px，
+     一句话被挤成五六行的窄黑块。电脑上一半也有 500 多，比上限 560 差不多，看不出来。
+     窄屏改成左右各留 16px 撑开、margin:auto 居中；多行时圆角改小，不再是胶囊形。
+     （2026-09-22。home-file-resident.html 里另有一份同样的覆盖，还管着给底栏让位，留着不冲突。） */
+  '@media (max-width:760px){',
+  '  #mnemo-toast{left:16px;right:16px;width:auto;margin-inline:auto;transform:translateY(10px);border-radius:22px}',
+  '  #mnemo-toast.is-on{transform:translateY(0)}',
+  '}',
   '@media (prefers-reduced-motion:reduce){#mnemo-toast{transition-duration:.01s}}'
 ].join('');
 

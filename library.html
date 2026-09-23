@@ -210,9 +210,16 @@ footer.foot{
 
 @media (max-width:1300px){ :root{ --pad:56px } }
 @media (max-width:1000px){
-  .row{ grid-template-columns:1fr; gap:28px }
-  .objs{ justify-content:flex-start; height:240px }
-  :root{ --band-h:240px }
+  /* 单栏时文字在上、图在下。间距 40：要明显大于「简介 → View all」的 26，
+     View all 才读得出是上面那段文字的收尾，而不是下面这张图的标题。 */
+  .row{ grid-template-columns:1fr; gap:40px }
+  /* ⚠ 图框高度必须跟着图走（2026-09-22 改）：
+     以前这里写的是 height:240px，但图片尺寸是 JS 按 BAND_H = 280 算好、
+     写进行内样式的，CSS 改不到它。于是 280 的图塞进 240 的框，
+     框又是底对齐（align-items:flex-end），多出来的 40px 全往上顶 ——
+     吃掉了 28px 的间距还倒扣 12px，图直接压在 View all 上。
+     改成 auto，框贴着图的实际高度，间距就只由上面的 gap 决定。 */
+  .objs{ justify-content:flex-start; height:auto }
 }
 @media (max-width:760px){
   :root{ --pad:24px }
