@@ -164,7 +164,10 @@ body[data-wide] .said .log{max-height:none;flex:1;min-height:0}
    这一版是大字、一屏一问，所以文案比另外两版短一档。 */
 .fork{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--space-lg);
   margin:var(--space-xl) 0 0;padding:0;list-style:none}
-.fcard{width:100%;text-align:left;font:inherit;cursor:pointer;background:var(--color-chip);
+/* color 必须写：<button> 不写文字颜色时用浏览器默认色 —— 电脑 Chrome 是黑的，
+   iPhone（Safari 和 App 内置浏览器）是系统蓝，卡片标题就成了一片蓝字（2026-09-23）。
+   下面 .tcard / .pal / .way 同理。 */
+.fcard{width:100%;text-align:left;font:inherit;color:var(--color-ink);cursor:pointer;background:var(--color-chip);
   border:var(--rule-chip) solid var(--color-chip-edge);border-radius:var(--radius-card);
   padding:var(--space-lg);min-height:var(--size-tap);
   transition:background var(--dur-short) var(--ease-out),border-color var(--dur-short) var(--ease-out)}
@@ -239,7 +242,7 @@ body[data-wide] .said .log{max-height:none;flex:1;min-height:0}
 
 .types{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--space-lg);
   margin:var(--space-xl) 0 0;padding:0;list-style:none}
-.tcard{width:100%;text-align:left;font:inherit;cursor:pointer;background:var(--color-chip);
+.tcard{width:100%;text-align:left;font:inherit;color:var(--color-ink);cursor:pointer;background:var(--color-chip);
   border:var(--rule-chip) solid var(--color-chip-edge);border-radius:var(--radius-card);
   padding:var(--space-md) var(--space-lg) var(--space-lg);
   transition:background var(--dur-short) var(--ease-out),border-color var(--dur-short) var(--ease-out)}
@@ -366,7 +369,7 @@ html.v-big{overflow:hidden}
 /* 整屋配色是几套成品方案，不是一块料，所以做成一行带说明的按钮 */
 .pals{display:grid;gap:var(--space-sm);margin:0;padding:0;list-style:none}
 .pal{display:flex;align-items:center;gap:var(--space-md);width:100%;text-align:left;
-  font:inherit;cursor:pointer;background:var(--color-chip);
+  font:inherit;color:var(--color-ink);cursor:pointer;background:var(--color-chip);
   border:var(--rule-hair) solid var(--color-rule);border-radius:var(--radius-card);
   padding:var(--space-sm) var(--space-lg);min-height:var(--size-tap)}
 .pal[aria-pressed="true"]{border-color:var(--color-accent);background:var(--color-paper)}
@@ -385,7 +388,7 @@ html.v-big{overflow:hidden}
 /* 第 5 步 · 四种寄出方式 */
 .ways{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--space-lg);
   margin:var(--space-xl) 0 0;padding:0;list-style:none;max-width:868px}
-.way{width:100%;text-align:left;font:inherit;cursor:pointer;background:var(--color-chip);
+.way{width:100%;text-align:left;font:inherit;color:var(--color-ink);cursor:pointer;background:var(--color-chip);
   border:var(--rule-chip) solid var(--color-chip-edge);border-radius:var(--radius-card);
   padding:var(--space-lg);transition:background var(--dur-short) var(--ease-out),border-color var(--dur-short) var(--ease-out)}
 .way:hover{border-color:var(--color-ink)}
