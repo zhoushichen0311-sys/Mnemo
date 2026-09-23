@@ -514,6 +514,22 @@ body.is-demo #tl{ margin-bottom:14px }
   .stack{ grid-template-rows:auto auto }
   .person{ grid-template-columns:44px 1fr; row-gap:12px }
   .status,.dots,.more{ grid-column:2 }
+
+  /* 三个点（More）挪到右上角（2026-09-23）：
+     上面那条让它和状态、点条一样排进第 2 列、自己占一行，
+     按钮被拉满整列宽 —— 三个点就飘在点条下面、卡片正中间，像是掉下来的。
+     电脑上它在每一行的最右端；手机上对应的位置是卡片右上角、和名字同一行，
+     这也是手机上「更多」按钮最常见的位置。
+     按钮原来只有 16px 高、几乎没有内边距，手指很难点中；
+     这里给到 40×40 的点按区域，三个点本身的大小和颜色不变。 */
+  .person{ grid-template-columns:44px minmax(0,1fr) auto }
+  .status,.dots{ grid-column:2 / -1 }
+  .more{ grid-column:3; grid-row:1; align-self:center;
+    width:40px; height:40px; margin:-4px -10px -4px 0; place-content:center }
+  /* 顺手：360 宽时这一行（10 根小条 + 「10/10」）比卡片里的空间宽 20px 左右，
+     「10/10」顶出卡片右边。小条允许在放不下时变窄一点（最窄 4px），数字不压缩。 */
+  .dots i{ flex:0 1 7px; min-width:4px }
+  .dots span{ flex:none; margin-left:14px }
 }
 /* ── 手机 ─────────────────────────────────────────────────
    桌面这页是 1440 的看板：侧栏竖着、卡片并排、几处小标签靠绝对坐标
